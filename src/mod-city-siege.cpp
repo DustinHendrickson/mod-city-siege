@@ -645,21 +645,30 @@ void EndSiegeEvent(SiegeEvent& event)
     DespawnSiegeCreatures(event);
     AnnounceSiege(city, false);
 
-    if (g_RewardOnDefense && defendersWon)
+    // Determine which faction owns the city
+    bool isAllianceCity = (event.cityId == CITY_STORMWIND || event.cityId == CITY_IRONFORGE || 
+                          event.cityId == CITY_DARNASSUS || event.cityId == CITY_EXODAR);
+
+    if (g_RewardOnDefense)
     {
-        // Determine which faction defended the city
-        bool isAllianceCity = (event.cityId == CITY_STORMWIND || event.cityId == CITY_IRONFORGE || 
-                              event.cityId == CITY_DARNASSUS || event.cityId == CITY_EXODAR);
-        
-        // Reward the defending faction (0 = Alliance, 1 = Horde)
-        int winningTeam = isAllianceCity ? 0 : 1;
-        DistributeRewards(event, city, winningTeam);
+        if (defendersWon)
+        {
+            // Defenders won - reward defending faction (0 = Alliance, 1 = Horde)
+            int winningTeam = isAllianceCity ? 0 : 1;
+            DistributeRewards(event, city, winningTeam);
+        }
+        else
+        {
+            // Attackers won (city leader killed) - reward attacking faction
+            int winningTeam = isAllianceCity ? 1 : 0; // Opposite faction
+            DistributeRewards(event, city, winningTeam);
+        }
     }
 
     if (g_DebugMode)
     {
-        LOG_INFO("server.loading", "[City Siege] Ended siege event at {} - Defenders {}", 
-                 city.name, defendersWon ? "won" : "lost");
+        LOG_INFO("server.loading", "[City Siege] Ended siege event at {} - {} won", 
+                 city.name, defendersWon ? "Defenders" : "Attackers");
     }
 }
 
@@ -667,8 +676,9 @@ void EndSiegeEvent(SiegeEvent& event)
  * @brief Distributes rewards to players who defended the city.
  * @param event The siege event that ended.
  * @param city The city that was defended.
+ * @param winningTeam The team ID to reward (0=Alliance, 1=Horde, -1=all players)
  */
-void DistributeRewards(const SiegeEvent& event, const CityData& city, int winningTeam = -1)
+void DistributeRewards(const SiegeEvent& event, const CityData& city, int winningTeam)
 {
     Map* map = sMapMgr->FindMap(city.mapId, 0);
     if (!map)

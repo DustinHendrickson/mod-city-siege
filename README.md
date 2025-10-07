@@ -6,7 +6,9 @@
 
 Overview
 --------
-The City Siege module for AzerothCore adds dynamic, timed siege events to all major cities in World of Warcraft. On a random, configurable timer, opposing faction forces assault a major city, spawning enemy units outside the city limits who march toward the city leader while engaging defenders. Enemy forces spawn at the city outskirts and use pathfinding and waypoints to march into the city, attacking the faction leader as their primary objective. Defenders must protect their city leaders or face defeat. Successful defense is rewarded with honor and gold scaled by player level. This module creates exciting world events that encourage player participation in defending their cities and creates a more dynamic, living world experience.
+The City Siege module for AzerothCore adds dynamic, timed siege events to all major cities in World of Warcraft. On a random, configurable timer, opposing faction forces assault a major city, spawning enemy units outside the city limits who march toward the city leader while engaging defenders. Enemy forces spawn at the city outskirts and use pathfinding and waypoints to march into the city, attacking the faction leader as their primary objective. 
+
+**Both factions can win rewards:** Defenders earn rewards if they protect their city leader until the event ends, while attackers earn rewards if they successfully kill the city leader. This creates competitive PvE content where both Alliance and Horde players have incentive to participate. The module features fully configurable spawn locations, creature entries, reward scaling, and RP elements to create exciting world events that encourage faction participation and creates a more dynamic, living world experience.
 
 > [!CAUTION]
 > THIS MODULE IS IN ACTIVE DEVELOPMENT. IT PROBABLY WON’T WORK, WILL SOMETIMES WORK POORLY, AND MAY RANDOMLY DECIDE TO TAKE A VACATION. DO NOT USE ON AN ACTIVE SERVER OR EXPECT ANYTHING RESEMBLING RELIABILITY UNTIL THIS NOTICE IS GONE.
@@ -39,9 +41,11 @@ Features
 - **City-Specific Configuration:**  
   Enable or disable events for individual cities.
 - **Reward System:**  
-  Automatic honor (100 default) and level-scaled gold rewards for successful defenders (base 50 silver + 50 silver per level).
-- **Victory Detection:**  
-  System checks if city leader survived to determine defense success.
+  Automatic honor (100 default) and level-scaled gold rewards for winning faction players (base 50 silver + 50 silver per level).
+- **Dual Victory Conditions:**  
+  Defenders win if the city leader survives, attackers win if they kill the city leader. Both outcomes reward the winning faction.
+- **Faction-Based Rewards:**  
+  Only players of the winning faction receive rewards - defenders get rewards if they protect their city, attackers get rewards if they conquer it.
 - **Automatic Cleanup:**  
   Creatures despawn after event ends, preventing database pollution.
 - **Debug Mode:**  
@@ -303,19 +307,34 @@ How It Works
    System verifies if the city leader survived using configured leader positions.
 
 10. **Resolution:**  
-    Event ends, creatures despawn, and rewards are distributed to nearby defenders (if leader survived and RewardOnDefense is enabled).
+    - **If Defenders Win** (city leader survives): Defending faction players receive rewards (Alliance for Alliance cities, Horde for Horde cities)
+    - **If Attackers Win** (city leader killed): Attacking faction players receive rewards (Horde conquering Alliance cities, Alliance conquering Horde cities)
+    - Creatures despawn and event ends
 
 ### Event Mechanics
 
 - **Target Priority:**  
   Siege forces prioritize the city leader but will attack players and NPCs in their path based on aggro configuration.
 
+- **Victory Conditions:**
+  - **Defenders Win:** City leader survives the full event duration
+  - **Attackers Win:** City leader is killed before event ends
+  - Only the winning faction receives rewards
+
 - **Automatic Rewards:**  
-  Successful defenders within the configured radius receive:
+  Winning faction players within the configured radius receive:
   - Honor points (configurable, default 100)
   - Gold scaled by level: Base amount (default 50 silver at level 1) + additional gold per level (default 50 silver per level)
     * Example: Level 80 player receives 50 silver + (50 silver × 80) = 40.5 gold
   - Confirmation message (configurable)
+  
+- **Faction-Specific Rewards:**
+  - Alliance cities (Stormwind, Ironforge, Darnassus, Exodar):
+    * Alliance players rewarded if leader survives
+    * Horde players rewarded if leader is killed
+  - Horde cities (Orgrimmar, Undercity, Thunder Bluff, Silvermoon):
+    * Horde players rewarded if leader survives
+    * Alliance players rewarded if leader is killed
 
 Customization
 -------------
