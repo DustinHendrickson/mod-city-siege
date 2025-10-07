@@ -1,7 +1,7 @@
 # AzerothCore Module: City Siege
 
 <p align="center">
-  <img src="./icon.png" alt="City Siege Icon" title="City Siege Icon">
+  <img src="./icon.png" alt="City Siege Icon" title="City Siege Icon" width="256">
 </p>
 
 Overview
