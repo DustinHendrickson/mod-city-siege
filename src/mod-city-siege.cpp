@@ -66,15 +66,17 @@ static uint32 g_SpawnCountElites = 5;
 static uint32 g_SpawnCountMiniBosses = 2;
 static uint32 g_SpawnCountLeaders = 1;
 
-// Creature entries
-static uint32 g_CreatureAllianceMinion = 14425;
-static uint32 g_CreatureAllianceElite = 14428;
-static uint32 g_CreatureAllianceMiniBoss = 14762;
-static uint32 g_CreatureAllianceLeader = 16441;
-static uint32 g_CreatureHordeMinion = 14423;
-static uint32 g_CreatureHordeElite = 14426;
-static uint32 g_CreatureHordeMiniBoss = 14763;
-static uint32 g_CreatureHordeLeader = 16440;
+// Creature entries - Using Mount Hyjal battle units for thematic appropriateness
+// Alliance attackers: Footman, Knights, Riflemen, Priests
+static uint32 g_CreatureAllianceMinion = 17919;   // Alliance Footman
+static uint32 g_CreatureAllianceElite = 17920;    // Alliance Knight  
+static uint32 g_CreatureAllianceMiniBoss = 17921; // Alliance Rifleman
+static uint32 g_CreatureAllianceLeader = 17928;   // Alliance Priest (commander)
+// Horde attackers: Grunts, Tauren Warriors, Headhunters, Shamans
+static uint32 g_CreatureHordeMinion = 17932;      // Horde Grunt
+static uint32 g_CreatureHordeElite = 17933;       // Tauren Warrior
+static uint32 g_CreatureHordeMiniBoss = 17934;    // Horde Headhunter
+static uint32 g_CreatureHordeLeader = 17936;      // Horde Shaman (commander)
 
 // Aggro settings
 static bool g_AggroPlayers = true;
@@ -203,15 +205,15 @@ void LoadCitySiegeConfiguration()
     g_SpawnCountMiniBosses = sConfigMgr->GetOption<uint32>("CitySiege.SpawnCount.MiniBosses", 2);
     g_SpawnCountLeaders = sConfigMgr->GetOption<uint32>("CitySiege.SpawnCount.Leaders", 1);
 
-    // Creature entries
-    g_CreatureAllianceMinion = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Minion", 14425);
-    g_CreatureAllianceElite = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Elite", 14428);
-    g_CreatureAllianceMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.MiniBoss", 14762);
-    g_CreatureAllianceLeader = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Leader", 16441);
-    g_CreatureHordeMinion = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Minion", 14423);
-    g_CreatureHordeElite = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Elite", 14426);
-    g_CreatureHordeMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.MiniBoss", 14763);
-    g_CreatureHordeLeader = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Leader", 16440);
+    // Creature entries - Mount Hyjal battle units
+    g_CreatureAllianceMinion = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Minion", 17919);   // Alliance Footman
+    g_CreatureAllianceElite = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Elite", 17920);     // Alliance Knight
+    g_CreatureAllianceMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.MiniBoss", 17921); // Alliance Rifleman
+    g_CreatureAllianceLeader = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Leader", 17928);   // Alliance Priest
+    g_CreatureHordeMinion = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Minion", 17932);         // Horde Grunt
+    g_CreatureHordeElite = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Elite", 17933);           // Tauren Warrior
+    g_CreatureHordeMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.MiniBoss", 17934);     // Horde Headhunter
+    g_CreatureHordeLeader = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Leader", 17936);         // Horde Shaman
 
     // Aggro settings
     g_AggroPlayers = sConfigMgr->GetOption<bool>("CitySiege.AggroPlayers", true);
@@ -459,18 +461,18 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         float y = city.spawnY + spawnRadius * sin(currentAngle);
         float z = city.spawnZ;
         
-        // Get proper ground height
-        float groundZ = map->GetHeight(x, y, z + 10.0f, true);
+        // Get proper ground height - check from above
+        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
         if (groundZ > INVALID_HEIGHT)
         {
-            z = groundZ;
+            z = groundZ + 0.5f; // Slightly above ground to prevent clipping
         }
         
         if (Creature* creature = map->SummonCreature(minionEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
-            // Spawn opposite faction as attackers: Horde attacks Alliance cities, Alliance attacks Horde cities
-            creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
+            // Set to friendly/neutral during cinematic phase - will be changed to hostile after
+            creature->SetFaction(35); // Friendly to all during RP
             event.spawnedCreatures.push_back(creature->GetGUID());
             
             if (g_DebugMode)
@@ -488,17 +490,17 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         float y = city.spawnY + (spawnRadius * 0.7f) * sin(currentAngle);
         float z = city.spawnZ;
         
-        // Get proper ground height
-        float groundZ = map->GetHeight(x, y, z + 10.0f, true);
+        // Get proper ground height - check from above
+        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
         if (groundZ > INVALID_HEIGHT)
         {
-            z = groundZ;
+            z = groundZ + 0.5f;
         }
         
         if (Creature* creature = map->SummonCreature(eliteEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
+            creature->SetFaction(35); // Friendly to all during RP
             event.spawnedCreatures.push_back(creature->GetGUID());
         }
         currentAngle += spawnAngleStep;
@@ -511,17 +513,17 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         float y = city.spawnY + (spawnRadius * 0.5f) * sin(currentAngle);
         float z = city.spawnZ;
         
-        // Get proper ground height
-        float groundZ = map->GetHeight(x, y, z + 10.0f, true);
+        // Get proper ground height - check from above
+        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
         if (groundZ > INVALID_HEIGHT)
         {
-            z = groundZ;
+            z = groundZ + 0.5f;
         }
         
         if (Creature* creature = map->SummonCreature(miniBossEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
+            creature->SetFaction(35); // Friendly to all during RP
             event.spawnedCreatures.push_back(creature->GetGUID());
         }
         currentAngle += spawnAngleStep;
@@ -534,17 +536,17 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         float y = city.spawnY + (10.0f * sin(currentAngle));
         float z = city.spawnZ;
         
-        // Get proper ground height
-        float groundZ = map->GetHeight(x, y, z + 10.0f, true);
+        // Get proper ground height - check from above
+        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
         if (groundZ > INVALID_HEIGHT)
         {
-            z = groundZ;
+            z = groundZ + 0.5f;
         }
         
         if (Creature* creature = map->SummonCreature(leaderEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
+            creature->SetFaction(35); // Friendly to all during RP
             event.spawnedCreatures.push_back(creature->GetGUID());
             
             // Make leader yell on spawn
@@ -814,8 +816,11 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 LOG_INFO("server.loading", "[City Siege] Cinematic phase ended, combat begins");
             }
             
-            // Make creatures aggressive after cinematic phase
+            // Determine the city faction
             const CityData& city = g_Cities[event.cityId];
+            bool isAllianceCity = (event.cityId <= CITY_EXODAR);
+            
+            // Make creatures aggressive after cinematic phase
             Map* map = sMapMgr->FindMap(city.mapId, 0);
             if (map)
             {
@@ -823,7 +828,10 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 {
                     if (Creature* creature = map->GetCreature(guid))
                     {
-                        // Determine react state based on configuration
+                        // Set proper hostile faction: Horde attacks Alliance cities, Alliance attacks Horde cities
+                        creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
+                        
+                        // Set react state based on configuration
                         if (g_AggroPlayers && g_AggroNPCs)
                         {
                             creature->SetReactState(REACT_AGGRESSIVE);
@@ -837,16 +845,25 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             creature->SetReactState(REACT_DEFENSIVE);
                         }
                         
-                        // Enable walking and proper pathfinding
-                        creature->SetWalk(true);
+                        // Clear any existing movement and set to walk
+                        creature->GetMotionMaster()->Clear(false);
+                        creature->GetMotionMaster()->MoveIdle();
+                        creature->SetWalk(false); // Run to the leader
+                        
+                        // Get proper height at destination
+                        float destZ = map->GetHeight(city.leaderX, city.leaderY, city.leaderZ + 50.0f, true, 50.0f);
+                        if (destZ <= INVALID_HEIGHT)
+                        {
+                            destZ = city.leaderZ;
+                        }
                         
                         // Move toward the configured leader location with pathfinding
-                        creature->GetMotionMaster()->Clear();
-                        creature->GetMotionMaster()->MovePoint(0, city.leaderX, city.leaderY, city.leaderZ, true); // true = use pathfinding
+                        creature->GetMotionMaster()->MovePoint(0, city.leaderX, city.leaderY, destZ, true);
                         
                         if (g_DebugMode)
                         {
-                            LOG_INFO("server.loading", "[City Siege] Creature {} activated and moving to leader", creature->GetEntry());
+                            LOG_INFO("server.loading", "[City Siege] Creature {} activated, faction set to {}, moving to ({}, {}, {})", 
+                                     creature->GetEntry(), isAllianceCity ? 83 : 84, city.leaderX, city.leaderY, destZ);
                         }
                     }
                 }

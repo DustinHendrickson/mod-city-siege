@@ -286,55 +286,57 @@ CitySiege.SpawnCount.Leaders = 1
 # Creature Entry Configurations
 ###############################################
 # These define which creature entries to use for siege forces.
-# Customize these based on your server's creature_template table.
+# Using Mount Hyjal battle units for authentic faction warfare feel.
+# Alliance attackers spawn Footmen, Knights, Riflemen, and Priests.
+# Horde attackers spawn Grunts, Tauren Warriors, Headhunters, and Shamans.
 
 #
 #    CitySiege.Creature.Alliance.Minion
 #        Description: Creature entry for Alliance city attackers (regular minions).
-#        Default:     14425 (Generic soldier)
-CitySiege.Creature.Alliance.Minion = 14425
+#        Default:     17919 (Alliance Footman from Mount Hyjal)
+CitySiege.Creature.Alliance.Minion = 17919
 
 #
 #    CitySiege.Creature.Alliance.Elite
 #        Description: Creature entry for Alliance city attackers (elites).
-#        Default:     14428 (Generic elite)
-CitySiege.Creature.Alliance.Elite = 14428
+#        Default:     17920 (Alliance Knight from Mount Hyjal)
+CitySiege.Creature.Alliance.Elite = 17920
 
 #
 #    CitySiege.Creature.Alliance.MiniBoss
 #        Description: Creature entry for Alliance city attackers (mini-bosses).
-#        Default:     14762 (Generic boss)
-CitySiege.Creature.Alliance.MiniBoss = 14762
+#        Default:     17921 (Alliance Rifleman from Mount Hyjal)
+CitySiege.Creature.Alliance.MiniBoss = 17921
 
 #
 #    CitySiege.Creature.Alliance.Leader
 #        Description: Creature entry for Alliance city attackers (faction leaders).
-#        Default:     16441 (Generic leader)
-CitySiege.Creature.Alliance.Leader = 16441
+#        Default:     17928 (Alliance Priest from Mount Hyjal)
+CitySiege.Creature.Alliance.Leader = 17928
 
 #
 #    CitySiege.Creature.Horde.Minion
 #        Description: Creature entry for Horde city attackers (regular minions).
-#        Default:     14423 (Generic soldier)
-CitySiege.Creature.Horde.Minion = 14423
+#        Default:     17932 (Horde Grunt from Mount Hyjal)
+CitySiege.Creature.Horde.Minion = 17932
 
 #
 #    CitySiege.Creature.Horde.Elite
 #        Description: Creature entry for Horde city attackers (elites).
-#        Default:     14426 (Generic elite)
-CitySiege.Creature.Horde.Elite = 14426
+#        Default:     17933 (Tauren Warrior from Mount Hyjal)
+CitySiege.Creature.Horde.Elite = 17933
 
 #
 #    CitySiege.Creature.Horde.MiniBoss
 #        Description: Creature entry for Horde city attackers (mini-bosses).
-#        Default:     14763 (Generic boss)
-CitySiege.Creature.Horde.MiniBoss = 14763
+#        Default:     17934 (Horde Headhunter from Mount Hyjal)
+CitySiege.Creature.Horde.MiniBoss = 17934
 
 #
 #    CitySiege.Creature.Horde.Leader
 #        Description: Creature entry for Horde city attackers (faction leaders).
-#        Default:     16440 (Generic leader)
-CitySiege.Creature.Horde.Leader = 16440
+#        Default:     17936 (Horde Shaman from Mount Hyjal)
+CitySiege.Creature.Horde.Leader = 17936
 
 #
 #    CitySiege.AggroPlayers
