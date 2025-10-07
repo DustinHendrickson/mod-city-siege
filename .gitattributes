@@ -1,0 +1,20 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Source code
+*.cpp text
+*.h text
+*.sql text
+*.cmake text
+*.sh text eol=lf
+
+# Documentation
+*.md text
+*.txt text
+
+# Configuration
+*.conf text
+*.dist text
+
+# Scripts should always use LF
+*.sh text eol=lf

@@ -1,0 +1,254 @@
+[worldserver]
+
+##############################################
+# mod-city-siege configuration
+##############################################
+#
+#    CitySiege.Enabled
+#        Description: Enables the City Siege module.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Enabled = 1
+
+#
+#    CitySiege.DebugMode
+#        Description: Enables debug logging for the City Siege module.
+#        Default:     0 (disabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.DebugMode = 0
+
+#
+#    CitySiege.TimerMin
+#        Description: Minimum time (in minutes) between city siege events.
+#        Default:     120 (2 hours)
+CitySiege.TimerMin = 120
+
+#
+#    CitySiege.TimerMax
+#        Description: Maximum time (in minutes) between city siege events.
+#        Default:     240 (4 hours)
+CitySiege.TimerMax = 240
+
+#
+#    CitySiege.EventDuration
+#        Description: Duration (in minutes) of each siege event.
+#        Default:     30
+CitySiege.EventDuration = 30
+
+#
+#    CitySiege.AllowMultipleCities
+#        Description: Allow siege events in multiple cities at the same time.
+#        Default:     0 (only one city at a time)
+#                     Valid values: 0 (single) / 1 (multiple)
+CitySiege.AllowMultipleCities = 0
+
+#
+#    CitySiege.AnnounceRadius
+#        Description: Radius (in yards) for announcing siege events to nearby players.
+#                     Set to 0 to announce to the entire world.
+#        Default:     500
+CitySiege.AnnounceRadius = 500
+
+#
+#    CitySiege.MinimumLevel
+#        Description: Minimum player level to participate in siege events.
+#        Default:     1
+CitySiege.MinimumLevel = 1
+
+###############################################
+# City Configurations
+###############################################
+# Each city can be enabled/disabled individually.
+# Cities: Stormwind, Ironforge, Darnassus, Exodar,
+#         Orgrimmar, Undercity, Thunder Bluff, Silvermoon
+
+#
+#    CitySiege.Stormwind.Enabled
+#        Description: Enable siege events in Stormwind.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Stormwind.Enabled = 1
+
+#
+#    CitySiege.Ironforge.Enabled
+#        Description: Enable siege events in Ironforge.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Ironforge.Enabled = 1
+
+#
+#    CitySiege.Darnassus.Enabled
+#        Description: Enable siege events in Darnassus.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Darnassus.Enabled = 1
+
+#
+#    CitySiege.Exodar.Enabled
+#        Description: Enable siege events in the Exodar.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Exodar.Enabled = 1
+
+#
+#    CitySiege.Orgrimmar.Enabled
+#        Description: Enable siege events in Orgrimmar.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Orgrimmar.Enabled = 1
+
+#
+#    CitySiege.Undercity.Enabled
+#        Description: Enable siege events in Undercity.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Undercity.Enabled = 1
+
+#
+#    CitySiege.ThunderBluff.Enabled
+#        Description: Enable siege events in Thunder Bluff.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.ThunderBluff.Enabled = 1
+
+#
+#    CitySiege.Silvermoon.Enabled
+#        Description: Enable siege events in Silvermoon City.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Silvermoon.Enabled = 1
+
+###############################################
+# Spawn Configurations
+###############################################
+
+#
+#    CitySiege.SpawnCount.Minions
+#        Description: Number of regular enemy units to spawn during siege.
+#        Default:     15
+CitySiege.SpawnCount.Minions = 15
+
+#
+#    CitySiege.SpawnCount.Elites
+#        Description: Number of elite enemy units to spawn during siege.
+#        Default:     5
+CitySiege.SpawnCount.Elites = 5
+
+#
+#    CitySiege.SpawnCount.MiniBosses
+#        Description: Number of mini-bosses to spawn during siege.
+#        Default:     2
+CitySiege.SpawnCount.MiniBosses = 2
+
+#
+#    CitySiege.SpawnCount.Leaders
+#        Description: Number of faction leaders to spawn during siege.
+#        Default:     1
+CitySiege.SpawnCount.Leaders = 1
+
+###############################################
+# Creature Entry Configurations
+###############################################
+# These define which creature entries to use for siege forces.
+# Customize these based on your server's creature_template table.
+
+#
+#    CitySiege.Creature.Alliance.Minion
+#        Description: Creature entry for Alliance city attackers (regular minions).
+#        Default:     14425 (Generic soldier)
+CitySiege.Creature.Alliance.Minion = 14425
+
+#
+#    CitySiege.Creature.Alliance.Elite
+#        Description: Creature entry for Alliance city attackers (elites).
+#        Default:     14428 (Generic elite)
+CitySiege.Creature.Alliance.Elite = 14428
+
+#
+#    CitySiege.Creature.Alliance.MiniBoss
+#        Description: Creature entry for Alliance city attackers (mini-bosses).
+#        Default:     14762 (Generic boss)
+CitySiege.Creature.Alliance.MiniBoss = 14762
+
+#
+#    CitySiege.Creature.Alliance.Leader
+#        Description: Creature entry for Alliance city attackers (faction leaders).
+#        Default:     16441 (Generic leader)
+CitySiege.Creature.Alliance.Leader = 16441
+
+#
+#    CitySiege.Creature.Horde.Minion
+#        Description: Creature entry for Horde city attackers (regular minions).
+#        Default:     14423 (Generic soldier)
+CitySiege.Creature.Horde.Minion = 14423
+
+#
+#    CitySiege.Creature.Horde.Elite
+#        Description: Creature entry for Horde city attackers (elites).
+#        Default:     14426 (Generic elite)
+CitySiege.Creature.Horde.Elite = 14426
+
+#
+#    CitySiege.Creature.Horde.MiniBoss
+#        Description: Creature entry for Horde city attackers (mini-bosses).
+#        Default:     14763 (Generic boss)
+CitySiege.Creature.Horde.MiniBoss = 14763
+
+#
+#    CitySiege.Creature.Horde.Leader
+#        Description: Creature entry for Horde city attackers (faction leaders).
+#        Default:     16440 (Generic leader)
+CitySiege.Creature.Horde.Leader = 16440
+
+#
+#    CitySiege.AggroPlayers
+#        Description: Whether siege units should aggro players on sight.
+#        Default:     1 (yes)
+#                     Valid values: 0 (no) / 1 (yes)
+CitySiege.AggroPlayers = 1
+
+#
+#    CitySiege.AggroNPCs
+#        Description: Whether siege units should aggro city NPCs on sight.
+#        Default:     1 (yes)
+#                     Valid values: 0 (no) / 1 (yes)
+CitySiege.AggroNPCs = 1
+
+###############################################
+# Cinematic and RP Settings
+###############################################
+
+#
+#    CitySiege.CinematicDelay
+#        Description: Time (in seconds) for the initial cinematic/RP phase before combat.
+#        Default:     45
+CitySiege.CinematicDelay = 45
+
+#
+#    CitySiege.YellFrequency
+#        Description: How often (in seconds) siege leaders yell during the event.
+#        Default:     30
+CitySiege.YellFrequency = 30
+
+###############################################
+# Reward Settings
+###############################################
+
+#
+#    CitySiege.RewardOnDefense
+#        Description: Enable rewards for players who defend the city.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.RewardOnDefense = 1
+
+#
+#    CitySiege.RewardHonor
+#        Description: Amount of honor points to award for successful defense.
+#        Default:     100
+CitySiege.RewardHonor = 100
+
+#
+#    CitySiege.RewardGold
+#        Description: Amount of gold (in copper) to award for successful defense.
+#        Default:     500000 (50 gold)
+CitySiege.RewardGold = 500000

@@ -1,0 +1,29 @@
+# Build files
+build/
+*.o
+*.a
+*.so
+*.dll
+*.dylib
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Config files (keep .dist, ignore actual configs)
+*.conf
+!*.conf.dist
+
+# Logs
+*.log
+
+# Backup files
+*.bak
+*.backup
