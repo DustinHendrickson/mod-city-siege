@@ -305,10 +305,10 @@ void LoadCitySiegeConfiguration()
 
     if (g_DebugMode)
     {
-        LOG_INFO("module", "[City Siege] Configuration loaded:");
-        LOG_INFO("module", "[City Siege]   Enabled: {}", g_CitySiegeEnabled);
-        LOG_INFO("module", "[City Siege]   Timer: {}-{} minutes", g_TimerMin / 60, g_TimerMax / 60);
-        LOG_INFO("module", "[City Siege]   Event Duration: {} minutes", g_EventDuration / 60);
+        LOG_INFO("server.loading", "[City Siege] Configuration loaded:");
+        LOG_INFO("server.loading", "[City Siege]   Enabled: {}", g_CitySiegeEnabled);
+        LOG_INFO("server.loading", "[City Siege]   Timer: {}-{} minutes", g_TimerMin / 60, g_TimerMax / 60);
+        LOG_INFO("server.loading", "[City Siege]   Event Duration: {} minutes", g_EventDuration / 60);
     }
 }
 
@@ -405,7 +405,7 @@ void AnnounceSiege(const CityData& city, bool isStart)
 
     if (g_DebugMode)
     {
-        LOG_INFO("module", "[City Siege] {}", message);
+        LOG_INFO("server.loading", "[City Siege] {}", message);
     }
 }
 
@@ -419,17 +419,17 @@ void SpawnSiegeCreatures(SiegeEvent& event)
     
     if (g_DebugMode)
     {
-        LOG_INFO("module", "[City Siege] Spawning creatures for siege at {}", city.name);
-        LOG_INFO("module", "[City Siege]   Minions: {}", g_SpawnCountMinions);
-        LOG_INFO("module", "[City Siege]   Elites: {}", g_SpawnCountElites);
-        LOG_INFO("module", "[City Siege]   Mini-Bosses: {}", g_SpawnCountMiniBosses);
-        LOG_INFO("module", "[City Siege]   Leaders: {}", g_SpawnCountLeaders);
+        LOG_INFO("server.loading", "[City Siege] Spawning creatures for siege at {}", city.name);
+        LOG_INFO("server.loading", "[City Siege]   Minions: {}", g_SpawnCountMinions);
+        LOG_INFO("server.loading", "[City Siege]   Elites: {}", g_SpawnCountElites);
+        LOG_INFO("server.loading", "[City Siege]   Mini-Bosses: {}", g_SpawnCountMiniBosses);
+        LOG_INFO("server.loading", "[City Siege]   Leaders: {}", g_SpawnCountLeaders);
     }
 
     Map* map = sMapMgr->FindMap(city.mapId, 0);
     if (!map)
     {
-        LOG_ERROR("module", "[City Siege] Failed to find map {} for {}", city.mapId, city.name);
+        LOG_ERROR("server.loading", "[City Siege] Failed to find map {} for {}", city.mapId, city.name);
         return;
     }
 
@@ -462,7 +462,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             
             if (g_DebugMode)
             {
-                LOG_INFO("module", "[City Siege] Spawned minion at ({}, {}, {})", x, y, z);
+                LOG_INFO("server.loading", "[City Siege] Spawned minion at ({}, {}, {})", x, y, z);
             }
         }
         currentAngle += spawnAngleStep;
@@ -519,7 +519,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         currentAngle += spawnAngleStep;
     }
 
-    LOG_INFO("module", "[City Siege] Spawned {} total creatures for siege at {}", 
+    LOG_INFO("server.loading", "[City Siege] Spawned {} total creatures for siege at {}", 
              event.spawnedCreatures.size(), city.name);
 }
 
@@ -547,7 +547,7 @@ void DespawnSiegeCreatures(SiegeEvent& event)
 
     if (g_DebugMode)
     {
-        LOG_INFO("module", "[City Siege] Despawned creatures for siege at {}", city.name);
+        LOG_INFO("server.loading", "[City Siege] Despawned creatures for siege at {}", city.name);
     }
 }
 
@@ -579,7 +579,7 @@ void StartSiegeEvent()
     {
         if (g_DebugMode)
         {
-            LOG_INFO("module", "[City Siege] No available cities for siege event");
+            LOG_INFO("server.loading", "[City Siege] No available cities for siege event");
         }
         return;
     }
@@ -600,7 +600,7 @@ void StartSiegeEvent()
 
     if (g_DebugMode)
     {
-        LOG_INFO("module", "[City Siege] Started siege event at {}", city->name);
+        LOG_INFO("server.loading", "[City Siege] Started siege event at {}", city->name);
     }
 }
 
@@ -648,7 +648,7 @@ void EndSiegeEvent(SiegeEvent& event)
 
     if (g_DebugMode)
     {
-        LOG_INFO("module", "[City Siege] Ended siege event at {} - Defenders {}", 
+        LOG_INFO("server.loading", "[City Siege] Ended siege event at {} - Defenders {}", 
                  city.name, defendersWon ? "won" : "lost");
     }
 }
@@ -702,7 +702,7 @@ void DistributeRewards(const SiegeEvent& event, const CityData& city)
     
     if (g_DebugMode)
     {
-        LOG_INFO("module", "[City Siege] Rewarded {} players for defending {}", 
+        LOG_INFO("server.loading", "[City Siege] Rewarded {} players for defending {}", 
                  rewardedPlayers, city.name);
     }
 }
@@ -729,7 +729,7 @@ void UpdateSiegeEvents(uint32 diff)
             event.cinematicPhase = false;
             if (g_DebugMode)
             {
-                LOG_INFO("module", "[City Siege] Cinematic phase ended, combat begins");
+                LOG_INFO("server.loading", "[City Siege] Cinematic phase ended, combat begins");
             }
             
             // Make creatures aggressive after cinematic phase
@@ -831,7 +831,7 @@ void UpdateSiegeEvents(uint32 diff)
 
         if (g_DebugMode)
         {
-            LOG_INFO("module", "[City Siege] Next siege scheduled in {} minutes", nextDelay / 60);
+            LOG_INFO("server.loading", "[City Siege] Next siege scheduled in {} minutes", nextDelay / 60);
         }
     }
 }

@@ -8,6 +8,9 @@ Overview
 --------
 The City Siege module for AzerothCore adds dynamic, timed siege events to all major cities in World of Warcraft. On a random, configurable timer, opposing faction forces assault a major city, spawning enemy units outside the city limits who march toward the city leader while engaging defenders. Enemy forces spawn at the city outskirts and use AI pathfinding to march into the city, attacking the faction leader as their primary objective. Defenders must protect their city leaders or face defeat. Successful defense is rewarded with honor and gold scaled by player level. This module creates exciting world events that encourage player participation in defending their cities and creates a more dynamic, living world experience.
 
+> [!CAUTION]
+> THIS MODULE IS IN ACTIVE DEVELOPMENT. IT PROBABLY WON’T WORK, WILL SOMETIMES WORK POORLY, AND MAY RANDOMLY DECIDE TO TAKE A VACATION. DO NOT USE ON AN ACTIVE SERVER OR EXPECT ANYTHING RESEMBLING RELIABILITY UNTIL THIS NOTICE IS GONE.
+
 Features
 --------
 - **Dynamic Siege Events:**  
