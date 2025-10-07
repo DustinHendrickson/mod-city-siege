@@ -137,14 +137,14 @@ struct CityData
 
 // City definitions with approximate center coordinates
 static std::vector<CityData> g_Cities = {
-    { CITY_STORMWIND,   "Stormwind",      0,   -8913.23f, 554.633f,  93.7944f,  -8913.23f, 554.633f,  93.7944f,  -8913.23f, 554.633f,  93.7944f,  1748  },
-    { CITY_IRONFORGE,   "Ironforge",      0,   -4981.25f, -881.542f, 501.660f,  -4981.25f, -881.542f, 501.660f,  -4981.25f, -881.542f, 501.660f,  2784  },
-    { CITY_DARNASSUS,   "Darnassus",      1,    9947.52f, 2482.73f,  1316.21f,   9947.52f, 2482.73f,  1316.21f,   9947.52f, 2482.73f,  1316.21f,  7999  },
-    { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, -3864.92f, -11643.7f, -137.644f, -3864.92f, -11643.7f, -137.644f, 17949 },
-    { CITY_ORGRIMMAR,   "Orgrimmar",      1,    1633.75f, -4439.39f, 15.4396f,   1633.75f, -4439.39f, 15.4396f,   1633.75f, -4439.39f, 15.4396f,  4949  },
-    { CITY_UNDERCITY,   "Undercity",      0,    1633.75f, 240.167f,  -43.1034f,  1633.75f, 240.167f,  -43.1034f,  1633.75f, 240.167f,  -43.1034f, 10181 },
-    { CITY_THUNDERBLUFF, "Thunder Bluff", 1,   -1043.11f, 285.809f,  135.165f,  -1043.11f, 285.809f,  135.165f,  -1043.11f, 285.809f,  135.165f,  3057  },
-    { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f,   9338.74f, -7277.27f, 13.7014f,   9338.74f, -7277.27f, 13.7014f,  16283 }
+    { CITY_STORMWIND,   "Stormwind",      0,   -8913.23f, 554.633f,  93.7944f,  -9161.16f, 353.365f,  88.117f,   -8913.23f, 554.633f,  93.7944f,  1748  },
+    { CITY_IRONFORGE,   "Ironforge",      0,   -4981.25f, -881.542f, 501.660f,  -5174.09f, -594.361f, 397.853f,  -4981.25f, -881.542f, 501.660f,  2784  },
+    { CITY_DARNASSUS,   "Darnassus",      1,    9947.52f, 2482.73f,  1316.21f,   9887.36f, 1856.49f,  1317.14f,   9947.52f, 2482.73f,  1316.21f,  7999  },
+    { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, -4080.80f, -12193.2f, 1.712f,    -3864.92f, -11643.7f, -137.644f, 17949 },
+    { CITY_ORGRIMMAR,   "Orgrimmar",      1,    1633.75f, -4439.39f, 15.4396f,   1114.96f, -4374.63f, 25.813f,    1633.75f, -4439.39f, 15.4396f,  4949  },
+    { CITY_UNDERCITY,   "Undercity",      0,    1633.75f, 240.167f,  -43.1034f,  1982.26f, 226.674f,  35.951f,    1633.75f, 240.167f,  -43.1034f, 10181 },
+    { CITY_THUNDERBLUFF, "Thunder Bluff", 1,   -1043.11f, 285.809f,  135.165f,  -1558.61f, -5.071f,   5.384f,    -1043.11f, 285.809f,  135.165f,  3057  },
+    { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f,   9230.47f, -6962.67f, 5.004f,     9338.74f, -7277.27f, 13.7014f,  16283 }
 };
 
 struct SiegeEvent
@@ -242,37 +242,37 @@ void LoadCitySiegeConfiguration()
         "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!");
 
     // Load spawn locations for each city
-    g_Cities[CITY_STORMWIND].spawnX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnX", -8913.23f);
-    g_Cities[CITY_STORMWIND].spawnY = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnY", 554.633f);
-    g_Cities[CITY_STORMWIND].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnZ", 93.7944f);
+    g_Cities[CITY_STORMWIND].spawnX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnX", -9161.16f);
+    g_Cities[CITY_STORMWIND].spawnY = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnY", 353.365f);
+    g_Cities[CITY_STORMWIND].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnZ", 88.117f);
     
-    g_Cities[CITY_IRONFORGE].spawnX = sConfigMgr->GetOption<float>("CitySiege.Ironforge.SpawnX", -4981.25f);
-    g_Cities[CITY_IRONFORGE].spawnY = sConfigMgr->GetOption<float>("CitySiege.Ironforge.SpawnY", -881.542f);
-    g_Cities[CITY_IRONFORGE].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Ironforge.SpawnZ", 501.660f);
+    g_Cities[CITY_IRONFORGE].spawnX = sConfigMgr->GetOption<float>("CitySiege.Ironforge.SpawnX", -5174.09f);
+    g_Cities[CITY_IRONFORGE].spawnY = sConfigMgr->GetOption<float>("CitySiege.Ironforge.SpawnY", -594.361f);
+    g_Cities[CITY_IRONFORGE].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Ironforge.SpawnZ", 397.853f);
     
-    g_Cities[CITY_DARNASSUS].spawnX = sConfigMgr->GetOption<float>("CitySiege.Darnassus.SpawnX", 9947.52f);
-    g_Cities[CITY_DARNASSUS].spawnY = sConfigMgr->GetOption<float>("CitySiege.Darnassus.SpawnY", 2482.73f);
-    g_Cities[CITY_DARNASSUS].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Darnassus.SpawnZ", 1316.21f);
+    g_Cities[CITY_DARNASSUS].spawnX = sConfigMgr->GetOption<float>("CitySiege.Darnassus.SpawnX", 9887.36f);
+    g_Cities[CITY_DARNASSUS].spawnY = sConfigMgr->GetOption<float>("CitySiege.Darnassus.SpawnY", 1856.49f);
+    g_Cities[CITY_DARNASSUS].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Darnassus.SpawnZ", 1317.14f);
     
-    g_Cities[CITY_EXODAR].spawnX = sConfigMgr->GetOption<float>("CitySiege.Exodar.SpawnX", -3864.92f);
-    g_Cities[CITY_EXODAR].spawnY = sConfigMgr->GetOption<float>("CitySiege.Exodar.SpawnY", -11643.7f);
-    g_Cities[CITY_EXODAR].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Exodar.SpawnZ", -137.644f);
+    g_Cities[CITY_EXODAR].spawnX = sConfigMgr->GetOption<float>("CitySiege.Exodar.SpawnX", -4080.80f);
+    g_Cities[CITY_EXODAR].spawnY = sConfigMgr->GetOption<float>("CitySiege.Exodar.SpawnY", -12193.2f);
+    g_Cities[CITY_EXODAR].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Exodar.SpawnZ", 1.712f);
     
-    g_Cities[CITY_ORGRIMMAR].spawnX = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.SpawnX", 1633.75f);
-    g_Cities[CITY_ORGRIMMAR].spawnY = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.SpawnY", -4439.39f);
-    g_Cities[CITY_ORGRIMMAR].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.SpawnZ", 15.4396f);
+    g_Cities[CITY_ORGRIMMAR].spawnX = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.SpawnX", 1114.96f);
+    g_Cities[CITY_ORGRIMMAR].spawnY = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.SpawnY", -4374.63f);
+    g_Cities[CITY_ORGRIMMAR].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.SpawnZ", 25.813f);
     
-    g_Cities[CITY_UNDERCITY].spawnX = sConfigMgr->GetOption<float>("CitySiege.Undercity.SpawnX", 1633.75f);
-    g_Cities[CITY_UNDERCITY].spawnY = sConfigMgr->GetOption<float>("CitySiege.Undercity.SpawnY", 240.167f);
-    g_Cities[CITY_UNDERCITY].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Undercity.SpawnZ", -43.1034f);
+    g_Cities[CITY_UNDERCITY].spawnX = sConfigMgr->GetOption<float>("CitySiege.Undercity.SpawnX", 1982.26f);
+    g_Cities[CITY_UNDERCITY].spawnY = sConfigMgr->GetOption<float>("CitySiege.Undercity.SpawnY", 226.674f);
+    g_Cities[CITY_UNDERCITY].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Undercity.SpawnZ", 35.951f);
     
-    g_Cities[CITY_THUNDERBLUFF].spawnX = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.SpawnX", -1043.11f);
-    g_Cities[CITY_THUNDERBLUFF].spawnY = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.SpawnY", 285.809f);
-    g_Cities[CITY_THUNDERBLUFF].spawnZ = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.SpawnZ", 135.165f);
+    g_Cities[CITY_THUNDERBLUFF].spawnX = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.SpawnX", -1558.61f);
+    g_Cities[CITY_THUNDERBLUFF].spawnY = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.SpawnY", -5.071f);
+    g_Cities[CITY_THUNDERBLUFF].spawnZ = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.SpawnZ", 5.384f);
     
-    g_Cities[CITY_SILVERMOON].spawnX = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.SpawnX", 9338.74f);
-    g_Cities[CITY_SILVERMOON].spawnY = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.SpawnY", -7277.27f);
-    g_Cities[CITY_SILVERMOON].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.SpawnZ", 13.7014f);
+    g_Cities[CITY_SILVERMOON].spawnX = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.SpawnX", 9230.47f);
+    g_Cities[CITY_SILVERMOON].spawnY = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.SpawnY", -6962.67f);
+    g_Cities[CITY_SILVERMOON].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.SpawnZ", 5.004f);
 
     // Load leader locations for each city
     g_Cities[CITY_STORMWIND].leaderX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.LeaderX", -8913.23f);

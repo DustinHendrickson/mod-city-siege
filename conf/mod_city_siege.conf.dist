@@ -124,67 +124,67 @@ CitySiege.Silvermoon.Enabled = 1
 
 #
 #    CitySiege.Stormwind.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Stormwind gates.
-#        Default:     -8913.23, 554.633, 93.7944
-CitySiege.Stormwind.SpawnX = -8913.23
-CitySiege.Stormwind.SpawnY = 554.633
-CitySiege.Stormwind.SpawnZ = 93.7944
+#        Description: Spawn location for siege forces outside Stormwind gates (Elwynn Forest entrance).
+#        Default:     -9161.16, 353.365, 88.117
+CitySiege.Stormwind.SpawnX = -9161.16
+CitySiege.Stormwind.SpawnY = 353.365
+CitySiege.Stormwind.SpawnZ = 88.117
 
 #
 #    CitySiege.Ironforge.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Ironforge gates.
-#        Default:     -4981.25, -881.542, 501.660
-CitySiege.Ironforge.SpawnX = -4981.25
-CitySiege.Ironforge.SpawnY = -881.542
-CitySiege.Ironforge.SpawnZ = 501.660
+#        Description: Spawn location for siege forces outside Ironforge gates (Dun Morogh entrance).
+#        Default:     -5174.09, -594.361, 397.853
+CitySiege.Ironforge.SpawnX = -5174.09
+CitySiege.Ironforge.SpawnY = -594.361
+CitySiege.Ironforge.SpawnZ = 397.853
 
 #
 #    CitySiege.Darnassus.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Darnassus gates.
-#        Default:     9947.52, 2482.73, 1316.21
-CitySiege.Darnassus.SpawnX = 9947.52
-CitySiege.Darnassus.SpawnY = 2482.73
-CitySiege.Darnassus.SpawnZ = 1316.21
+#        Description: Spawn location for siege forces outside Darnassus gates (Teldrassil entrance).
+#        Default:     9887.36, 1856.49, 1317.14
+CitySiege.Darnassus.SpawnX = 9887.36
+CitySiege.Darnassus.SpawnY = 1856.49
+CitySiege.Darnassus.SpawnZ = 1317.14
 
 #
 #    CitySiege.Exodar.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Exodar gates.
-#        Default:     -3864.92, -11643.7, -137.644
-CitySiege.Exodar.SpawnX = -3864.92
-CitySiege.Exodar.SpawnY = -11643.7
-CitySiege.Exodar.SpawnZ = -137.644
+#        Description: Spawn location for siege forces outside Exodar gates (Azuremyst Isle entrance).
+#        Default:     -4080.80, -12193.2, 1.712
+CitySiege.Exodar.SpawnX = -4080.80
+CitySiege.Exodar.SpawnY = -12193.2
+CitySiege.Exodar.SpawnZ = 1.712
 
 #
 #    CitySiege.Orgrimmar.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Orgrimmar gates.
-#        Default:     1633.75, -4439.39, 15.4396
-CitySiege.Orgrimmar.SpawnX = 1633.75
-CitySiege.Orgrimmar.SpawnY = -4439.39
-CitySiege.Orgrimmar.SpawnZ = 15.4396
+#        Description: Spawn location for siege forces outside Orgrimmar gates (Durotar entrance).
+#        Default:     1114.96, -4374.63, 25.813
+CitySiege.Orgrimmar.SpawnX = 1114.96
+CitySiege.Orgrimmar.SpawnY = -4374.63
+CitySiege.Orgrimmar.SpawnZ = 25.813
 
 #
 #    CitySiege.Undercity.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Undercity gates.
-#        Default:     1633.75, 240.167, -43.1034
-CitySiege.Undercity.SpawnX = 1633.75
-CitySiege.Undercity.SpawnY = 240.167
-CitySiege.Undercity.SpawnZ = -43.1034
+#        Description: Spawn location for siege forces outside Undercity gates (Tirisfal Glades entrance).
+#        Default:     1982.26, 226.674, 35.951
+CitySiege.Undercity.SpawnX = 1982.26
+CitySiege.Undercity.SpawnY = 226.674
+CitySiege.Undercity.SpawnZ = 35.951
 
 #
 #    CitySiege.ThunderBluff.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Thunder Bluff gates.
-#        Default:     -1043.11, 285.809, 135.165
-CitySiege.ThunderBluff.SpawnX = -1043.11
-CitySiege.ThunderBluff.SpawnY = 285.809
-CitySiege.ThunderBluff.SpawnZ = 135.165
+#        Description: Spawn location for siege forces outside Thunder Bluff gates (Mulgore entrance).
+#        Default:     -1558.61, -5.071, 5.384
+CitySiege.ThunderBluff.SpawnX = -1558.61
+CitySiege.ThunderBluff.SpawnY = -5.071
+CitySiege.ThunderBluff.SpawnZ = 5.384
 
 #
 #    CitySiege.Silvermoon.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Silvermoon gates.
-#        Default:     9338.74, -7277.27, 13.7014
-CitySiege.Silvermoon.SpawnX = 9338.74
-CitySiege.Silvermoon.SpawnY = -7277.27
-CitySiege.Silvermoon.SpawnZ = 13.7014
+#        Description: Spawn location for siege forces outside Silvermoon gates (Eversong Woods/Dead Scar entrance).
+#        Default:     9230.47, -6962.67, 5.004
+CitySiege.Silvermoon.SpawnX = 9230.47
+CitySiege.Silvermoon.SpawnY = -6962.67
+CitySiege.Silvermoon.SpawnZ = 5.004
 
 ###############################################
 # City Leader Locations
