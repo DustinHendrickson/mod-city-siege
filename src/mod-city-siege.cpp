@@ -23,6 +23,7 @@
 #include "Configuration/Config.h"
 #include "Common.h"
 #include "World.h"
+#include "WorldSessionMgr.h"
 #include "Map.h"
 #include "MapMgr.h"
 #include "Creature.h"
@@ -380,7 +381,7 @@ void AnnounceSiege(const CityData& city, bool isStart)
     if (g_AnnounceRadius == 0)
     {
         // Announce to the entire world
-        sWorld->SendServerMessage(SERVER_MSG_STRING, message.c_str());
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, message);
     }
     else
     {
