@@ -470,6 +470,11 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         
         if (Creature* creature = map->SummonCreature(minionEntry, Position(x, y, z, 0)))
         {
+            // Ensure creature is grounded and not flying
+            creature->SetDisableGravity(false);
+            creature->SetCanFly(false);
+            creature->SetHover(false);
+            
             creature->SetReactState(REACT_PASSIVE);
             // Set to friendly/neutral during cinematic phase - will be changed to hostile after
             creature->SetFaction(35); // Friendly to all during RP
@@ -499,6 +504,11 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         
         if (Creature* creature = map->SummonCreature(eliteEntry, Position(x, y, z, 0)))
         {
+            // Ensure creature is grounded and not flying
+            creature->SetDisableGravity(false);
+            creature->SetCanFly(false);
+            creature->SetHover(false);
+            
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35); // Friendly to all during RP
             event.spawnedCreatures.push_back(creature->GetGUID());
@@ -522,6 +532,11 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         
         if (Creature* creature = map->SummonCreature(miniBossEntry, Position(x, y, z, 0)))
         {
+            // Ensure creature is grounded and not flying
+            creature->SetDisableGravity(false);
+            creature->SetCanFly(false);
+            creature->SetHover(false);
+            
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35); // Friendly to all during RP
             event.spawnedCreatures.push_back(creature->GetGUID());
@@ -545,6 +560,11 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         
         if (Creature* creature = map->SummonCreature(leaderEntry, Position(x, y, z, 0)))
         {
+            // Ensure creature is grounded and not flying
+            creature->SetDisableGravity(false);
+            creature->SetCanFly(false);
+            creature->SetHover(false);
+            
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35); // Friendly to all during RP
             event.spawnedCreatures.push_back(creature->GetGUID());
@@ -845,9 +865,14 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             creature->SetReactState(REACT_DEFENSIVE);
                         }
                         
-                        // Clear any existing movement and set to walk
+                        // Clear any existing movement
                         creature->GetMotionMaster()->Clear(false);
                         creature->GetMotionMaster()->MoveIdle();
+                        
+                        // Ensure grounded movement
+                        creature->SetDisableGravity(false);
+                        creature->SetCanFly(false);
+                        creature->SetHover(false);
                         creature->SetWalk(false); // Run to the leader
                         
                         // Get proper height at destination
@@ -857,8 +882,8 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             destZ = city.leaderZ;
                         }
                         
-                        // Move toward the configured leader location with pathfinding
-                        creature->GetMotionMaster()->MovePoint(0, city.leaderX, city.leaderY, destZ, true);
+                        // Move with BOTH pathfinding parameters set to true
+                        creature->GetMotionMaster()->MovePoint(0, city.leaderX, city.leaderY, destZ, true, true);
                         
                         if (g_DebugMode)
                         {
