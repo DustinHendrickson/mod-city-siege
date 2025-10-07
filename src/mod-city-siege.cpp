@@ -678,7 +678,7 @@ void EndSiegeEvent(SiegeEvent& event)
  * @param city The city that was defended.
  * @param winningTeam The team ID to reward (0=Alliance, 1=Horde, -1=all players)
  */
-void DistributeRewards(const SiegeEvent& event, const CityData& city, int winningTeam)
+void DistributeRewards(const SiegeEvent& /*event*/, const CityData& city, int winningTeam)
 {
     Map* map = sMapMgr->FindMap(city.mapId, 0);
     if (!map)
@@ -737,7 +737,7 @@ void DistributeRewards(const SiegeEvent& event, const CityData& city, int winnin
  * @brief Updates all active siege events.
  * @param diff Time since last update in milliseconds.
  */
-void UpdateSiegeEvents(uint32 diff)
+void UpdateSiegeEvents(uint32 /*diff*/)
 {
     uint32 currentTime = time(nullptr);
 
@@ -982,7 +982,7 @@ public:
             }
 
             // Check if city is enabled
-            if (!g_Cities[cityId].enabled)
+            if (!g_CityEnabled[g_Cities[cityId].name])
             {
                 handler->PSendSysMessage("City '%s' is disabled in configuration.", g_Cities[cityId].name.c_str());
                 return true;
