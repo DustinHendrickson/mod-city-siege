@@ -6,12 +6,7 @@
 
 Overview
 --------
-The City Siege. **Spawn Phase:**  
-   Enemy forces spawn at the configured spawn location (set via SpawnX/Y/Z for each city) in tight circular formation:
-   - Minions: 30 yards from spawn point (outermost ring)
-   - Elites: 21 yards (70% radius)
-   - Mini-bosses: 15 yards (50% radius)
-   - Leaders: 10 yards (center, leading the formation) for AzerothCore adds dynamic, timed siege events to all major cities in World of Warcraft. On a random, configurable timer, opposing faction forces assault a major city, spawning enemy units outside the city limits who march toward the city leader while engaging defenders. Enemy forces spawn at the city outskirts and use AI pathfinding to march into the city, attacking the faction leader as their primary objective. Defenders must protect their city leaders or face defeat. Successful defense is rewarded with honor and gold. This module creates exciting world events that encourage player participation in defending their cities and creates a more dynamic, living world experience.
+The City Siege module for AzerothCore adds dynamic, timed siege events to all major cities in World of Warcraft. On a random, configurable timer, opposing faction forces assault a major city, spawning enemy units outside the city limits who march toward the city leader while engaging defenders. Enemy forces spawn at the city outskirts and use AI pathfinding to march into the city, attacking the faction leader as their primary objective. Defenders must protect their city leaders or face defeat. Successful defense is rewarded with honor and gold scaled by player level. This module creates exciting world events that encourage player participation in defending their cities and creates a more dynamic, living world experience.
 
 Features
 --------
@@ -43,7 +38,7 @@ Features
 - **City-Specific Configuration:**  
   Enable or disable events for individual cities.
 - **Reward System:**  
-  Automatic honor (100 default) and gold (50g default) rewards for successful defenders.
+  Automatic honor (100 default) and level-scaled gold rewards for successful defenders (base 50 silver + 50 silver per level).
 - **Victory Detection:**  
   System checks if city leader survived to determine defense success.
 - **Automatic Cleanup:**  
@@ -159,7 +154,7 @@ Setting                                | Description                            
 ---------------------------------------|-------------------------------------------------------|--------
 CitySiege.RewardOnDefense              | Enable rewards for defenders.                         | 1
 CitySiege.RewardHonor                  | Honor points for successful defense.                  | 100
-CitySiege.RewardGoldBase               | Base gold at level 1 in copper (50g = 500000).       | 5000
+CitySiege.RewardGoldBase               | Base gold at level 1 in copper (50 silver = 5000).   | 5000
 CitySiege.RewardGoldPerLevel           | Additional gold per player level in copper.           | 5000
 
 ### Announcement Messages
@@ -191,11 +186,11 @@ How It Works
    Players in range (or server-wide if AnnounceRadius = 0) are notified with a configurable message (default: color-coded with city name).
 
 4. **Spawn Phase:**  
-   Enemy forces spawn outside the city (150 yards from center) in circular formation:
-   - Minions: 150 yards (outermost ring)
-   - Elites: 135 yards (90% radius)
-   - Mini-bosses: 120 yards (80% radius)
-   - Leaders: 105 yards (70% radius, leading the charge)
+   Enemy forces spawn at the configured spawn location (set via SpawnX/Y/Z for each city) in tight circular formation:
+   - Minions: 30 yards from spawn point (outermost ring)
+   - Elites: 21 yards (70% radius from spawn point)
+   - Mini-bosses: 15 yards (50% radius from spawn point)
+   - Leaders: 10 yards from spawn point (center, leading the formation)
 
 5. **Cinematic Phase:**  
    For the configured delay (default 45 seconds), enemies remain passive and leaders yell RP messages configured in `CitySiege.Yell.LeaderSpawn`.
@@ -223,8 +218,8 @@ How It Works
 - **Automatic Rewards:**  
   Successful defenders within the configured radius receive:
   - Honor points (configurable, default 100)
-  - Gold scaled by level: Base amount (default 50g at level 1) + additional gold per level (default 1g per level)
-    * Example: Level 80 player receives 50g + (1g × 80) = 130 gold
+  - Gold scaled by level: Base amount (default 50 silver at level 1) + additional gold per level (default 50 silver per level)
+    * Example: Level 80 player receives 50 silver + (50 silver × 80) = 40.5 gold
   - Confirmation message (configurable)
 
 Customization
