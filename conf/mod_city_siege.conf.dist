@@ -119,6 +119,142 @@ CitySiege.ThunderBluff.Enabled = 1
 CitySiege.Silvermoon.Enabled = 1
 
 ###############################################
+# City Spawn Locations
+###############################################
+
+#
+#    CitySiege.Stormwind.SpawnX/Y/Z
+#        Description: Spawn location for siege forces outside Stormwind gates.
+#        Default:     -8913.23, 554.633, 93.7944
+CitySiege.Stormwind.SpawnX = -8913.23
+CitySiege.Stormwind.SpawnY = 554.633
+CitySiege.Stormwind.SpawnZ = 93.7944
+
+#
+#    CitySiege.Ironforge.SpawnX/Y/Z
+#        Description: Spawn location for siege forces outside Ironforge gates.
+#        Default:     -4981.25, -881.542, 501.660
+CitySiege.Ironforge.SpawnX = -4981.25
+CitySiege.Ironforge.SpawnY = -881.542
+CitySiege.Ironforge.SpawnZ = 501.660
+
+#
+#    CitySiege.Darnassus.SpawnX/Y/Z
+#        Description: Spawn location for siege forces outside Darnassus gates.
+#        Default:     9947.52, 2482.73, 1316.21
+CitySiege.Darnassus.SpawnX = 9947.52
+CitySiege.Darnassus.SpawnY = 2482.73
+CitySiege.Darnassus.SpawnZ = 1316.21
+
+#
+#    CitySiege.Exodar.SpawnX/Y/Z
+#        Description: Spawn location for siege forces outside Exodar gates.
+#        Default:     -3864.92, -11643.7, -137.644
+CitySiege.Exodar.SpawnX = -3864.92
+CitySiege.Exodar.SpawnY = -11643.7
+CitySiege.Exodar.SpawnZ = -137.644
+
+#
+#    CitySiege.Orgrimmar.SpawnX/Y/Z
+#        Description: Spawn location for siege forces outside Orgrimmar gates.
+#        Default:     1633.75, -4439.39, 15.4396
+CitySiege.Orgrimmar.SpawnX = 1633.75
+CitySiege.Orgrimmar.SpawnY = -4439.39
+CitySiege.Orgrimmar.SpawnZ = 15.4396
+
+#
+#    CitySiege.Undercity.SpawnX/Y/Z
+#        Description: Spawn location for siege forces outside Undercity gates.
+#        Default:     1633.75, 240.167, -43.1034
+CitySiege.Undercity.SpawnX = 1633.75
+CitySiege.Undercity.SpawnY = 240.167
+CitySiege.Undercity.SpawnZ = -43.1034
+
+#
+#    CitySiege.ThunderBluff.SpawnX/Y/Z
+#        Description: Spawn location for siege forces outside Thunder Bluff gates.
+#        Default:     -1043.11, 285.809, 135.165
+CitySiege.ThunderBluff.SpawnX = -1043.11
+CitySiege.ThunderBluff.SpawnY = 285.809
+CitySiege.ThunderBluff.SpawnZ = 135.165
+
+#
+#    CitySiege.Silvermoon.SpawnX/Y/Z
+#        Description: Spawn location for siege forces outside Silvermoon gates.
+#        Default:     9338.74, -7277.27, 13.7014
+CitySiege.Silvermoon.SpawnX = 9338.74
+CitySiege.Silvermoon.SpawnY = -7277.27
+CitySiege.Silvermoon.SpawnZ = 13.7014
+
+###############################################
+# City Leader Locations
+###############################################
+
+#
+#    CitySiege.Stormwind.LeaderX/Y/Z
+#        Description: Location of the city leader (King Varian Wrynn) for siege targeting.
+#        Default:     -8913.23, 554.633, 93.7944
+CitySiege.Stormwind.LeaderX = -8913.23
+CitySiege.Stormwind.LeaderY = 554.633
+CitySiege.Stormwind.LeaderZ = 93.7944
+
+#
+#    CitySiege.Ironforge.LeaderX/Y/Z
+#        Description: Location of the city leader (King Magni Bronzebeard) for siege targeting.
+#        Default:     -4981.25, -881.542, 501.660
+CitySiege.Ironforge.LeaderX = -4981.25
+CitySiege.Ironforge.LeaderY = -881.542
+CitySiege.Ironforge.LeaderZ = 501.660
+
+#
+#    CitySiege.Darnassus.LeaderX/Y/Z
+#        Description: Location of the city leader (Tyrande Whisperwind) for siege targeting.
+#        Default:     9947.52, 2482.73, 1316.21
+CitySiege.Darnassus.LeaderX = 9947.52
+CitySiege.Darnassus.LeaderY = 2482.73
+CitySiege.Darnassus.LeaderZ = 1316.21
+
+#
+#    CitySiege.Exodar.LeaderX/Y/Z
+#        Description: Location of the city leader (Prophet Velen) for siege targeting.
+#        Default:     -3864.92, -11643.7, -137.644
+CitySiege.Exodar.LeaderX = -3864.92
+CitySiege.Exodar.LeaderY = -11643.7
+CitySiege.Exodar.LeaderZ = -137.644
+
+#
+#    CitySiege.Orgrimmar.LeaderX/Y/Z
+#        Description: Location of the city leader (Thrall) for siege targeting.
+#        Default:     1633.75, -4439.39, 15.4396
+CitySiege.Orgrimmar.LeaderX = 1633.75
+CitySiege.Orgrimmar.LeaderY = -4439.39
+CitySiege.Orgrimmar.LeaderZ = 15.4396
+
+#
+#    CitySiege.Undercity.LeaderX/Y/Z
+#        Description: Location of the city leader (Lady Sylvanas Windrunner) for siege targeting.
+#        Default:     1633.75, 240.167, -43.1034
+CitySiege.Undercity.LeaderX = 1633.75
+CitySiege.Undercity.LeaderY = 240.167
+CitySiege.Undercity.LeaderZ = -43.1034
+
+#
+#    CitySiege.ThunderBluff.LeaderX/Y/Z
+#        Description: Location of the city leader (Cairne Bloodhoof) for siege targeting.
+#        Default:     -1043.11, 285.809, 135.165
+CitySiege.ThunderBluff.LeaderX = -1043.11
+CitySiege.ThunderBluff.LeaderY = 285.809
+CitySiege.ThunderBluff.LeaderZ = 135.165
+
+#
+#    CitySiege.Silvermoon.LeaderX/Y/Z
+#        Description: Location of the city leader (Lor'themar Theron) for siege targeting.
+#        Default:     9338.74, -7277.27, 13.7014
+CitySiege.Silvermoon.LeaderX = 9338.74
+CitySiege.Silvermoon.LeaderY = -7277.27
+CitySiege.Silvermoon.LeaderZ = 13.7014
+
+###############################################
 # Spawn Configurations
 ###############################################
 
@@ -248,7 +384,56 @@ CitySiege.RewardOnDefense = 1
 CitySiege.RewardHonor = 100
 
 #
-#    CitySiege.RewardGold
-#        Description: Amount of gold (in copper) to award for successful defense.
-#        Default:     500000 (50 gold)
-CitySiege.RewardGold = 500000
+#    CitySiege.RewardGoldBase
+#        Description: Base amount of gold (in copper) to award for successful defense at level 1.
+#                     This is the starting amount before level scaling is applied.
+#        Default:     5000 (50 silver)
+CitySiege.RewardGoldBase = 5000
+
+#
+#    CitySiege.RewardGoldPerLevel
+#        Description: Additional gold (in copper) per player level for defense rewards.
+#                     Total gold = RewardGoldBase + (RewardGoldPerLevel * player level)
+#                     Example: Level 80 player = 5000 + (5000 * 80) = 405,000 copper (40.5 gold)
+#        Default:     5000 (0.5 gold per level)
+CitySiege.RewardGoldPerLevel = 5000
+
+###############################################
+# Announcement Messages
+###############################################
+
+#
+#    CitySiege.Message.SiegeStart
+#        Description: Message announced when a siege begins. Use %s for city name.
+#        Default:     "|cffff0000[City Siege]|r The city of %s is under attack! Defenders are needed!"
+CitySiege.Message.SiegeStart = "|cffff0000[City Siege]|r The city of %s is under attack! Defenders are needed!"
+
+#
+#    CitySiege.Message.SiegeEnd
+#        Description: Message announced when a siege ends. Use %s for city name.
+#        Default:     "|cff00ff00[City Siege]|r The siege of %s has ended!"
+CitySiege.Message.SiegeEnd = "|cff00ff00[City Siege]|r The siege of %s has ended!"
+
+#
+#    CitySiege.Message.Reward
+#        Description: Message sent to players when they receive rewards. Use %s for city name.
+#        Default:     "|cff00ff00[City Siege]|r You have been rewarded for defending %s!"
+CitySiege.Message.Reward = "|cff00ff00[City Siege]|r You have been rewarded for defending %s!"
+
+###############################################
+# Creature Yells
+###############################################
+
+#
+#    CitySiege.Yell.LeaderSpawn
+#        Description: Message that siege leaders yell when they spawn.
+#        Default:     "This city will fall before our might!"
+CitySiege.Yell.LeaderSpawn = "This city will fall before our might!"
+
+#
+#    CitySiege.Yell.Combat
+#        Description: Random yells during combat. Separate multiple yells with semicolons (;).
+#                     Leaders and mini-bosses will randomly yell one of these messages.
+#        Default:     "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!"
+CitySiege.Yell.Combat = "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!"
+

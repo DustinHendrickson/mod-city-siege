@@ -82,7 +82,19 @@ static uint32 g_YellFrequency = 30;  // seconds
 // Reward settings
 static bool g_RewardOnDefense = true;
 static uint32 g_RewardHonor = 100;
-static uint32 g_RewardGold = 500000; // 50 gold in copper
+static uint32 g_RewardGoldBase = 5000; // 50 silver in copper at level 1
+static uint32 g_RewardGoldPerLevel = 5000; // 0.5 gold per level in copper
+
+// Announcement messages
+static std::string g_MessageSiegeStart = "|cffff0000[City Siege]|r The city of %s is under attack! Defenders are needed!";
+static std::string g_MessageSiegeEnd = "|cff00ff00[City Siege]|r The siege of %s has ended!";
+static std::string g_MessageReward = "|cff00ff00[City Siege]|r You have been rewarded for defending %s!";
+
+// Leader spawn yell
+static std::string g_YellLeaderSpawn = "This city will fall before our might!";
+
+// Combat yells (semicolon separated)
+static std::string g_YellsCombat = "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!";
 
 // -----------------------------------------------------------------------------
 // CITY SIEGE DATA STRUCTURES
@@ -106,22 +118,28 @@ struct CityData
     CityId id;
     std::string name;
     uint32 mapId;
-    float centerX;
+    float centerX;      // City center for announcement radius
     float centerY;
     float centerZ;
+    float spawnX;       // Configurable spawn location
+    float spawnY;
+    float spawnZ;
+    float leaderX;      // Configurable leader location
+    float leaderY;
+    float leaderZ;
     uint32 targetLeaderEntry; // Entry ID of the city leader to attack
 };
 
 // City definitions with approximate center coordinates
 static std::vector<CityData> g_Cities = {
-    { CITY_STORMWIND,   "Stormwind",      0,   -8913.23f, 554.633f,  93.7944f, 1748  }, // King Varian Wrynn
-    { CITY_IRONFORGE,   "Ironforge",      0,   -4981.25f, -881.542f, 501.660f, 2784  }, // King Magni Bronzebeard
-    { CITY_DARNASSUS,   "Darnassus",      1,    9947.52f, 2482.73f,  1316.21f, 7999  }, // Tyrande Whisperwind
-    { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, 17949 }, // Prophet Velen
-    { CITY_ORGRIMMAR,   "Orgrimmar",      1,    1633.75f, -4439.39f, 15.4396f, 4949  }, // Thrall
-    { CITY_UNDERCITY,   "Undercity",      0,    1633.75f, 240.167f,  -43.1034f, 10181 }, // Lady Sylvanas Windrunner
-    { CITY_THUNDERBLUFF, "Thunder Bluff", 1,   -1043.11f, 285.809f,  135.165f, 3057  }, // Cairne Bloodhoof
-    { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f, 16283 }  // Lor'themar Theron
+    { CITY_STORMWIND,   "Stormwind",      0,   -8913.23f, 554.633f,  93.7944f,  -8913.23f, 554.633f,  93.7944f,  -8913.23f, 554.633f,  93.7944f,  1748  },
+    { CITY_IRONFORGE,   "Ironforge",      0,   -4981.25f, -881.542f, 501.660f,  -4981.25f, -881.542f, 501.660f,  -4981.25f, -881.542f, 501.660f,  2784  },
+    { CITY_DARNASSUS,   "Darnassus",      1,    9947.52f, 2482.73f,  1316.21f,   9947.52f, 2482.73f,  1316.21f,   9947.52f, 2482.73f,  1316.21f,  7999  },
+    { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, -3864.92f, -11643.7f, -137.644f, -3864.92f, -11643.7f, -137.644f, 17949 },
+    { CITY_ORGRIMMAR,   "Orgrimmar",      1,    1633.75f, -4439.39f, 15.4396f,   1633.75f, -4439.39f, 15.4396f,   1633.75f, -4439.39f, 15.4396f,  4949  },
+    { CITY_UNDERCITY,   "Undercity",      0,    1633.75f, 240.167f,  -43.1034f,  1633.75f, 240.167f,  -43.1034f,  1633.75f, 240.167f,  -43.1034f, 10181 },
+    { CITY_THUNDERBLUFF, "Thunder Bluff", 1,   -1043.11f, 285.809f,  135.165f,  -1043.11f, 285.809f,  135.165f,  -1043.11f, 285.809f,  135.165f,  3057  },
+    { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f,   9338.74f, -7277.27f, 13.7014f,   9338.74f, -7277.27f, 13.7014f,  16283 }
 };
 
 struct SiegeEvent
@@ -201,7 +219,88 @@ void LoadCitySiegeConfiguration()
     // Reward settings
     g_RewardOnDefense = sConfigMgr->GetOption<bool>("CitySiege.RewardOnDefense", true);
     g_RewardHonor = sConfigMgr->GetOption<uint32>("CitySiege.RewardHonor", 100);
-    g_RewardGold = sConfigMgr->GetOption<uint32>("CitySiege.RewardGold", 500000);
+    g_RewardGoldBase = sConfigMgr->GetOption<uint32>("CitySiege.RewardGoldBase", 5000);
+    g_RewardGoldPerLevel = sConfigMgr->GetOption<uint32>("CitySiege.RewardGoldPerLevel", 5000);
+
+    // Messages
+    g_MessageSiegeStart = sConfigMgr->GetOption<std::string>("CitySiege.Message.SiegeStart", 
+        "|cffff0000[City Siege]|r The city of %s is under attack! Defenders are needed!");
+    g_MessageSiegeEnd = sConfigMgr->GetOption<std::string>("CitySiege.Message.SiegeEnd", 
+        "|cff00ff00[City Siege]|r The siege of %s has ended!");
+    g_MessageReward = sConfigMgr->GetOption<std::string>("CitySiege.Message.Reward", 
+        "|cff00ff00[City Siege]|r You have been rewarded for defending %s!");
+    
+    // Yells
+    g_YellLeaderSpawn = sConfigMgr->GetOption<std::string>("CitySiege.Yell.LeaderSpawn", 
+        "This city will fall before our might!");
+    g_YellsCombat = sConfigMgr->GetOption<std::string>("CitySiege.Yell.Combat", 
+        "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!");
+
+    // Load spawn locations for each city
+    g_Cities[CITY_STORMWIND].spawnX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnX", -8913.23f);
+    g_Cities[CITY_STORMWIND].spawnY = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnY", 554.633f);
+    g_Cities[CITY_STORMWIND].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnZ", 93.7944f);
+    
+    g_Cities[CITY_IRONFORGE].spawnX = sConfigMgr->GetOption<float>("CitySiege.Ironforge.SpawnX", -4981.25f);
+    g_Cities[CITY_IRONFORGE].spawnY = sConfigMgr->GetOption<float>("CitySiege.Ironforge.SpawnY", -881.542f);
+    g_Cities[CITY_IRONFORGE].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Ironforge.SpawnZ", 501.660f);
+    
+    g_Cities[CITY_DARNASSUS].spawnX = sConfigMgr->GetOption<float>("CitySiege.Darnassus.SpawnX", 9947.52f);
+    g_Cities[CITY_DARNASSUS].spawnY = sConfigMgr->GetOption<float>("CitySiege.Darnassus.SpawnY", 2482.73f);
+    g_Cities[CITY_DARNASSUS].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Darnassus.SpawnZ", 1316.21f);
+    
+    g_Cities[CITY_EXODAR].spawnX = sConfigMgr->GetOption<float>("CitySiege.Exodar.SpawnX", -3864.92f);
+    g_Cities[CITY_EXODAR].spawnY = sConfigMgr->GetOption<float>("CitySiege.Exodar.SpawnY", -11643.7f);
+    g_Cities[CITY_EXODAR].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Exodar.SpawnZ", -137.644f);
+    
+    g_Cities[CITY_ORGRIMMAR].spawnX = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.SpawnX", 1633.75f);
+    g_Cities[CITY_ORGRIMMAR].spawnY = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.SpawnY", -4439.39f);
+    g_Cities[CITY_ORGRIMMAR].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.SpawnZ", 15.4396f);
+    
+    g_Cities[CITY_UNDERCITY].spawnX = sConfigMgr->GetOption<float>("CitySiege.Undercity.SpawnX", 1633.75f);
+    g_Cities[CITY_UNDERCITY].spawnY = sConfigMgr->GetOption<float>("CitySiege.Undercity.SpawnY", 240.167f);
+    g_Cities[CITY_UNDERCITY].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Undercity.SpawnZ", -43.1034f);
+    
+    g_Cities[CITY_THUNDERBLUFF].spawnX = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.SpawnX", -1043.11f);
+    g_Cities[CITY_THUNDERBLUFF].spawnY = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.SpawnY", 285.809f);
+    g_Cities[CITY_THUNDERBLUFF].spawnZ = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.SpawnZ", 135.165f);
+    
+    g_Cities[CITY_SILVERMOON].spawnX = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.SpawnX", 9338.74f);
+    g_Cities[CITY_SILVERMOON].spawnY = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.SpawnY", -7277.27f);
+    g_Cities[CITY_SILVERMOON].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.SpawnZ", 13.7014f);
+
+    // Load leader locations for each city
+    g_Cities[CITY_STORMWIND].leaderX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.LeaderX", -8913.23f);
+    g_Cities[CITY_STORMWIND].leaderY = sConfigMgr->GetOption<float>("CitySiege.Stormwind.LeaderY", 554.633f);
+    g_Cities[CITY_STORMWIND].leaderZ = sConfigMgr->GetOption<float>("CitySiege.Stormwind.LeaderZ", 93.7944f);
+    
+    g_Cities[CITY_IRONFORGE].leaderX = sConfigMgr->GetOption<float>("CitySiege.Ironforge.LeaderX", -4981.25f);
+    g_Cities[CITY_IRONFORGE].leaderY = sConfigMgr->GetOption<float>("CitySiege.Ironforge.LeaderY", -881.542f);
+    g_Cities[CITY_IRONFORGE].leaderZ = sConfigMgr->GetOption<float>("CitySiege.Ironforge.LeaderZ", 501.660f);
+    
+    g_Cities[CITY_DARNASSUS].leaderX = sConfigMgr->GetOption<float>("CitySiege.Darnassus.LeaderX", 9947.52f);
+    g_Cities[CITY_DARNASSUS].leaderY = sConfigMgr->GetOption<float>("CitySiege.Darnassus.LeaderY", 2482.73f);
+    g_Cities[CITY_DARNASSUS].leaderZ = sConfigMgr->GetOption<float>("CitySiege.Darnassus.LeaderZ", 1316.21f);
+    
+    g_Cities[CITY_EXODAR].leaderX = sConfigMgr->GetOption<float>("CitySiege.Exodar.LeaderX", -3864.92f);
+    g_Cities[CITY_EXODAR].leaderY = sConfigMgr->GetOption<float>("CitySiege.Exodar.LeaderY", -11643.7f);
+    g_Cities[CITY_EXODAR].leaderZ = sConfigMgr->GetOption<float>("CitySiege.Exodar.LeaderZ", -137.644f);
+    
+    g_Cities[CITY_ORGRIMMAR].leaderX = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.LeaderX", 1633.75f);
+    g_Cities[CITY_ORGRIMMAR].leaderY = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.LeaderY", -4439.39f);
+    g_Cities[CITY_ORGRIMMAR].leaderZ = sConfigMgr->GetOption<float>("CitySiege.Orgrimmar.LeaderZ", 15.4396f);
+    
+    g_Cities[CITY_UNDERCITY].leaderX = sConfigMgr->GetOption<float>("CitySiege.Undercity.LeaderX", 1633.75f);
+    g_Cities[CITY_UNDERCITY].leaderY = sConfigMgr->GetOption<float>("CitySiege.Undercity.LeaderY", 240.167f);
+    g_Cities[CITY_UNDERCITY].leaderZ = sConfigMgr->GetOption<float>("CitySiege.Undercity.LeaderZ", -43.1034f);
+    
+    g_Cities[CITY_THUNDERBLUFF].leaderX = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.LeaderX", -1043.11f);
+    g_Cities[CITY_THUNDERBLUFF].leaderY = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.LeaderY", 285.809f);
+    g_Cities[CITY_THUNDERBLUFF].leaderZ = sConfigMgr->GetOption<float>("CitySiege.ThunderBluff.LeaderZ", 135.165f);
+    
+    g_Cities[CITY_SILVERMOON].leaderX = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.LeaderX", 9338.74f);
+    g_Cities[CITY_SILVERMOON].leaderY = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.LeaderY", -7277.27f);
+    g_Cities[CITY_SILVERMOON].leaderZ = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.LeaderZ", 13.7014f);
 
     if (g_DebugMode)
     {
@@ -267,11 +366,15 @@ void AnnounceSiege(const CityData& city, bool isStart)
     std::string message;
     if (isStart)
     {
-        message = "|cffff0000[City Siege]|r The city of " + city.name + " is under attack! Defenders are needed!";
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer), g_MessageSiegeStart.c_str(), city.name.c_str());
+        message = buffer;
     }
     else
     {
-        message = "|cff00ff00[City Siege]|r The siege of " + city.name + " has ended!";
+        char buffer[256];
+        snprintf(buffer, sizeof(buffer), g_MessageSiegeEnd.c_str(), city.name.c_str());
+        message = buffer;
     }
 
     if (g_AnnounceRadius == 0)
@@ -338,17 +441,17 @@ void SpawnSiegeCreatures(SiegeEvent& event)
     uint32 miniBossEntry = isAllianceCity ? g_CreatureAllianceMiniBoss : g_CreatureHordeMiniBoss;
     uint32 leaderEntry = isAllianceCity ? g_CreatureAllianceLeader : g_CreatureHordeLeader;
     
-    // Spawn creatures OUTSIDE the city (further away from center)
-    float spawnRadius = 150.0f; // Spawn 150 yards outside city center
+    // Spawn creatures around the configured spawn point (not city center)
+    float spawnRadius = 30.0f; // Radius around the spawn point for formation
     float spawnAngleStep = 2 * M_PI / (g_SpawnCountMinions + g_SpawnCountElites + g_SpawnCountMiniBosses + g_SpawnCountLeaders);
     float currentAngle = 0.0f;
 
-    // Spawn minions outside the city in a circle
+    // Spawn minions in outer circle around spawn point
     for (uint32 i = 0; i < g_SpawnCountMinions; ++i)
     {
-        float x = city.centerX + spawnRadius * cos(currentAngle);
-        float y = city.centerY + spawnRadius * sin(currentAngle);
-        float z = city.centerZ;
+        float x = city.spawnX + spawnRadius * cos(currentAngle);
+        float y = city.spawnY + spawnRadius * sin(currentAngle);
+        float z = city.spawnZ;
         
         if (Creature* creature = map->SummonCreature(minionEntry, Position(x, y, z, 0)))
         {
@@ -364,12 +467,12 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         currentAngle += spawnAngleStep;
     }
 
-    // Spawn elites outside the city (slightly closer)
+    // Spawn elites in tighter circle
     for (uint32 i = 0; i < g_SpawnCountElites; ++i)
     {
-        float x = city.centerX + (spawnRadius * 0.9f) * cos(currentAngle);
-        float y = city.centerY + (spawnRadius * 0.9f) * sin(currentAngle);
-        float z = city.centerZ;
+        float x = city.spawnX + (spawnRadius * 0.7f) * cos(currentAngle);
+        float y = city.spawnY + (spawnRadius * 0.7f) * sin(currentAngle);
+        float z = city.spawnZ;
         
         if (Creature* creature = map->SummonCreature(eliteEntry, Position(x, y, z, 0)))
         {
@@ -380,12 +483,12 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         currentAngle += spawnAngleStep;
     }
 
-    // Spawn mini-bosses outside the city (even closer)
+    // Spawn mini-bosses closer
     for (uint32 i = 0; i < g_SpawnCountMiniBosses; ++i)
     {
-        float x = city.centerX + (spawnRadius * 0.8f) * cos(currentAngle);
-        float y = city.centerY + (spawnRadius * 0.8f) * sin(currentAngle);
-        float z = city.centerZ;
+        float x = city.spawnX + (spawnRadius * 0.5f) * cos(currentAngle);
+        float y = city.spawnY + (spawnRadius * 0.5f) * sin(currentAngle);
+        float z = city.spawnZ;
         
         if (Creature* creature = map->SummonCreature(miniBossEntry, Position(x, y, z, 0)))
         {
@@ -396,12 +499,12 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         currentAngle += spawnAngleStep;
     }
 
-    // Spawn faction leaders outside the city (leading the charge)
+    // Spawn faction leaders at the spawn point center
     for (uint32 i = 0; i < g_SpawnCountLeaders; ++i)
     {
-        float x = city.centerX + (spawnRadius * 0.7f) * cos(currentAngle);
-        float y = city.centerY + (spawnRadius * 0.7f) * sin(currentAngle);
-        float z = city.centerZ;
+        float x = city.spawnX + (10.0f * cos(currentAngle));
+        float y = city.spawnY + (10.0f * sin(currentAngle));
+        float z = city.spawnZ;
         
         if (Creature* creature = map->SummonCreature(leaderEntry, Position(x, y, z, 0)))
         {
@@ -410,7 +513,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             event.spawnedCreatures.push_back(creature->GetGUID());
             
             // Make leader yell on spawn
-            creature->Yell("This city will fall before our might!", LANG_UNIVERSAL);
+            creature->Yell(g_YellLeaderSpawn.c_str(), LANG_UNIVERSAL);
         }
         currentAngle += spawnAngleStep;
     }
@@ -579,16 +682,17 @@ void DistributeRewards(const SiegeEvent& event, const CityData& city)
                     player->RewardHonor(nullptr, 1, g_RewardHonor);
                 }
                 
-                // Award gold
-                if (g_RewardGold > 0)
+                // Award gold scaled by player level
+                if (g_RewardGoldBase > 0 || g_RewardGoldPerLevel > 0)
                 {
-                    player->ModifyMoney(g_RewardGold);
+                    uint32 goldAmount = g_RewardGoldBase + (g_RewardGoldPerLevel * player->getLevel());
+                    player->ModifyMoney(goldAmount);
                 }
                 
                 // Send confirmation message
-                ChatHandler(player->GetSession()).PSendSysMessage(
-                    "|cff00ff00[City Siege]|r You have been rewarded for defending {}!", 
-                    city.name.c_str());
+                char buffer[256];
+                snprintf(buffer, sizeof(buffer), g_MessageReward.c_str(), city.name.c_str());
+                ChatHandler(player->GetSession()).PSendSysMessage(buffer);
                 
                 rewardedPlayers++;
             }
@@ -638,20 +742,13 @@ void UpdateSiegeEvents(uint32 diff)
                     {
                         creature->SetReactState(g_AggroPlayers ? REACT_AGGRESSIVE : REACT_DEFENSIVE);
                         
-                        // Primary target: Find and move toward the city leader
-                        if (Creature* cityLeader = creature->FindNearestCreature(city.targetLeaderEntry, 1000.0f, true))
-                        {
-                            // Start moving toward the city leader
-                            creature->GetMotionMaster()->MovePoint(0, cityLeader->GetPositionX(), 
-                                                                    cityLeader->GetPositionY(), 
-                                                                    cityLeader->GetPositionZ());
-                            creature->AI()->AttackStart(cityLeader);
-                        }
+                        // Move toward the configured leader location
+                        creature->GetMotionMaster()->MovePoint(0, city.leaderX, city.leaderY, city.leaderZ);
                         
-                        // Secondary: If aggressive to NPCs, attack guards on the way
+                        // If aggressive to NPCs, will aggro any hostile NPCs encountered
                         if (g_AggroNPCs)
                         {
-                            creature->SetReactState(REACT_AGGRESSIVE); // Will aggro any hostile NPCs encountered
+                            creature->SetReactState(REACT_AGGRESSIVE);
                         }
                     }
                 }
@@ -677,17 +774,29 @@ void UpdateSiegeEvents(uint32 diff)
                         if (entry == g_CreatureAllianceLeader || entry == g_CreatureHordeLeader ||
                             entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss)
                         {
-                            // Random yells
-                            std::vector<std::string> yells = {
-                                "Your defenses crumble!",
-                                "This city will burn!",
-                                "Face your doom!",
-                                "None can stand against us!",
-                                "Your leaders will fall!"
-                            };
+                            // Parse combat yells from configuration (semicolon separated)
+                            std::vector<std::string> yells;
+                            std::string yellStr = g_YellsCombat;
+                            size_t pos = 0;
+                            while ((pos = yellStr.find(';')) != std::string::npos)
+                            {
+                                std::string yell = yellStr.substr(0, pos);
+                                if (!yell.empty())
+                                {
+                                    yells.push_back(yell);
+                                }
+                                yellStr.erase(0, pos + 1);
+                            }
+                            if (!yellStr.empty())
+                            {
+                                yells.push_back(yellStr);
+                            }
                             
-                            uint32 randomIndex = urand(0, yells.size() - 1);
-                            creature->Yell(yells[randomIndex].c_str(), LANG_UNIVERSAL);
+                            if (!yells.empty())
+                            {
+                                uint32 randomIndex = urand(0, yells.size() - 1);
+                                creature->Yell(yells[randomIndex].c_str(), LANG_UNIVERSAL);
+                            }
                             break; // Only one creature yells per cycle
                         }
                     }
