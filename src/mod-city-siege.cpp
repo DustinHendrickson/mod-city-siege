@@ -29,6 +29,8 @@
 #include "MapMgr.h"
 #include "Creature.h"
 #include "ObjectAccessor.h"
+#include "MoveSplineInit.h"
+#include "MotionMaster.h"
 #include "Language.h"
 #include "ScriptedCreature.h"
 #include <vector>
@@ -449,36 +451,116 @@ void SpawnSiegeCreatures(SiegeEvent& event)
     uint32 miniBossEntry = isAllianceCity ? g_CreatureHordeMiniBoss : g_CreatureAllianceMiniBoss;
     uint32 leaderEntry = isAllianceCity ? g_CreatureHordeLeader : g_CreatureAllianceLeader;
     
-    // Spawn creatures around the configured spawn point (not city center)
-    float spawnRadius = 30.0f; // Radius around the spawn point for formation
-    float spawnAngleStep = 2 * M_PI / (g_SpawnCountMinions + g_SpawnCountElites + g_SpawnCountMiniBosses + g_SpawnCountLeaders);
-    float currentAngle = 0.0f;
-
-    // Spawn minions in outer circle around spawn point
-    for (uint32 i = 0; i < g_SpawnCountMinions; ++i)
+    // Military formation setup - organized ranks like a real army assault
+    // Leaders at center, mini-bosses forming command circle, elites in mid-rank, minions in outer perimeter
+    float baseRadius = 35.0f;
+    
+    // === RANK 1: LEADERS (Center/Command Post) ===
+    // Leaders spawn at the very center in a tight formation
+    float leaderRadius = 3.0f;
+    float leaderAngleStep = (2 * M_PI) / std::max(1u, g_SpawnCountLeaders);
+    for (uint32 i = 0; i < g_SpawnCountLeaders; ++i)
     {
-        float x = city.spawnX + spawnRadius * cos(currentAngle);
-        float y = city.spawnY + spawnRadius * sin(currentAngle);
+        float angle = leaderAngleStep * i;
+        float x = city.spawnX + leaderRadius * cos(angle);
+        float y = city.spawnY + leaderRadius * sin(angle);
         float z = city.spawnZ;
         
-        // Get proper ground height - check from above
+        // Get proper ground height
         float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
         if (groundZ > INVALID_HEIGHT)
-        {
-            z = groundZ + 0.5f; // Slightly above ground to prevent clipping
-        }
+            z = groundZ + 0.5f;
         
-        if (Creature* creature = map->SummonCreature(minionEntry, Position(x, y, z, 0)))
+        if (Creature* creature = map->SummonCreature(leaderEntry, Position(x, y, z, 0)))
         {
-            // Ensure creature is grounded and not flying
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
             creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
-            
             creature->SetReactState(REACT_PASSIVE);
-            // Set to friendly/neutral during cinematic phase - will be changed to hostile after
-            creature->SetFaction(35); // Friendly to all during RP
+            creature->SetFaction(35);
+            event.spawnedCreatures.push_back(creature->GetGUID());
+            creature->Yell(g_YellLeaderSpawn.c_str(), LANG_UNIVERSAL);
+        }
+    }
+
+    // === RANK 2: MINI-BOSSES (Command Circle) ===
+    // Form a protective circle around the leaders
+    float miniBossRadius = baseRadius * 0.3f; // ~10.5 yards
+    float miniBossAngleStep = (2 * M_PI) / std::max(1u, g_SpawnCountMiniBosses);
+    for (uint32 i = 0; i < g_SpawnCountMiniBosses; ++i)
+    {
+        float angle = miniBossAngleStep * i;
+        float x = city.spawnX + miniBossRadius * cos(angle);
+        float y = city.spawnY + miniBossRadius * sin(angle);
+        float z = city.spawnZ;
+        
+        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
+        if (groundZ > INVALID_HEIGHT)
+            z = groundZ + 0.5f;
+        
+        if (Creature* creature = map->SummonCreature(miniBossEntry, Position(x, y, z, 0)))
+        {
+            creature->SetDisableGravity(false);
+            creature->SetCanFly(false);
+            creature->SetHover(false);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
+            creature->SetReactState(REACT_PASSIVE);
+            creature->SetFaction(35);
+            event.spawnedCreatures.push_back(creature->GetGUID());
+        }
+    }
+
+    // === RANK 3: ELITES (Mid-Rank Officers) ===
+    // Form the middle rank in an organized formation
+    float eliteRadius = baseRadius * 0.6f; // ~21 yards
+    float eliteAngleStep = (2 * M_PI) / std::max(1u, g_SpawnCountElites);
+    for (uint32 i = 0; i < g_SpawnCountElites; ++i)
+    {
+        float angle = eliteAngleStep * i;
+        float x = city.spawnX + eliteRadius * cos(angle);
+        float y = city.spawnY + eliteRadius * sin(angle);
+        float z = city.spawnZ;
+        
+        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
+        if (groundZ > INVALID_HEIGHT)
+            z = groundZ + 0.5f;
+        
+        if (Creature* creature = map->SummonCreature(eliteEntry, Position(x, y, z, 0)))
+        {
+            creature->SetDisableGravity(false);
+            creature->SetCanFly(false);
+            creature->SetHover(false);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
+            creature->SetReactState(REACT_PASSIVE);
+            creature->SetFaction(35);
+            event.spawnedCreatures.push_back(creature->GetGUID());
+        }
+    }
+
+    // === RANK 4: MINIONS (Front Line / Outer Perimeter) ===
+    // Form the outer perimeter - the main fighting force
+    float minionRadius = baseRadius; // Full 35 yards
+    float minionAngleStep = (2 * M_PI) / std::max(1u, g_SpawnCountMinions);
+    for (uint32 i = 0; i < g_SpawnCountMinions; ++i)
+    {
+        float angle = minionAngleStep * i;
+        float x = city.spawnX + minionRadius * cos(angle);
+        float y = city.spawnY + minionRadius * sin(angle);
+        float z = city.spawnZ;
+        
+        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
+        if (groundZ > INVALID_HEIGHT)
+            z = groundZ + 0.5f;
+        
+        if (Creature* creature = map->SummonCreature(minionEntry, Position(x, y, z, 0)))
+        {
+            creature->SetDisableGravity(false);
+            creature->SetCanFly(false);
+            creature->SetHover(false);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
+            creature->SetReactState(REACT_PASSIVE);
+            creature->SetFaction(35);
             event.spawnedCreatures.push_back(creature->GetGUID());
             
             if (g_DebugMode)
@@ -486,100 +568,9 @@ void SpawnSiegeCreatures(SiegeEvent& event)
                 LOG_INFO("server.loading", "[City Siege] Spawned minion at ({}, {}, {})", x, y, z);
             }
         }
-        currentAngle += spawnAngleStep;
     }
 
-    // Spawn elites in tighter circle
-    for (uint32 i = 0; i < g_SpawnCountElites; ++i)
-    {
-        float x = city.spawnX + (spawnRadius * 0.7f) * cos(currentAngle);
-        float y = city.spawnY + (spawnRadius * 0.7f) * sin(currentAngle);
-        float z = city.spawnZ;
-        
-        // Get proper ground height - check from above
-        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
-        if (groundZ > INVALID_HEIGHT)
-        {
-            z = groundZ + 0.5f;
-        }
-        
-        if (Creature* creature = map->SummonCreature(eliteEntry, Position(x, y, z, 0)))
-        {
-            // Ensure creature is grounded and not flying
-            creature->SetDisableGravity(false);
-            creature->SetCanFly(false);
-            creature->SetHover(false);
-            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
-            
-            creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(35); // Friendly to all during RP
-            event.spawnedCreatures.push_back(creature->GetGUID());
-        }
-        currentAngle += spawnAngleStep;
-    }
-
-    // Spawn mini-bosses closer
-    for (uint32 i = 0; i < g_SpawnCountMiniBosses; ++i)
-    {
-        float x = city.spawnX + (spawnRadius * 0.5f) * cos(currentAngle);
-        float y = city.spawnY + (spawnRadius * 0.5f) * sin(currentAngle);
-        float z = city.spawnZ;
-        
-        // Get proper ground height - check from above
-        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
-        if (groundZ > INVALID_HEIGHT)
-        {
-            z = groundZ + 0.5f;
-        }
-        
-        if (Creature* creature = map->SummonCreature(miniBossEntry, Position(x, y, z, 0)))
-        {
-            // Ensure creature is grounded and not flying
-            creature->SetDisableGravity(false);
-            creature->SetCanFly(false);
-            creature->SetHover(false);
-            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
-            
-            creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(35); // Friendly to all during RP
-            event.spawnedCreatures.push_back(creature->GetGUID());
-        }
-        currentAngle += spawnAngleStep;
-    }
-
-    // Spawn faction leaders at the spawn point center
-    for (uint32 i = 0; i < g_SpawnCountLeaders; ++i)
-    {
-        float x = city.spawnX + (10.0f * cos(currentAngle));
-        float y = city.spawnY + (10.0f * sin(currentAngle));
-        float z = city.spawnZ;
-        
-        // Get proper ground height - check from above
-        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
-        if (groundZ > INVALID_HEIGHT)
-        {
-            z = groundZ + 0.5f;
-        }
-        
-        if (Creature* creature = map->SummonCreature(leaderEntry, Position(x, y, z, 0)))
-        {
-            // Ensure creature is grounded and not flying
-            creature->SetDisableGravity(false);
-            creature->SetCanFly(false);
-            creature->SetHover(false);
-            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
-            
-            creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(35); // Friendly to all during RP
-            event.spawnedCreatures.push_back(creature->GetGUID());
-            
-            // Make leader yell on spawn
-            creature->Yell(g_YellLeaderSpawn.c_str(), LANG_UNIVERSAL);
-        }
-        currentAngle += spawnAngleStep;
-    }
-
-    LOG_INFO("server.loading", "[City Siege] Spawned {} total creatures for siege at {}", 
+    LOG_INFO("server.loading", "[City Siege] Spawned {} total creatures in military formation for siege at {}", 
              event.spawnedCreatures.size(), city.name);
 }
 
