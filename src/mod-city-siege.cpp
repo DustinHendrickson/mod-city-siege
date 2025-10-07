@@ -558,7 +558,11 @@ void DespawnSiegeCreatures(SiegeEvent& event)
 /**
  * @brief Starts a new siege event in a random city.
  */
-void StartSiegeEvent()
+/**
+ * @brief Starts a new siege event.
+ * @param targetCityId Optional specific city to siege. If -1, selects random city.
+ */
+void StartSiegeEvent(int targetCityId = -1)
 {
     if (!g_CitySiegeEnabled)
     {
@@ -578,7 +582,29 @@ void StartSiegeEvent()
         }
     }
 
-    CityData* city = SelectRandomCity();
+    CityData* city = nullptr;
+    
+    // If specific city requested, use it
+    if (targetCityId >= 0 && targetCityId < CITY_MAX)
+    {
+        city = &g_Cities[targetCityId];
+        
+        // Check if city is enabled
+        if (!g_CityEnabled[city->name])
+        {
+            if (g_DebugMode)
+            {
+                LOG_INFO("server.loading", "[City Siege] Cannot start siege - {} is disabled", city->name);
+            }
+            return;
+        }
+    }
+    else
+    {
+        // Select random city
+        city = SelectRandomCity();
+    }
+    
     if (!city)
     {
         if (g_DebugMode)
