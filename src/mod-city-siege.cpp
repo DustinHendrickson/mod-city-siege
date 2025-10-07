@@ -474,6 +474,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
             
             creature->SetReactState(REACT_PASSIVE);
             // Set to friendly/neutral during cinematic phase - will be changed to hostile after
@@ -508,6 +509,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
             
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35); // Friendly to all during RP
@@ -536,6 +538,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
             
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35); // Friendly to all during RP
@@ -564,6 +567,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
             
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35); // Friendly to all during RP
@@ -869,21 +873,22 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         creature->GetMotionMaster()->Clear(false);
                         creature->GetMotionMaster()->MoveIdle();
                         
-                        // Ensure grounded movement
+                        // Ensure creature walks on the ground
                         creature->SetDisableGravity(false);
                         creature->SetCanFly(false);
                         creature->SetHover(false);
+                        creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
                         creature->SetWalk(false); // Run to the leader
                         
-                        // Get proper height at destination
-                        float destZ = map->GetHeight(city.leaderX, city.leaderY, city.leaderZ + 50.0f, true, 50.0f);
-                        if (destZ <= INVALID_HEIGHT)
-                        {
-                            destZ = city.leaderZ;
-                        }
+                        // Update ground height at destination
+                        float destZ = city.leaderZ;
+                        creature->UpdateAllowedPositionZ(city.leaderX, city.leaderY, destZ);
                         
-                        // Move with BOTH pathfinding parameters set to true
-                        creature->GetMotionMaster()->MovePoint(0, city.leaderX, city.leaderY, destZ, true, true);
+                        // Use MoveSplineInit for proper pathfinding - this is how the core handles ground movement
+                        Movement::MoveSplineInit init(creature);
+                        init.MoveTo(city.leaderX, city.leaderY, destZ, true, true);
+                        init.SetWalk(false);
+                        init.Launch();
                         
                         if (g_DebugMode)
                         {
