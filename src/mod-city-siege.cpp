@@ -458,6 +458,13 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         float y = city.spawnY + spawnRadius * sin(currentAngle);
         float z = city.spawnZ;
         
+        // Get proper ground height
+        float groundZ = map->GetHeight(x, y, z + 10.0f, true);
+        if (groundZ > INVALID_HEIGHT)
+        {
+            z = groundZ;
+        }
+        
         if (Creature* creature = map->SummonCreature(minionEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
@@ -479,6 +486,13 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         float y = city.spawnY + (spawnRadius * 0.7f) * sin(currentAngle);
         float z = city.spawnZ;
         
+        // Get proper ground height
+        float groundZ = map->GetHeight(x, y, z + 10.0f, true);
+        if (groundZ > INVALID_HEIGHT)
+        {
+            z = groundZ;
+        }
+        
         if (Creature* creature = map->SummonCreature(eliteEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
@@ -495,6 +509,13 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         float y = city.spawnY + (spawnRadius * 0.5f) * sin(currentAngle);
         float z = city.spawnZ;
         
+        // Get proper ground height
+        float groundZ = map->GetHeight(x, y, z + 10.0f, true);
+        if (groundZ > INVALID_HEIGHT)
+        {
+            z = groundZ;
+        }
+        
         if (Creature* creature = map->SummonCreature(miniBossEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
@@ -510,6 +531,13 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         float x = city.spawnX + (10.0f * cos(currentAngle));
         float y = city.spawnY + (10.0f * sin(currentAngle));
         float z = city.spawnZ;
+        
+        // Get proper ground height
+        float groundZ = map->GetHeight(x, y, z + 10.0f, true);
+        if (groundZ > INVALID_HEIGHT)
+        {
+            z = groundZ;
+        }
         
         if (Creature* creature = map->SummonCreature(leaderEntry, Position(x, y, z, 0)))
         {
@@ -793,15 +821,26 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 {
                     if (Creature* creature = map->GetCreature(guid))
                     {
-                        creature->SetReactState(g_AggroPlayers ? REACT_AGGRESSIVE : REACT_DEFENSIVE);
+                        // Determine react state based on configuration
+                        if (g_AggroPlayers && g_AggroNPCs)
+                        {
+                            creature->SetReactState(REACT_AGGRESSIVE);
+                        }
+                        else if (g_AggroPlayers)
+                        {
+                            creature->SetReactState(REACT_DEFENSIVE);
+                        }
+                        else
+                        {
+                            creature->SetReactState(REACT_DEFENSIVE);
+                        }
                         
                         // Move toward the configured leader location
                         creature->GetMotionMaster()->MovePoint(0, city.leaderX, city.leaderY, city.leaderZ);
                         
-                        // If aggressive to NPCs, will aggro any hostile NPCs encountered
-                        if (g_AggroNPCs)
+                        if (g_DebugMode)
                         {
-                            creature->SetReactState(REACT_AGGRESSIVE);
+                            LOG_INFO("server.loading", "[City Siege] Creature {} activated and moving to leader", creature->GetEntry());
                         }
                     }
                 }
