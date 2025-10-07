@@ -19,6 +19,7 @@
 #include "Player.h"
 #include "ObjectMgr.h"
 #include "Chat.h"
+#include "CommandScript.h"
 #include "Log.h"
 #include "Configuration/Config.h"
 #include "Common.h"
@@ -34,6 +35,9 @@
 #include <unordered_map>
 #include <string>
 #include <cmath>
+#include <algorithm>
+
+using namespace Acore::ChatCommands;
 
 // -----------------------------------------------------------------------------
 // CONFIGURATION VARIABLES
@@ -163,7 +167,7 @@ static uint32 g_NextSiegeTime = 0;
 // -----------------------------------------------------------------------------
 
 // Forward declarations
-void DistributeRewards(const SiegeEvent& event, const CityData& city);
+void DistributeRewards(const SiegeEvent& event, const CityData& city, int winningTeam = -1);
 
 /**
  * @brief Loads the configuration for the City Siege module.
@@ -643,7 +647,13 @@ void EndSiegeEvent(SiegeEvent& event)
 
     if (g_RewardOnDefense && defendersWon)
     {
-        DistributeRewards(event, city);
+        // Determine which faction defended the city
+        bool isAllianceCity = (event.cityId == CITY_STORMWIND || event.cityId == CITY_IRONFORGE || 
+                              event.cityId == CITY_DARNASSUS || event.cityId == CITY_EXODAR);
+        
+        // Reward the defending faction (0 = Alliance, 1 = Horde)
+        int winningTeam = isAllianceCity ? 0 : 1;
+        DistributeRewards(event, city, winningTeam);
     }
 
     if (g_DebugMode)
@@ -658,7 +668,7 @@ void EndSiegeEvent(SiegeEvent& event)
  * @param event The siege event that ended.
  * @param city The city that was defended.
  */
-void DistributeRewards(const SiegeEvent& event, const CityData& city)
+void DistributeRewards(const SiegeEvent& event, const CityData& city, int winningTeam = -1)
 {
     Map* map = sMapMgr->FindMap(city.mapId, 0);
     if (!map)
@@ -673,6 +683,12 @@ void DistributeRewards(const SiegeEvent& event, const CityData& city)
     {
         if (Player* player = itr->GetSource())
         {
+            // If winningTeam is specified, only reward players of that faction
+            if (winningTeam != -1 && player->GetTeamId() != winningTeam)
+            {
+                continue;
+            }
+            
             // Check if player is in range and appropriate level
             if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius &&
                 player->GetLevel() >= g_MinimumLevel)
@@ -702,7 +718,7 @@ void DistributeRewards(const SiegeEvent& event, const CityData& city)
     
     if (g_DebugMode)
     {
-        LOG_INFO("server.loading", "[City Siege] Rewarded {} players for defending {}", 
+        LOG_INFO("server.loading", "[City Siege] Rewarded {} players for the siege of {}", 
                  rewardedPlayers, city.name);
     }
 }
@@ -894,10 +910,311 @@ public:
 };
 
 // -----------------------------------------------------------------------------
+// COMMAND SCRIPT
+// -----------------------------------------------------------------------------
+
+/**
+ * @brief CommandScript for GM commands to manage City Siege events.
+ */
+class citysiege_commandscript : public CommandScript
+{
+public:
+    citysiege_commandscript() : CommandScript("citysiege_commandscript") { }
+
+    ChatCommandTable GetCommands() const override
+    {
+        static ChatCommandTable citySiegeCommandTable =
+        {
+            { "start",   HandleCitySiegeStartCommand,   SEC_GAMEMASTER, Console::No },
+            { "stop",    HandleCitySiegeStopCommand,    SEC_GAMEMASTER, Console::No },
+            { "cleanup", HandleCitySiegeCleanupCommand, SEC_GAMEMASTER, Console::No },
+            { "status",  HandleCitySiegeStatusCommand,  SEC_GAMEMASTER, Console::No }
+        };
+
+        static ChatCommandTable commandTable =
+        {
+            { "citysiege", citySiegeCommandTable }
+        };
+
+        return commandTable;
+    }
+
+    static bool HandleCitySiegeStartCommand(ChatHandler* handler, Optional<std::string> cityNameArg)
+    {
+        if (!g_CitySiegeEnabled)
+        {
+            handler->PSendSysMessage("City Siege module is disabled.");
+            return true;
+        }
+
+        // Parse city name if provided
+        int cityId = -1;
+        if (cityNameArg)
+        {
+            std::string cityName = *cityNameArg;
+            std::transform(cityName.begin(), cityName.end(), cityName.begin(), ::tolower);
+
+            for (int i = 0; i < CITY_MAX; ++i)
+            {
+                std::string compareName = g_Cities[i].name;
+                std::transform(compareName.begin(), compareName.end(), compareName.begin(), ::tolower);
+                if (compareName == cityName)
+                {
+                    cityId = i;
+                    break;
+                }
+            }
+
+            if (cityId == -1)
+            {
+                handler->PSendSysMessage("Invalid city name. Valid cities: Stormwind, Ironforge, Darnassus, Exodar, Orgrimmar, Undercity, Thunderbluff, Silvermoon");
+                return true;
+            }
+
+            // Check if city is enabled
+            if (!g_Cities[cityId].enabled)
+            {
+                handler->PSendSysMessage("City '%s' is disabled in configuration.", g_Cities[cityId].name.c_str());
+                return true;
+            }
+        }
+
+        // Check if already active
+        if (cityId != -1)
+        {
+            for (const auto& event : g_ActiveSieges)
+            {
+                if (event.isActive && event.cityId == cityId)
+                {
+                    handler->PSendSysMessage("City '%s' is already under siege!", g_Cities[cityId].name.c_str());
+                    return true;
+                }
+            }
+        }
+
+        // Start the siege
+        if (cityId == -1)
+        {
+            StartSiegeEvent(); // Random city
+            handler->PSendSysMessage("Started siege event in a random enabled city!");
+        }
+        else
+        {
+            StartSiegeEvent(cityId);
+            handler->PSendSysMessage("Started siege event in %s!", g_Cities[cityId].name.c_str());
+        }
+
+        return true;
+    }
+
+    static bool HandleCitySiegeStopCommand(ChatHandler* handler, Optional<std::string> cityNameArg, Optional<std::string> factionArg)
+    {
+        if (g_ActiveSieges.empty())
+        {
+            handler->PSendSysMessage("No active siege events.");
+            return true;
+        }
+
+        // Faction is required
+        if (!factionArg)
+        {
+            handler->PSendSysMessage("Usage: .citysiege stop <cityname> <alliance|horde>");
+            handler->PSendSysMessage("Specify which faction wins the siege.");
+            return true;
+        }
+
+        // Parse faction
+        std::string factionStr = *factionArg;
+        std::transform(factionStr.begin(), factionStr.end(), factionStr.begin(), ::tolower);
+        
+        bool allianceWins = false;
+        if (factionStr == "alliance")
+        {
+            allianceWins = true;
+        }
+        else if (factionStr == "horde")
+        {
+            allianceWins = false;
+        }
+        else
+        {
+            handler->PSendSysMessage("Invalid faction. Use 'alliance' or 'horde'.");
+            return true;
+        }
+
+        // Parse city name
+        int cityId = -1;
+        if (cityNameArg)
+        {
+            std::string cityName = *cityNameArg;
+            std::transform(cityName.begin(), cityName.end(), cityName.begin(), ::tolower);
+
+            for (int i = 0; i < CITY_MAX; ++i)
+            {
+                std::string compareName = g_Cities[i].name;
+                std::transform(compareName.begin(), compareName.end(), compareName.begin(), ::tolower);
+                if (compareName == cityName)
+                {
+                    cityId = i;
+                    break;
+                }
+            }
+
+            if (cityId == -1)
+            {
+                handler->PSendSysMessage("Invalid city name.");
+                return true;
+            }
+        }
+        else
+        {
+            handler->PSendSysMessage("Usage: .citysiege stop <cityname> <alliance|horde>");
+            return true;
+        }
+
+        // Find and stop the siege with winner determination
+        bool found = false;
+        for (auto& event : g_ActiveSieges)
+        {
+            if (event.isActive && event.cityId == cityId)
+            {
+                found = true;
+                
+                // Determine winning team (0 = Alliance, 1 = Horde)
+                int winningTeam = allianceWins ? 0 : 1;
+                
+                // Distribute rewards to winning faction's players
+                DistributeRewards(event, g_Cities[cityId], winningTeam);
+                
+                handler->PSendSysMessage("Siege stopped. %s wins! %s players have been rewarded.", 
+                    allianceWins ? "Alliance" : "Horde",
+                    allianceWins ? "Alliance" : "Horde");
+                
+                // Clean up
+                DespawnSiegeCreatures(event);
+                event.isActive = false;
+                
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            handler->PSendSysMessage("No active siege in %s", g_Cities[cityId].name.c_str());
+        }
+        else
+        {
+            // Remove inactive events
+            g_ActiveSieges.erase(
+                std::remove_if(g_ActiveSieges.begin(), g_ActiveSieges.end(),
+                    [](const SiegeEvent& event) { return !event.isActive; }),
+                g_ActiveSieges.end());
+        }
+
+        return true;
+    }
+
+    static bool HandleCitySiegeCleanupCommand(ChatHandler* handler, Optional<std::string> cityNameArg)
+    {
+        int cityId = -1;
+        if (cityNameArg)
+        {
+            std::string cityName = *cityNameArg;
+            std::transform(cityName.begin(), cityName.end(), cityName.begin(), ::tolower);
+
+            for (int i = 0; i < CITY_MAX; ++i)
+            {
+                std::string compareName = g_Cities[i].name;
+                std::transform(compareName.begin(), compareName.end(), compareName.begin(), ::tolower);
+                if (compareName == cityName)
+                {
+                    cityId = i;
+                    break;
+                }
+            }
+
+            if (cityId == -1)
+            {
+                handler->PSendSysMessage("Invalid city name.");
+                return true;
+            }
+        }
+
+        // Cleanup sieges
+        int cleanedCount = 0;
+        for (auto& event : g_ActiveSieges)
+        {
+            if (cityId == -1 || event.cityId == cityId)
+            {
+                DespawnSiegeCreatures(event);
+                event.isActive = false;
+                handler->PSendSysMessage("Cleaned up siege creatures in %s", g_Cities[event.cityId].name.c_str());
+                cleanedCount++;
+
+                if (cityId != -1)
+                    break;
+            }
+        }
+
+        if (cleanedCount == 0)
+        {
+            handler->PSendSysMessage("No siege events to cleanup.");
+        }
+        else
+        {
+            // Remove inactive events
+            g_ActiveSieges.erase(
+                std::remove_if(g_ActiveSieges.begin(), g_ActiveSieges.end(),
+                    [](const SiegeEvent& event) { return !event.isActive; }),
+                g_ActiveSieges.end());
+        }
+
+        return true;
+    }
+
+    static bool HandleCitySiegeStatusCommand(ChatHandler* handler)
+    {
+        handler->PSendSysMessage("=== City Siege Status ===");
+        handler->PSendSysMessage("Module Enabled: %s", g_CitySiegeEnabled ? "Yes" : "No");
+        handler->PSendSysMessage("Active Sieges: %u", static_cast<uint32>(g_ActiveSieges.size()));
+
+        if (!g_ActiveSieges.empty())
+        {
+            handler->PSendSysMessage("--- Active Siege Events ---");
+            for (const auto& event : g_ActiveSieges)
+            {
+                if (event.isActive)
+                {
+                    uint32 currentTime = time(nullptr);
+                    uint32 remaining = event.endTime > currentTime ? (event.endTime - currentTime) : 0;
+                    handler->PSendSysMessage("  %s - %u creatures, %u minutes remaining",
+                        g_Cities[event.cityId].name.c_str(),
+                        static_cast<uint32>(event.spawnedCreatures.size()),
+                        remaining / 60);
+                }
+            }
+        }
+
+        if (g_CitySiegeEnabled)
+        {
+            uint32 currentTime = time(nullptr);
+            if (g_NextSiegeTime > currentTime)
+            {
+                uint32 timeUntilNext = g_NextSiegeTime - currentTime;
+                handler->PSendSysMessage("Next auto-siege in: %u minutes", timeUntilNext / 60);
+            }
+        }
+
+        return true;
+    }
+};
+
+// -----------------------------------------------------------------------------
 // SCRIPT REGISTRATION
 // -----------------------------------------------------------------------------
 
 void Addmod_city_siegeScripts()
 {
     new CitySiegeWorldScript();
+    new citysiege_commandscript();
 }

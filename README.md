@@ -6,7 +6,7 @@
 
 Overview
 --------
-The City Siege module for AzerothCore adds dynamic, timed siege events to all major cities in World of Warcraft. On a random, configurable timer, opposing faction forces assault a major city, spawning enemy units outside the city limits who march toward the city leader while engaging defenders. Enemy forces spawn at the city outskirts and use AI pathfinding to march into the city, attacking the faction leader as their primary objective. Defenders must protect their city leaders or face defeat. Successful defense is rewarded with honor and gold scaled by player level. This module creates exciting world events that encourage player participation in defending their cities and creates a more dynamic, living world experience.
+The City Siege module for AzerothCore adds dynamic, timed siege events to all major cities in World of Warcraft. On a random, configurable timer, opposing faction forces assault a major city, spawning enemy units outside the city limits who march toward the city leader while engaging defenders. Enemy forces spawn at the city outskirts and use pathfinding and waypoints to march into the city, attacking the faction leader as their primary objective. Defenders must protect their city leaders or face defeat. Successful defense is rewarded with honor and gold scaled by player level. This module creates exciting world events that encourage player participation in defending their cities and creates a more dynamic, living world experience.
 
 > [!CAUTION]
 > THIS MODULE IS IN ACTIVE DEVELOPMENT. IT PROBABLY WON’T WORK, WILL SOMETIMES WORK POORLY, AND MAY RANDOMLY DECIDE TO TAKE A VACATION. DO NOT USE ON AN ACTIVE SERVER OR EXPECT ANYTHING RESEMBLING RELIABILITY UNTIL THIS NOTICE IS GONE.
@@ -22,8 +22,6 @@ Features
   Regular minions, Elite soldiers, Mini-bosses, and Faction leaders with configurable spawn counts.
 - **Strategic Spawning:**  
   Enemies spawn at configurable X/Y/Z locations outside each city (manually positioned at city gates) in tight formation and march toward the city leader.
-- **AI Pathfinding:**  
-  Creatures use GetMotionMaster()->MovePoint() to navigate toward city leaders, creating dynamic attack patterns.
 - **Cinematic RP Phase:**  
   Configurable delay (default 45s) where siege forces stand passive and yell RP messages before combat begins.
 - **Periodic Yells:**  
@@ -77,6 +75,100 @@ Installation
    Launch the world server:
    
        ./worldserver
+
+GM Commands
+-----------
+Game Masters with `SEC_GAMEMASTER` security level have access to manual siege control commands. These commands allow you to trigger, stop, and manage siege events for testing or special events.
+
+### Available Commands
+
+#### `.citysiege start [cityname]`
+Starts a siege event immediately in the specified city or a random enabled city if no name is provided.
+
+**Usage:**
+```
+.citysiege start                  # Start siege in random enabled city
+.citysiege start Stormwind        # Start siege in Stormwind
+.citysiege start orgrimmar        # Start siege in Orgrimmar (case-insensitive)
+```
+
+**Notes:**
+- City name matching is case-insensitive
+- Validates city exists and is enabled in configuration
+- Will not start if a siege is already active in that city
+- Respects `CitySiege.AllowMultipleCities` setting
+
+#### `.citysiege stop <cityname> <alliance|horde>`
+Stops an active siege event and declares a winner. The GM specifies which faction wins, and players of that faction receive rewards.
+
+**Usage:**
+```
+.citysiege stop Stormwind alliance    # Alliance wins - all Alliance players get rewards
+.citysiege stop Stormwind horde       # Horde wins - all Horde players get rewards
+.citysiege stop Orgrimmar horde       # Horde wins - all Horde players get rewards
+.citysiege stop Orgrimmar alliance    # Alliance wins - all Alliance players get rewards
+```
+
+**Notes:**
+- **Faction parameter is required** - GM manually decides which faction wins the battle
+- **Winning faction's players receive rewards** regardless of which city is under siege
+- If Alliance wins: Alliance players within range get honor and gold
+- If Horde wins: Horde players within range get honor and gold
+- Losing faction receives no rewards
+- Despawns all siege creatures
+- Removes event from active list
+
+#### `.citysiege cleanup [cityname]`
+Force despawns all siege creatures and clears event data. Use this if a siege becomes stuck or has issues.
+
+**Usage:**
+```
+.citysiege cleanup                # Cleanup all active sieges
+.citysiege cleanup Darnassus      # Cleanup Darnassus siege only
+```
+
+**Notes:**
+- Force removes creatures **without** reward distribution
+- Clears all event data and timers
+- Use this for troubleshooting problematic events
+- Does not trigger normal end-of-event procedures
+- No winner determination or rewards
+
+#### `.citysiege status`
+Displays the current status of the City Siege module and all active events.
+
+**Usage:**
+```
+.citysiege status
+```
+
+**Output includes:**
+- Module enabled/disabled state
+- Number of active sieges
+- Details for each active siege:
+  - City name
+  - Time remaining in the event
+  - Number of creatures alive
+- Time until next automatic siege event
+
+### Command Examples
+
+```
+# Test a siege event in Stormwind
+.citysiege start Stormwind
+
+# Check how the event is progressing
+.citysiege status
+
+# GM observes and decides Alliance wins - Alliance players get rewards
+.citysiege stop Stormwind alliance
+
+# Or if GM decides Horde wins - Horde players get rewards
+.citysiege stop Stormwind horde
+
+# If creatures get stuck, force cleanup (no rewards, no winner)
+.citysiege cleanup Stormwind
+```
 
 Configuration Options
 ---------------------
@@ -199,7 +291,7 @@ How It Works
    For the configured delay (default 45 seconds), enemies remain passive and leaders yell RP messages configured in `CitySiege.Yell.LeaderSpawn`.
 
 6. **Combat Phase:**  
-   After the cinematic delay, enemies become aggressive and use AI pathfinding (GetMotionMaster()->MovePoint()) to march toward the city leader. Enemies will engage any hostile players or NPCs in their path based on aggro settings.
+   After the cinematic delay, enemies become aggressive and use pathfinding (GetMotionMaster()->MovePoint()) to march toward the city leader. Enemies will engage any hostile players or NPCs in their path based on aggro settings.
 
 7. **Periodic Yells:**  
    Every 30 seconds (configurable), leaders and mini-bosses yell threatening messages configured in `CitySiege.Yell.Combat`.
@@ -306,6 +398,9 @@ This module is released under the GNU AGPL v3 license, consistent with AzerothCo
 
 Credits
 -------
+
+Created by Dustin Hendrickson
+
 Created for the AzerothCore Project.
 
 Inspired by Classic WoW world events and city raids.
