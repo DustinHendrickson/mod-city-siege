@@ -536,7 +536,7 @@ void DespawnSiegeCreatures(SiegeEvent& event)
     {
         for (const auto& guid : event.spawnedCreatures)
         {
-            if (Creature* creature = ObjectAccessor::GetCreature(*map, guid))
+            if (Creature* creature = map->GetCreature(guid))
             {
                 creature->DespawnOrUnsummon();
             }
@@ -739,7 +739,7 @@ void UpdateSiegeEvents(uint32 diff)
             {
                 for (const auto& guid : event.spawnedCreatures)
                 {
-                    if (Creature* creature = ObjectAccessor::GetCreature(*map, guid))
+                    if (Creature* creature = map->GetCreature(guid))
                     {
                         creature->SetReactState(g_AggroPlayers ? REACT_AGGRESSIVE : REACT_DEFENSIVE);
                         
@@ -768,7 +768,7 @@ void UpdateSiegeEvents(uint32 diff)
                 // Make siege leaders yell
                 for (const auto& guid : event.spawnedCreatures)
                 {
-                    if (Creature* creature = ObjectAccessor::GetCreature(*map, guid))
+                    if (Creature* creature = map->GetCreature(guid))
                     {
                         uint32 entry = creature->GetEntry();
                         // Only leaders and mini-bosses yell
