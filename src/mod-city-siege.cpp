@@ -675,7 +675,7 @@ void DistributeRewards(const SiegeEvent& event, const CityData& city)
         {
             // Check if player is in range and appropriate level
             if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius &&
-                player->getLevel() >= g_MinimumLevel)
+                player->GetLevel() >= g_MinimumLevel)
             {
                 // Award honor
                 if (g_RewardHonor > 0)
@@ -686,7 +686,7 @@ void DistributeRewards(const SiegeEvent& event, const CityData& city)
                 // Award gold scaled by player level
                 if (g_RewardGoldBase > 0 || g_RewardGoldPerLevel > 0)
                 {
-                    uint32 goldAmount = g_RewardGoldBase + (g_RewardGoldPerLevel * player->getLevel());
+                    uint32 goldAmount = g_RewardGoldBase + (g_RewardGoldPerLevel * player->GetLevel());
                     player->ModifyMoney(goldAmount);
                 }
                 
