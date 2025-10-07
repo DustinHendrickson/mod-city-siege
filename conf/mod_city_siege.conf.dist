@@ -193,10 +193,10 @@ CitySiege.Silvermoon.SpawnZ = 5.004
 #
 #    CitySiege.Stormwind.LeaderX/Y/Z
 #        Description: Location of the city leader (King Varian Wrynn) for siege targeting.
-#        Default:     -8913.23, 554.633, 93.7944
-CitySiege.Stormwind.LeaderX = -8913.23
-CitySiege.Stormwind.LeaderY = 554.633
-CitySiege.Stormwind.LeaderZ = 93.7944
+#        Default:     -8442.578, 334.6064, 122.476685 (Stormwind Keep throne room)
+CitySiege.Stormwind.LeaderX = -8442.578
+CitySiege.Stormwind.LeaderY = 334.6064
+CitySiege.Stormwind.LeaderZ = 122.476685
 
 #
 #    CitySiege.Ironforge.LeaderX/Y/Z

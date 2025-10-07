@@ -137,7 +137,7 @@ struct CityData
 
 // City definitions with approximate center coordinates
 static std::vector<CityData> g_Cities = {
-    { CITY_STORMWIND,   "Stormwind",      0,   -8913.23f, 554.633f,  93.7944f,  -9161.16f, 353.365f,  88.117f,   -8913.23f, 554.633f,  93.7944f,  1748  },
+    { CITY_STORMWIND,   "Stormwind",      0,   -8913.23f, 554.633f,  93.7944f,  -9161.16f, 353.365f,  88.117f,   -8442.578f, 334.6064f, 122.476685f,  1748  },
     { CITY_IRONFORGE,   "Ironforge",      0,   -4981.25f, -881.542f, 501.660f,  -5174.09f, -594.361f, 397.853f,  -4981.25f, -881.542f, 501.660f,  2784  },
     { CITY_DARNASSUS,   "Darnassus",      1,    9947.52f, 2482.73f,  1316.21f,   9887.36f, 1856.49f,  1317.14f,   9947.52f, 2482.73f,  1316.21f,  7999  },
     { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, -4080.80f, -12193.2f, 1.712f,    -3864.92f, -11643.7f, -137.644f, 17949 },
@@ -275,9 +275,9 @@ void LoadCitySiegeConfiguration()
     g_Cities[CITY_SILVERMOON].spawnZ = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.SpawnZ", 5.004f);
 
     // Load leader locations for each city
-    g_Cities[CITY_STORMWIND].leaderX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.LeaderX", -8913.23f);
-    g_Cities[CITY_STORMWIND].leaderY = sConfigMgr->GetOption<float>("CitySiege.Stormwind.LeaderY", 554.633f);
-    g_Cities[CITY_STORMWIND].leaderZ = sConfigMgr->GetOption<float>("CitySiege.Stormwind.LeaderZ", 93.7944f);
+    g_Cities[CITY_STORMWIND].leaderX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.LeaderX", -8442.578f);
+    g_Cities[CITY_STORMWIND].leaderY = sConfigMgr->GetOption<float>("CitySiege.Stormwind.LeaderY", 334.6064f);
+    g_Cities[CITY_STORMWIND].leaderZ = sConfigMgr->GetOption<float>("CitySiege.Stormwind.LeaderZ", 122.476685f);
     
     g_Cities[CITY_IRONFORGE].leaderX = sConfigMgr->GetOption<float>("CitySiege.Ironforge.LeaderX", -4981.25f);
     g_Cities[CITY_IRONFORGE].leaderY = sConfigMgr->GetOption<float>("CitySiege.Ironforge.LeaderY", -881.542f);
@@ -438,13 +438,14 @@ void SpawnSiegeCreatures(SiegeEvent& event)
     }
 
     // Define creature entries based on city faction
+    // If it's an Alliance city, spawn Horde attackers (and vice versa)
     bool isAllianceCity = (event.cityId <= CITY_EXODAR);
     
-    // Use configured creature entries
-    uint32 minionEntry = isAllianceCity ? g_CreatureAllianceMinion : g_CreatureHordeMinion;
-    uint32 eliteEntry = isAllianceCity ? g_CreatureAllianceElite : g_CreatureHordeElite;
-    uint32 miniBossEntry = isAllianceCity ? g_CreatureAllianceMiniBoss : g_CreatureHordeMiniBoss;
-    uint32 leaderEntry = isAllianceCity ? g_CreatureAllianceLeader : g_CreatureHordeLeader;
+    // Use configured creature entries - spawn OPPOSITE faction as attackers
+    uint32 minionEntry = isAllianceCity ? g_CreatureHordeMinion : g_CreatureAllianceMinion;
+    uint32 eliteEntry = isAllianceCity ? g_CreatureHordeElite : g_CreatureAllianceElite;
+    uint32 miniBossEntry = isAllianceCity ? g_CreatureHordeMiniBoss : g_CreatureAllianceMiniBoss;
+    uint32 leaderEntry = isAllianceCity ? g_CreatureHordeLeader : g_CreatureAllianceLeader;
     
     // Spawn creatures around the configured spawn point (not city center)
     float spawnRadius = 30.0f; // Radius around the spawn point for formation
@@ -468,7 +469,8 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         if (Creature* creature = map->SummonCreature(minionEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(isAllianceCity ? 84 : 83); // Horde/Alliance hostile
+            // Spawn opposite faction as attackers: Horde attacks Alliance cities, Alliance attacks Horde cities
+            creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
             event.spawnedCreatures.push_back(creature->GetGUID());
             
             if (g_DebugMode)
@@ -496,7 +498,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         if (Creature* creature = map->SummonCreature(eliteEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(isAllianceCity ? 84 : 83);
+            creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
             event.spawnedCreatures.push_back(creature->GetGUID());
         }
         currentAngle += spawnAngleStep;
@@ -519,7 +521,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         if (Creature* creature = map->SummonCreature(miniBossEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(isAllianceCity ? 84 : 83);
+            creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
             event.spawnedCreatures.push_back(creature->GetGUID());
         }
         currentAngle += spawnAngleStep;
@@ -542,7 +544,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         if (Creature* creature = map->SummonCreature(leaderEntry, Position(x, y, z, 0)))
         {
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(isAllianceCity ? 84 : 83);
+            creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
             event.spawnedCreatures.push_back(creature->GetGUID());
             
             // Make leader yell on spawn
@@ -835,8 +837,12 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             creature->SetReactState(REACT_DEFENSIVE);
                         }
                         
-                        // Move toward the configured leader location
-                        creature->GetMotionMaster()->MovePoint(0, city.leaderX, city.leaderY, city.leaderZ);
+                        // Enable walking and proper pathfinding
+                        creature->SetWalk(true);
+                        
+                        // Move toward the configured leader location with pathfinding
+                        creature->GetMotionMaster()->Clear();
+                        creature->GetMotionMaster()->MovePoint(0, city.leaderX, city.leaderY, city.leaderZ, true); // true = use pathfinding
                         
                         if (g_DebugMode)
                         {
