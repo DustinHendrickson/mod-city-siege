@@ -1002,8 +1002,6 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         Movement::MoveSplineInit init(creature);
                         init.MoveTo(destX, destY, destZ, true, true);
                         init.SetWalk(false);
-                        init.SetFly(false); // Explicitly disable flying
-                        init.SetSmooth(); // Smooth ground following
                         init.Launch();
                     }
                 }
@@ -1177,8 +1175,6 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             Movement::MoveSplineInit init(creature);
                             init.MoveTo(targetX, targetY, targetZ, true, true);
                             init.SetWalk(false);
-                            init.SetFly(false); // Explicitly disable flying
-                            init.SetSmooth(); // Smooth ground following
                             init.Launch();
                             continue;
                         }
@@ -1227,8 +1223,6 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                                 Movement::MoveSplineInit init(creature);
                                 init.MoveTo(nextX, nextY, nextZ, true, true);
                                 init.SetWalk(false);
-                                init.SetFly(false); // Explicitly disable flying
-                                init.SetSmooth(); // Smooth ground following
                                 init.Launch();
                             }
                         }
@@ -1327,8 +1321,6 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             Movement::MoveSplineInit init(creature);
                             init.MoveTo(destX, destY, destZ, true, true);
                             init.SetWalk(false);
-                            init.SetFly(false);
-                            init.SetSmooth();
                             init.Launch();
                             
                             if (g_DebugMode)
