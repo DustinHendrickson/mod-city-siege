@@ -167,6 +167,26 @@ Displays the current status of the City Siege module and all active events.
   - Number of creatures alive
 - Time until next automatic siege event
 
+#### `.citysiege testwaypoint`
+Spawns a temporary waypoint marker at your current position for 20 seconds. Use this to preview and test waypoint positions before adding them to the config file.
+
+**Usage:**
+```
+.citysiege testwaypoint            # Spawn test marker at current position
+```
+
+**Output:**
+- Spawns a white spotlight beam (scale 2.5) at your location
+- Displays your exact coordinates (X, Y, Z)
+- Marker automatically despawns after 20 seconds
+
+**Notes:**
+- Stand where you want a waypoint, then use this command
+- The marker shows exactly what the waypoint will look like
+- Copy the displayed coordinates to your config file
+- Perfect for building and testing waypoint paths
+- Use `.gps` first to position yourself, then use this to visualize
+
 #### `.citysiege waypoints <cityname>`
 Toggles visualization of the siege waypoint path for a specific city. Shows tall beam-style markers to help diagnose pathfinding issues.
 
@@ -179,7 +199,13 @@ Toggles visualization of the siege waypoint path for a specific city. Shows tall
 **Visual Markers:**
 - **Spawn Position** (scale 3.0): Green spotlight beam marking attacker spawn point
 - **Waypoint Path** (scale 2.5): White spotlight beams marking each waypoint along the route
-- **Leader Position** (scale 3.5): Large spotlight beam marking where the leader stops
+- **Leader Position** (scale 2.5): Red spotlight beam marking where the leader stops
+
+**Output:**
+- Shows how many waypoints are configured for the city
+- Reports successful marker spawns and any failures
+- Displays total marker count breakdown (spawn + waypoints + leader)
+- Color legend: Green=Spawn, White=Waypoints, Red=Leader
 
 **Notes:**
 - Run the command again to hide the waypoints
@@ -187,6 +213,7 @@ Toggles visualization of the siege waypoint path for a specific city. Shows tall
 - Useful for identifying problematic waypoint positions
 - Helps visualize the complete attack path
 - Each city's waypoints can be toggled independently
+- If markers are missing, check the output messages for spawn failures
 
 ### Command Examples
 
@@ -197,7 +224,10 @@ Toggles visualization of the siege waypoint path for a specific city. Shows tall
 # Check how the event is progressing
 .citysiege status
 
-# Visualize the waypoint path to diagnose pathing issues
+# Building waypoint paths - spawn a test marker at your current position
+.citysiege testwaypoint
+
+# Visualize the complete waypoint path to diagnose pathing issues
 .citysiege waypoints Stormwind
 
 # Hide the waypoint markers when done diagnosing
@@ -541,25 +571,34 @@ Waypoints allow you to create custom paths for siege units through each city:
    CitySiege.Stormwind.WaypointCount = 3
    ```
 
-2. **Use `.gps` command in-game** to get coordinates at key locations:
+2. **Position yourself in-game** at key locations using `.gps` to get coordinates:
    - City entrance/gates
    - Main roads or districts
    - Near the leader location
 
-3. **Add waypoint coordinates** to your config file:
+3. **Use `.citysiege testwaypoint`** to preview the waypoint marker at your current position:
+   - Spawns a temporary visual marker for 20 seconds
+   - Displays exact coordinates to copy
+   - Shows exactly how the waypoint will appear
+
+4. **Add waypoint coordinates** to your config file:
    ```
    CitySiege.Stormwind.Waypoint1.X = -8829.0
    CitySiege.Stormwind.Waypoint1.Y = 640.530
    CitySiege.Stormwind.Waypoint1.Z = 94.11582
    ```
 
-4. **Repeat for each waypoint** (numbered sequentially: Waypoint1, Waypoint2, Waypoint3, etc.)
+5. **Repeat for each waypoint** (numbered sequentially: Waypoint1, Waypoint2, Waypoint3, etc.)
 
-5. **Restart the worldserver** for changes to take effect.
+6. **Restart the worldserver** for changes to take effect.
+
+7. **Verify with `.citysiege waypoints CITYNAME`** to visualize the complete path.
 
 **Tips:**
 - Waypoints should form a logical path from spawn point to leader
 - Space waypoints 50-100 yards apart for smooth movement
+- Use `.citysiege testwaypoint` at each position before adding to config
+- Use `.citysiege waypoints CITYNAME` to see the full path visualization
 - Test with `.citysiege start CITYNAME` to verify pathing
 - Set WaypointCount to 0 to disable waypoints and use direct pathing
 
