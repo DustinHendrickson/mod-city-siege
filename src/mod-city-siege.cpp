@@ -236,6 +236,7 @@ struct SiegeEvent
     bool isActive;
     std::vector<ObjectGuid> spawnedCreatures;
     std::vector<ObjectGuid> spawnedDefenders; // Defender creatures
+    ObjectGuid cityLeaderGuid; // GUID of the city leader being defended
     bool cinematicPhase;
     uint32 lastYellTime;
     uint32 lastStatusAnnouncement; // For 5-minute countdown announcements
@@ -1055,6 +1056,37 @@ void StartSiegeEvent(int targetCityId = -1)
     newEvent.countdown50Announced = false;
     newEvent.countdown25Announced = false;
 
+    // Find and store the city leader's GUID
+    Map* map = sMapMgr->FindMap(city->mapId, 0);
+    if (map)
+    {
+        std::list<Creature*> leaderList;
+        CitySiege::CreatureEntryCheck check(city->targetLeaderEntry);
+        CitySiege::SimpleCreatureListSearcher<CitySiege::CreatureEntryCheck> searcher(leaderList, check);
+        Cell::VisitObjects(city->leaderX, city->leaderY, map, searcher, 100.0f);
+        
+        for (Creature* leader : leaderList)
+        {
+            if (leader && leader->IsAlive())
+            {
+                newEvent.cityLeaderGuid = leader->GetGUID();
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Found city leader: {} (Entry: {}, GUID: {})",
+                             leader->GetName(), city->targetLeaderEntry, leader->GetGUID().ToString());
+                }
+                break;
+            }
+        }
+        
+        if (!newEvent.cityLeaderGuid)
+        {
+            LOG_ERROR("server.loading", "[City Siege] WARNING: Could not find city leader for {} (Entry: {}). Defenders will auto-win!",
+                     city->name, city->targetLeaderEntry);
+        }
+    }
+
     // Announce siege is coming (before RP phase)
     std::string preAnnounce = "|cffff0000[City Siege]|r |cffFFFF00WARNING!|r A siege force is preparing to attack " + city->name + "! The battle will begin in " + std::to_string(g_CinematicDelay) + " seconds. Defenders, prepare yourselves!";
     sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, preAnnounce);
@@ -1088,27 +1120,61 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     bool defendersWon = false;
     bool leaderKilled = false;
     Map* map = sMapMgr->FindMap(city.mapId, 0);
-    if (map)
+    
+    if (map && event.cityLeaderGuid)
     {
-        // Find city leader by entry
-        Map::PlayerList const& players = map->GetPlayers();
-        for (auto itr = players.begin(); itr != players.end(); ++itr)
+        // Use the stored GUID to get the actual leader creature
+        Creature* cityLeader = map->GetCreature(event.cityLeaderGuid);
+        
+        if (cityLeader && cityLeader->IsAlive())
         {
-            if (Player* player = itr->GetSource())
+            defendersWon = true;
+            
+            if (g_DebugMode)
             {
-                if (Creature* cityLeader = player->FindNearestCreature(city.targetLeaderEntry, 1000.0f, true))
+                LOG_INFO("server.loading", "[City Siege] City leader {} is alive. Defenders win!",
+                         cityLeader->GetName());
+            }
+        }
+        else
+        {
+            leaderKilled = true;
+            
+            if (g_DebugMode)
+            {
+                if (cityLeader)
                 {
-                    defendersWon = true;
-                    break;
+                    LOG_INFO("server.loading", "[City Siege] City leader {} is dead. Attackers win!",
+                             cityLeader->GetName());
+                }
+                else
+                {
+                    LOG_INFO("server.loading", "[City Siege] City leader GUID {} not found (despawned?). Attackers win!",
+                             event.cityLeaderGuid.ToString());
                 }
             }
         }
+    }
+    else
+    {
+        // No leader GUID stored or no map - defenders win by default
+        defendersWon = true;
         
-        // If winningTeam was explicitly passed (leader died), mark it
-        if (winningTeam != -1)
+        if (g_DebugMode)
         {
-            defendersWon = false;
-            leaderKilled = true;
+            LOG_INFO("server.loading", "[City Siege] No city leader GUID stored. Defenders win by default.");
+        }
+    }
+    
+    // If winningTeam was explicitly passed (GM command), override the result
+    if (winningTeam != -1)
+    {
+        defendersWon = false;
+        leaderKilled = true;
+        
+        if (g_DebugMode)
+        {
+            LOG_INFO("server.loading", "[City Siege] GM override: winningTeam = {}", winningTeam);
         }
     }
 
@@ -2438,6 +2504,34 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                     int winningTeam = isAllianceCity ? 1 : 0; // 0 = Alliance, 1 = Horde
                     
                     EndSiegeEvent(event, winningTeam);
+                }
+            }
+        }
+
+        // Check if city leader has died (attackers win immediately)
+        if (!event.cinematicPhase && event.cityLeaderGuid)
+        {
+            const CityData& city = g_Cities[event.cityId];
+            Map* map = sMapMgr->FindMap(city.mapId, 0);
+            
+            if (map)
+            {
+                Creature* cityLeader = map->GetCreature(event.cityLeaderGuid);
+                
+                if (!cityLeader || !cityLeader->IsAlive())
+                {
+                    if (g_DebugMode)
+                    {
+                        LOG_INFO("server.loading", "[City Siege] City leader has been killed! Attackers win the siege of {}!", city.name);
+                    }
+                    
+                    // Determine winning team (attackers = opposite of city faction)
+                    bool isAllianceCity = (event.cityId == CITY_STORMWIND || event.cityId == CITY_IRONFORGE || 
+                                          event.cityId == CITY_DARNASSUS || event.cityId == CITY_EXODAR);
+                    int winningTeam = isAllianceCity ? 1 : 0; // Opposite faction wins
+                    
+                    EndSiegeEvent(event, winningTeam);
+                    continue; // Skip to next event since this one just ended
                 }
             }
         }
