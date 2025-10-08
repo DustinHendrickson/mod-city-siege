@@ -1033,7 +1033,7 @@ bool ValidateGroundPosition(float x, float y, float& z, Map* map)
  * @param city The city structure containing position and faction info
  * @return Vector of GUIDs of recruited defender bots
  */
-std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityInfo const& city)
+std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city)
 {
     std::vector<ObjectGuid> recruitedBots;
     
@@ -1116,7 +1116,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityInfo const& city)
  * @param city The city structure containing spawn position
  * @return Vector of GUIDs of recruited attacker bots
  */
-std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityInfo const& city)
+std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city)
 {
     std::vector<ObjectGuid> recruitedBots;
     
@@ -1217,7 +1217,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
         return;
     }
     
-    CityInfo const* city = nullptr;
+    CityData const* city = nullptr;
     for (auto& c : g_Cities)
     {
         if (c.id == event.cityId)
