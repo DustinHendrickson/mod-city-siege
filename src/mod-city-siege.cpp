@@ -838,7 +838,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             float y = city.leaderY + defenderRadius * sin(angle);
             float z = city.leaderZ;
             
-            float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
+            float groundZ = map->GetHeight(x, y, z, true, 50.0f);
             if (groundZ > INVALID_HEIGHT)
                 z = groundZ + 0.5f;
             
