@@ -719,3 +719,39 @@ CitySiege.RP.Alliance = "Citizens of {CITY}, your time has come! We march under 
 #        Default:     Multiple lore-based RP scripts
 CitySiege.RP.Horde = "The Horde has come to claim {CITY}! Your precious Alliance ends today!;{LEADER}, you have oppressed our people for the last time! Come out and face your fate!;We are not savages - we are warriors! And today, we show {CITY} what true strength means!;Your guards are weak. Your walls are weak. {LEADER} hides in the throne room while we stand at the gates!;Blood and honor! Today we prove that the Horde is the superior force in Azeroth!|Citizens of {CITY}, flee while you can! We have come for your leaders, not for you!;{LEADER}! Your reign of tyranny over {CITY} ends today! The throne will belong to the Horde!;You call us monsters, but it is YOU who started this war! We finish it today at {CITY}!;The spirits of our ancestors guide us. No amount of Light magic will save {CITY} from our wrath!;Lok'tar Ogar! {LEADER}, today you fall, and the Horde claims {CITY}!|The Warchief has sent his finest warriors to end Alliance tyranny at {CITY} once and for all!;Your pitiful city guard cannot stop the Horde war machine! {LEADER}, your time has come!;We march for honor! We march for glory! We march to prove that the Horde will take {CITY}!;Every siege tower, every warrior, every drop of blood spilled today at {CITY} - it all leads to YOUR defeat!;{LEADER}, the Alliance has grown soft under your leadership. Today at {CITY}, the Horde reminds you why you should fear us!"
 
+###################################################################################################
+# PLAYERBOT INTEGRATION
+# NOTE: These settings only work if you have the mod-playerbots module installed!
+#       If you don't have playerbots, these settings will be ignored (no errors).
+###################################################################################################
+
+#
+#    CitySiege.Playerbots.Enabled
+#        Description: Enable integration with mod-playerbots to recruit bots during sieges.
+#                     Requires mod-playerbots module to be installed and compiled.
+#        Default:     0 (disabled)
+
+CitySiege.Playerbots.Enabled = 0
+
+#
+#    CitySiege.Playerbots.MinLevel
+#        Description: Minimum level for playerbots to participate in city sieges
+#        Default:     70
+
+CitySiege.Playerbots.MinLevel = 70
+
+#
+#    CitySiege.Playerbots.MaxDefenders
+#        Description: Maximum number of defending playerbots to teleport to city
+#        Default:     20
+
+CitySiege.Playerbots.MaxDefenders = 20
+
+#
+#    CitySiege.Playerbots.MaxAttackers
+#        Description: Maximum number of attacking playerbots to teleport to spawn point
+#        Default:     20
+
+CitySiege.Playerbots.MaxAttackers = 20
+
+
