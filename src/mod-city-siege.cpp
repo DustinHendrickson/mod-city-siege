@@ -565,6 +565,9 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->GetMotionMaster()->Clear(false);
             creature->GetMotionMaster()->MoveIdle();
             
+            // Set home position to spawn location to prevent evading back
+            creature->SetHomePosition(x, y, z, o);
+            
             // Enforce ground position immediately after spawn
             creature->UpdateGroundPositionZ(x, y, z);
             
@@ -602,6 +605,9 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->GetMotionMaster()->Clear(false);
             creature->GetMotionMaster()->MoveIdle();
             
+            // Set home position to spawn location to prevent evading back
+            creature->SetHomePosition(x, y, z, 0);
+            
             // Enforce ground position immediately after spawn
             creature->UpdateGroundPositionZ(x, y, z);
             
@@ -638,6 +644,9 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->GetMotionMaster()->Clear(false);
             creature->GetMotionMaster()->MoveIdle();
             
+            // Set home position to spawn location to prevent evading back
+            creature->SetHomePosition(x, y, z, 0);
+            
             // Enforce ground position immediately after spawn
             creature->UpdateGroundPositionZ(x, y, z);
             
@@ -671,6 +680,11 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             
             // Prevent return to home position after combat
             creature->SetWalk(false);
+            creature->GetMotionMaster()->Clear(false);
+            creature->GetMotionMaster()->MoveIdle();
+            
+            // Set home position to spawn location to prevent evading back
+            creature->SetHomePosition(x, y, z, 0);
             creature->GetMotionMaster()->Clear(false);
             creature->GetMotionMaster()->MoveIdle();
             
@@ -1262,6 +1276,10 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         if (creature->IsInCombat())
                             continue;
                         
+                        // IMPORTANT: Set home position to current position to prevent evading/returning
+                        // This must be done continuously because combat reset can restore original home
+                        creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
+                        
                         // Check if creature is currently moving - if so, don't interrupt
                         if (!creature->movespline->Finalized())
                             continue;
@@ -1454,6 +1472,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             creature->SetWalk(false);
                             creature->GetMotionMaster()->Clear(false);
                             creature->GetMotionMaster()->MoveIdle();
+                            
+                            // Set home position to spawn location to prevent evading back
+                            creature->SetHomePosition(spawnX, spawnY, spawnZ, 0);
                             
                             // Replace the old GUID with the new one in spawned creatures list
                             for (auto& spawnedGuid : event.spawnedCreatures)
@@ -1839,12 +1860,10 @@ public:
         if (cityId == -1)
         {
             StartSiegeEvent(); // Random city
-            handler->PSendSysMessage("Started siege event in a random enabled city!");
         }
         else
         {
             StartSiegeEvent(cityId);
-            handler->PSendSysMessage(("Started siege event in " + g_Cities[cityId].name + "!").c_str());
         }
 
         return true;
