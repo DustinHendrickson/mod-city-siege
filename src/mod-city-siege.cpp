@@ -780,6 +780,32 @@ void DespawnSiegeCreatures(SiegeEvent& event)
  * @brief Starts a new siege event in a random city.
  */
 /**
+ * @brief Randomize a position within a radius to prevent creatures from bunching up.
+ * @param x Original X coordinate
+ * @param y Original Y coordinate
+ * @param z Original Z coordinate (will be updated with proper ground height)
+ * @param map Map to check ground height
+ * @param radius Random radius (default 5.0 yards)
+ */
+void RandomizePosition(float& x, float& y, float& z, Map* map, float radius = 5.0f)
+{
+    // Generate random offset within radius
+    float angle = frand(0.0f, 2.0f * M_PI);
+    float dist = frand(0.0f, radius);
+    
+    x += dist * cos(angle);
+    y += dist * sin(angle);
+    
+    // Update Z to proper ground height
+    if (map)
+    {
+        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
+        if (groundZ > INVALID_HEIGHT)
+            z = groundZ + 0.5f;
+    }
+}
+
+/**
  * @brief Starts a new siege event.
  * @param targetCityId Optional specific city to siege. If -1, selects random city.
  */
@@ -1181,9 +1207,13 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             destZ = city.leaderZ;
                         }
                         
+                        // Randomize position within 5 yards to prevent bunching
+                        Map* creatureMap = creature->GetMap();
+                        RandomizePosition(destX, destY, destZ, creatureMap, 5.0f);
+                        
                         if (g_DebugMode)
                         {
-                            LOG_INFO("server.loading", "[City Siege] Creature {} starting movement to waypoint/leader at ({}, {}, {})", 
+                            LOG_INFO("server.loading", "[City Siege] Creature {} starting movement to randomized waypoint/leader at ({}, {}, {})", 
                                      creature->GetGUID().ToString(), destX, destY, destZ);
                         }
                         
@@ -1356,9 +1386,13 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         // If creature is far from target (>10 yards) and not moving, resume movement to current target
                         if (dist > 10.0f)
                         {
+                            // Randomize target position to prevent bunching
+                            Map* creatureMap = creature->GetMap();
+                            RandomizePosition(targetX, targetY, targetZ, creatureMap, 5.0f);
+                            
                             if (g_DebugMode)
                             {
-                                LOG_INFO("server.loading", "[City Siege] Creature {} resuming movement to waypoint/leader at ({}, {}, {}) - distance: {}",
+                                LOG_INFO("server.loading", "[City Siege] Creature {} resuming movement to randomized waypoint/leader at ({}, {}, {}) - distance: {}",
                                          creature->GetGUID().ToString(), targetX, targetY, targetZ, dist);
                             }
                             
@@ -1409,6 +1443,16 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             if (hasNextDestination)
                             {
                                 event.creatureWaypointProgress[guid] = nextWP;
+                                
+                                // Randomize next position to prevent bunching
+                                Map* creatureMap = creature->GetMap();
+                                RandomizePosition(nextX, nextY, nextZ, creatureMap, 5.0f);
+                                
+                                if (g_DebugMode)
+                                {
+                                    LOG_INFO("server.loading", "[City Siege] Creature {} moving to randomized next position at ({}, {}, {})",
+                                             creature->GetGUID().ToString(), nextX, nextY, nextZ);
+                                }
                                 
                                 Movement::MoveSplineInit init(creature);
                                 init.MoveTo(nextX, nextY, nextZ, true, true);
@@ -1525,6 +1569,10 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                                 destY = city.leaderY;
                                 destZ = city.leaderZ;
                             }
+                            
+                            // Randomize position to prevent bunching on respawn
+                            Map* creatureMap = creature->GetMap();
+                            RandomizePosition(destX, destY, destZ, creatureMap, 5.0f);
                             
                             Movement::MoveSplineInit init(creature);
                             init.MoveTo(destX, destY, destZ, true, true);
