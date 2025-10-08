@@ -177,15 +177,16 @@ Spawns a temporary waypoint marker at your current position for 20 seconds. Use 
 
 **Output:**
 - Spawns a white spotlight beam (scale 2.5) at your location
-- Displays your exact coordinates (X, Y, Z)
+- Displays your exact coordinates (X, Y, Z) with +1 yard Z buffer built-in
 - Marker automatically despawns after 20 seconds
 
 **Notes:**
 - Stand where you want a waypoint, then use this command
 - The marker shows exactly what the waypoint will look like
+- **Z coordinate automatically includes +1 yard buffer** to prevent ground clipping
 - Copy the displayed coordinates to your config file
 - Perfect for building and testing waypoint paths
-- Use `.gps` first to position yourself, then use this to visualize
+- The buffer prevents units from sinking into the ground during movement
 
 #### `.citysiege waypoints <cityname>`
 Toggles visualization of the siege waypoint path for a specific city. Shows tall beam-style markers to help diagnose pathfinding issues.

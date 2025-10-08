@@ -2748,8 +2748,8 @@ public:
         float y = player->GetPositionY();
         float z = player->GetPositionZ();
         
-        // Store original for display
-        float displayZ = z;
+        // Add 1 yard buffer to Z coordinate to prevent ground clipping
+        float configZ = z + 1.0f;
 
         // Try to find ground near player position for spawning the marker
         float groundZ = map->GetHeight(x, y, z + 10.0f, true, 50.0f);
@@ -2759,8 +2759,8 @@ public:
             groundZ = map->GetHeight(x, y, z - 10.0f, true, 50.0f);
         }
         
-        // Use ground height if found, otherwise use player height
-        float spawnZ = (groundZ > INVALID_HEIGHT) ? groundZ : z;
+        // Use ground height if found (with buffer), otherwise use player height with buffer
+        float spawnZ = (groundZ > INVALID_HEIGHT) ? (groundZ + 1.0f) : configZ;
 
         // Spawn temporary waypoint marker (white spotlight - entry 15631)
         if (Creature* marker = map->SummonCreature(15631, Position(x, y, spawnZ, 0)))
@@ -2772,10 +2772,11 @@ public:
             marker->DespawnOrUnsummon(20000); // Despawn after 20 seconds
 
             handler->PSendSysMessage("Test waypoint marker spawned at your location for 20 seconds.");
+            handler->PSendSysMessage("(Z coordinate includes +1 yard buffer to prevent ground clipping)");
             
-            // Format coordinates properly
+            // Format coordinates properly - show the config Z (with buffer)
             char coordMsg[256];
-            snprintf(coordMsg, sizeof(coordMsg), "Coordinates: X=%.2f, Y=%.2f, Z=%.2f", x, y, displayZ);
+            snprintf(coordMsg, sizeof(coordMsg), "Coordinates: X=%.2f, Y=%.2f, Z=%.2f", x, y, configZ);
             handler->PSendSysMessage(coordMsg);
             
             handler->PSendSysMessage("Copy these coordinates to your mod_city_siege.conf file.");
@@ -2784,9 +2785,9 @@ public:
         {
             handler->PSendSysMessage("Failed to spawn test waypoint marker at this location.");
             
-            // Show coordinates anyway
+            // Show coordinates anyway - with buffer
             char coordMsg[256];
-            snprintf(coordMsg, sizeof(coordMsg), "Your position: X=%.2f, Y=%.2f, Z=%.2f", x, y, displayZ);
+            snprintf(coordMsg, sizeof(coordMsg), "Your position (+1 yard): X=%.2f, Y=%.2f, Z=%.2f", x, y, configZ);
             handler->PSendSysMessage(coordMsg);
             
             handler->PSendSysMessage("This location may not be valid for spawning creatures.");
