@@ -793,7 +793,7 @@ void StartSiegeEvent(int targetCityId = -1)
 
     // Announce siege is coming (before RP phase)
     std::string preAnnounce = "|cffff0000[City Siege]|r |cffFFFF00WARNING!|r A siege force is preparing to attack " + city->name + "! The battle will begin in " + std::to_string(g_CinematicDelay) + " seconds. Defenders, prepare yourselves!";
-    sWorld->SendServerMessage(SERVER_MSG_STRING, preAnnounce.c_str());
+    sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, preAnnounce);
 
     g_ActiveSieges.push_back(newEvent);
 
@@ -1043,19 +1043,19 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             {
                 event.countdown75Announced = true;
                 std::string countdownMsg = "|cffff0000[City Siege]|r |cffFFFF00" + std::to_string(remaining) + " seconds|r until the siege of " + city.name + " begins! Defenders, prepare!";
-                sWorld->SendServerMessage(SERVER_MSG_STRING, countdownMsg.c_str());
+                sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, countdownMsg);
             }
             else if (percentRemaining <= 50.0f && !event.countdown50Announced)
             {
                 event.countdown50Announced = true;
                 std::string countdownMsg = "|cffff0000[City Siege]|r |cffFF8800" + std::to_string(remaining) + " seconds|r until the siege of " + city.name + " begins! Defenders, to your posts!";
-                sWorld->SendServerMessage(SERVER_MSG_STRING, countdownMsg.c_str());
+                sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, countdownMsg);
             }
             else if (percentRemaining <= 25.0f && !event.countdown25Announced)
             {
                 event.countdown25Announced = true;
                 std::string countdownMsg = "|cffff0000[City Siege]|r |cffFF0000" + std::to_string(remaining) + " seconds|r until the siege of " + city.name + " begins! FINAL WARNING!";
-                sWorld->SendServerMessage(SERVER_MSG_STRING, countdownMsg.c_str());
+                sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, countdownMsg);
             }
         }
 
@@ -1068,7 +1068,7 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             
             // Announce battle has begun!
             std::string battleStart = "|cffff0000[City Siege]|r |cffFF0000THE BATTLE HAS BEGUN!|r The siege of " + city.name + " is now underway! Defenders, to arms!";
-            sWorld->SendServerMessage(SERVER_MSG_STRING, battleStart.c_str());
+            sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, battleStart);
             
             if (g_DebugMode)
             {
@@ -1599,7 +1599,7 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 statusMsg += " |cffFFFF00FINAL MINUTES!|r";
             }
             
-            sWorld->SendServerMessage(SERVER_MSG_STRING, statusMsg.c_str());
+            sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, statusMsg);
         }
 
         // Check if city leader is dead (attackers win)
