@@ -274,58 +274,68 @@ CitySiege.Silvermoon.LeaderZ = 13.7014
 #
 #    CitySiege.Stormwind.WaypointCount
 #        Description: Number of waypoints for Stormwind siege path.
-#        Default:     10 (complete path through Stormwind to King Varian)
-CitySiege.Stormwind.WaypointCount = 10
+#        Default:     12 (complete path through Stormwind to King Varian)
+CitySiege.Stormwind.WaypointCount = 12
 
-# Waypoint 1: 
-CitySiege.Stormwind.Waypoint1.X = -8987.759
-CitySiege.Stormwind.Waypoint1.Y = 517.60864
-CitySiege.Stormwind.Waypoint1.Z = 96.35521
+# Waypoint 1
+CitySiege.Stormwind.Waypoint1.X = -9071.35
+CitySiege.Stormwind.Waypoint1.Y = 428.56
+CitySiege.Stormwind.Waypoint1.Z = 93.06
 
-# Waypoint 2: 
-CitySiege.Stormwind.Waypoint2.X = -8914.376
-CitySiege.Stormwind.Waypoint2.Y = 493.37134
-CitySiege.Stormwind.Waypoint2.Z = 93.86035
+# Waypoint 2
+CitySiege.Stormwind.Waypoint2.X = -8964.66
+CitySiege.Stormwind.Waypoint2.Y = 512.68
+CitySiege.Stormwind.Waypoint2.Z = 96.35
 
-# Waypoint 3: 
-CitySiege.Stormwind.Waypoint3.X = -8914.376
-CitySiege.Stormwind.Waypoint3.Y = 493.37134
-CitySiege.Stormwind.Waypoint3.Z = 93.86035
+# Waypoint 3
+CitySiege.Stormwind.Waypoint3.X = -8880.79
+CitySiege.Stormwind.Waypoint3.Y = 581.20
+CitySiege.Stormwind.Waypoint3.Z = 93.00
 
-# Waypoint 4: 
-CitySiege.Stormwind.Waypoint4.X = -8773.413
-CitySiege.Stormwind.Waypoint4.Y = 670.62585
-CitySiege.Stormwind.Waypoint4.Z = 103.09238
+# Waypoint 4
+CitySiege.Stormwind.Waypoint4.X = -8817.26
+CitySiege.Stormwind.Waypoint4.Y = 629.23
+CitySiege.Stormwind.Waypoint4.Z = 94.10
 
-# Waypoint 5: 
-CitySiege.Stormwind.Waypoint5.X = -8715.385
-CitySiege.Stormwind.Waypoint5.Y = 735.63916
-CitySiege.Stormwind.Waypoint5.Z = 97.801056
+# Waypoint 5
+CitySiege.Stormwind.Waypoint5.X = -8796.29
+CitySiege.Stormwind.Waypoint5.Y = 658.42
+CitySiege.Stormwind.Waypoint5.Z = 97.40
 
-# Waypoint 6: 
-CitySiege.Stormwind.Waypoint6.X = -8648.922
-CitySiege.Stormwind.Waypoint6.Y = 754.79395
-CitySiege.Stormwind.Waypoint6.Z = 96.79475
+# Waypoint 6
+CitySiege.Stormwind.Waypoint6.X = -8771.24
+CitySiege.Stormwind.Waypoint6.Y = 608.35
+CitySiege.Stormwind.Waypoint6.Z = 97.21
 
-# Waypoint 7:
-CitySiege.Stormwind.Waypoint7.X = -8509.772
-CitySiege.Stormwind.Waypoint7.Y = 651.5583
-CitySiege.Stormwind.Waypoint7.Z = 100.29104
+# Waypoint 7
+CitySiege.Stormwind.Waypoint7.X = -8749.64
+CitySiege.Stormwind.Waypoint7.Y = 562.25
+CitySiege.Stormwind.Waypoint7.Z = 97.40
 
-# Waypoint 8: 
-CitySiege.Stormwind.Waypoint8.X = -8472.973
-CitySiege.Stormwind.Waypoint8.Y = 692.2879
-CitySiege.Stormwind.Waypoint8.Z = 99.63387
+# Waypoint 8
+CitySiege.Stormwind.Waypoint8.X = -8693.77
+CitySiege.Stormwind.Waypoint8.Y = 475.11
+CitySiege.Stormwind.Waypoint8.Z = 96.32
 
-# Waypoint 9: 
-CitySiege.Stormwind.Waypoint9.X = -8400.993
-CitySiege.Stormwind.Waypoint9.Y = 669.76215
-CitySiege.Stormwind.Waypoint9.Z = 94.89415
+# Waypoint 9
+CitySiege.Stormwind.Waypoint9.X = -8679.19
+CitySiege.Stormwind.Waypoint9.Y = 487.14
+CitySiege.Stormwind.Waypoint9.Z = 97.50
 
-# Waypoint 10: 
-CitySiege.Stormwind.Waypoint10.X = -8544.173
-CitySiege.Stormwind.Waypoint10.Y = 500.85233
-CitySiege.Stormwind.Waypoint10.Z = 98.6572
+# Waypoint 10
+CitySiege.Stormwind.Waypoint10.X = -8608.92
+CitySiege.Stormwind.Waypoint10.Y = 508.28
+CitySiege.Stormwind.Waypoint10.Z = 103.72
+
+# Waypoint 11
+CitySiege.Stormwind.Waypoint11.X = -8568.28
+CitySiege.Stormwind.Waypoint11.Y = 461.86
+CitySiege.Stormwind.Waypoint11.Z = 104.34
+
+# Waypoint 12
+CitySiege.Stormwind.Waypoint12.X = -8542.94
+CitySiege.Stormwind.Waypoint12.Y = 461.86
+CitySiege.Stormwind.Waypoint12.Z = 104.34
 
 #
 #    CitySiege.Ironforge.WaypointCount
