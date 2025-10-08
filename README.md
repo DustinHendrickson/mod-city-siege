@@ -20,50 +20,36 @@ Features
 - **All Major Cities Supported:**  
   Alliance: Stormwind, Ironforge, Darnassus, Exodar  
   Horde: Orgrimmar, Undercity, Thunder Bluff, Silvermoon
-- **Intelligent Waypoint System:**  
-  Siege units follow configurable waypoint paths to navigate through cities to reach their targets. Each city can have multiple waypoints configured for optimal pathing (e.g., Stormwind units go through main gate → trade district → keep entrance → throne room).
+- **Waypoint System:**  
+  Siege units follow configurable waypoint paths to navigate through cities to reach their targets. Each city can have multiple waypoints configured for optimal pathing.
 - **Dynamic Unit Respawning:**  
   Fallen siege units automatically respawn during active sieges with configurable respawn timers based on unit type (Leaders: 5 min, Mini-bosses: 3 min, Elites: 2 min, Minions: 1 min, Defenders: 45 sec). Attackers respawn at siege spawn point, defenders respawn near city leader. Creates sustained pressure throughout the event.
 - **4-Tier Enemy System:**  
   Regular minions, Elite soldiers, Mini-bosses, and Faction leaders with configurable spawn counts, levels, and scale sizes.
 - **City Defender System:**  
   Configurable defender units spawn near the city leader and march backwards through waypoints to meet attackers, creating dynamic frontlines throughout the city.
-- **Strategic Spawning:**  
-  Enemies spawn at configurable X/Y/Z locations outside each city (manually positioned at city gates) in tight formation and march toward the city leader.
-- **Advanced Pathfinding:**  
-  Siege units use server pathfinding with ground movement enforcement to navigate naturally through cities, avoiding obstacles and following proper paths. Includes automatic ground validation to prevent units from moving to invalid positions in mid-air or underground.
 - **Waypoint Visualization:**  
   GM command to toggle tall beam-style markers showing spawn points, waypoint paths, and leader positions for easy diagnosis of pathfinding issues.
 - **Cinematic RP Phase:**  
-  Configurable delay (default 45s) where siege forces stand passive and yell RP messages before combat begins.
+  Configurable delay where siege forces stand passive and yell RP messages before combat begins to give players time to join in and get ready.
 - **Periodic Yells:**  
   Leaders and mini-bosses yell threatening messages every 30 seconds during combat for immersion.
 - **Configurable Creature Entries:**  
   All creature types (Alliance & Horde attackers + defenders) fully configurable in .conf file with customizable levels and scale sizes.
-- **Visual Hierarchy:**  
-  Leaders are 30% larger and Mini-bosses are 15% larger than regular units (configurable), making important targets easily identifiable in battle.
 - **Flexible Event Timing:**  
   Configurable minimum (120min default) and maximum (240min default) intervals between events.
 - **Event Duration Control:**  
   Configurable siege duration (default 30 minutes).
 - **Single or Multiple Sieges:**  
   Choose whether only one city can be under siege at a time, or allow multiple simultaneous events.
-- **Smart Announcements:**  
-  Radius-based or world-wide announcements with color-coded messages.
 - **City-Specific Configuration:**  
   Enable or disable events for individual cities.
 - **Reward System:**  
   Automatic honor (100 default) and level-scaled gold rewards for winning faction players (base 50 silver + 50 silver per level).
 - **Dual Victory Conditions:**  
   Defenders win if the city leader survives, attackers win if they kill the city leader. Both outcomes reward the winning faction.
-- **Faction-Based Rewards:**  
-  Only players of the winning faction receive rewards - defenders get rewards if they protect their city, attackers get rewards if they conquer it.
-- **Automatic Cleanup:**  
-  Creatures despawn after event ends, preventing database pollution.
 - **Debug Mode:**  
   Comprehensive logging for server administrators.
-- **Aggro Configuration:**  
-  Separate toggles for player aggro and NPC aggro behavior.
 
 Installation
 ------------
@@ -461,110 +447,6 @@ Setting                                | Description                            
 ---------------------------------------|-------------------------------------------------------|--------
 CitySiege.Yell.LeaderSpawn             | Message leaders yell when spawning.                   | This city will fall before our might!
 CitySiege.Yell.Combat                  | Random combat yells (semicolon separated).            | Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!
-
-How It Works
-------------
-### Event Flow
-
-1. **Timer Phase:**  
-   The module waits for a random interval between TimerMin and TimerMax.
-
-2. **City Selection:**  
-   A random enabled city is selected for siege. If AllowMultipleCities is disabled and a siege is already active, no new siege will start.
-
-3. **Announcement:**  
-   Players in range (or server-wide if AnnounceRadius = 0) are notified with a configurable message (default: color-coded with city name).
-
-4. **Spawn Phase:**  
-   **Attacker forces** spawn at the configured spawn location (set via SpawnX/Y/Z for each city) in tight circular formation:
-   - Minions: 30 yards from spawn point (outermost ring)
-   - Elites: 21 yards (70% radius from spawn point)
-   - Mini-bosses: 15 yards (50% radius from spawn point)
-   - Leaders: 10 yards from spawn point (center, leading the formation)
-   
-   **Defender forces** (if enabled) spawn in a 15-yard circle around the city leader position, ready to march out and meet the attackers.
-
-5. **Cinematic Phase:**  
-   For the configured delay (default 45 seconds), enemies remain passive and leaders yell RP messages configured in `CitySiege.Yell.LeaderSpawn`.
-
-6. **Combat Phase:**  
-   After the cinematic delay, units become aggressive and use advanced pathfinding to navigate through the city:
-   - **Attackers** follow configured waypoint paths forward (e.g., Stormwind: main gate → trade district → keep entrance → throne room) marching toward the city leader
-   - **Defenders** follow the same waypoints in **reverse order** (throne room → keep entrance → trade district → main gate) marching out to meet the attackers
-   - Units engage hostile players or NPCs in their path based on aggro settings, then resume waypoint progression after combat
-   - This creates dynamic frontlines that shift throughout the city as forces clash at different waypoints
-
-7. **Respawn System:**  
-   During active sieges, fallen units automatically respawn and rejoin the battle. Respawn times and locations vary by unit type:
-   
-   **Attackers** (respawn at siege spawn point):
-   - Minions: 60 seconds
-   - Elites: 120 seconds (2 minutes)
-   - Mini-bosses: 180 seconds (3 minutes)
-   - Leaders: 300 seconds (5 minutes)
-   
-   **Defenders** (respawn near city leader):
-   - All defenders: 45 seconds (configurable)
-   
-   Respawned attackers reset to the first waypoint and march forward. Respawned defenders start at the last waypoint and march backward to meet the attackers.
-
-8. **Periodic Yells:**  
-   Every 30 seconds (configurable), leaders and mini-bosses yell threatening messages configured in `CitySiege.Yell.Combat`.
-
-8. **Event Duration:**  
-   The siege lasts for the configured duration (default 30 minutes).
-
-9. **Victory Check:**  
-   System verifies if the city leader survived using configured leader positions.
-
-10. **Resolution:**  
-    - **If Defenders Win** (city leader survives): Defending faction players receive rewards (Alliance for Alliance cities, Horde for Horde cities)
-    - **If Attackers Win** (city leader killed): Attacking faction players receive rewards (Horde conquering Alliance cities, Alliance conquering Horde cities)
-    - Creatures despawn and event ends
-
-### Event Mechanics
-
-- **Waypoint Navigation:**  
-  Units follow configured waypoint paths through the city:
-  - **Attackers** progress forward (Spawn → WP1 → WP2 → WP3 → Leader)
-  - **Defenders** progress backward (Leader → WP3 → WP2 → WP1 → Spawn)
-  - Units advance to the next waypoint when within 5 yards
-  - After combat, units automatically resume movement to their current waypoint target
-  - Creates dynamic battle lines that move through the city as forces meet
-
-- **Respawn Mechanics:**  
-  Dead units respawn after their configured timer expires:
-  - **Attackers** respawn at the siege spawn point and restart at the first waypoint
-  - **Defenders** respawn near the city leader and restart at the last waypoint
-  - Respawned units maintain their configured level and scale
-  - Respawning only occurs during active sieges and stops when the event ends
-  - Creates sustained pressure and continuous waves of combat throughout the event
-
-- **Ground Movement:**  
-  All siege units use enforced ground movement with pathfinding to navigate naturally through cities. Units cannot fly, float, or clip through terrain.
-
-- **Target Priority:**  
-  Siege forces prioritize the city leader but will attack players and NPCs in their path based on aggro configuration.
-
-- **Victory Conditions:**
-  - **Defenders Win:** City leader survives the full event duration
-  - **Attackers Win:** City leader is killed before event ends
-  - Only the winning faction receives rewards
-
-- **Automatic Rewards:**  
-  Winning faction players within the configured radius receive:
-  - Honor points (configurable, default 100)
-  - Gold scaled by level: Base amount (default 50 silver at level 1) + additional gold per level (default 50 silver per level)
-    * Example: Level 80 player receives 50 silver + (50 silver × 80) = 40.5 gold
-  - Confirmation message (configurable)
-  
-- **Faction-Specific Rewards:**
-  - Alliance cities (Stormwind, Ironforge, Darnassus, Exodar):
-    * Alliance players rewarded if leader survives
-    * Horde players rewarded if leader is killed
-  - Horde cities (Orgrimmar, Undercity, Thunder Bluff, Silvermoon):
-    * Horde players rewarded if leader survives
-    * Alliance players rewarded if leader is killed
 
 Customization
 -------------
