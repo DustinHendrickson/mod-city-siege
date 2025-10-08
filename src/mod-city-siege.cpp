@@ -1387,9 +1387,15 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             destZ = city.leaderZ;
                         }
                         
-                        // Randomize position within 5 yards to prevent bunching
+                        // Store original Z coordinate
+                        float waypointZ = destZ;
+                        
+                        // Randomize position within 5 yards to prevent bunching (X/Y only)
                         Map* creatureMap = creature->GetMap();
                         RandomizePosition(destX, destY, destZ, creatureMap, 5.0f);
+                        
+                        // Restore original Z to prevent underground pathing
+                        destZ = waypointZ;
                         
                         // Update home position before movement to prevent evading
                         creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
@@ -1455,9 +1461,15 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             destZ = city.spawnZ;
                         }
                         
-                        // Randomize position to prevent bunching
+                        // Store original Z coordinate
+                        float waypointZ = destZ;
+                        
+                        // Randomize position to prevent bunching (X/Y only)
                         Map* creatureMap = creature->GetMap();
                         RandomizePosition(destX, destY, destZ, creatureMap, 5.0f);
+                        
+                        // Restore original Z to prevent underground pathing
+                        destZ = waypointZ;
                         
                         // Update home position
                         creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
@@ -1670,21 +1682,16 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         // If creature is far from target (>10 yards) and not moving, resume movement to current target
                         if (dist > 10.0f)
                         {
-                            // Randomize target position to prevent bunching
+                            // Store original waypoint Z to preserve floor height
+                            float waypointZ = targetZ;
+                            
+                            // Randomize target position to prevent bunching (X and Y only)
                             Map* creatureMap = creature->GetMap();
                             RandomizePosition(targetX, targetY, targetZ, creatureMap, 5.0f);
                             
-                            // Validate ground position before movement
-                            if (!ValidateGroundPosition(targetX, targetY, targetZ, creatureMap))
-                            {
-                                // Position is invalid, skip movement for this cycle
-                                if (g_DebugMode)
-                                {
-                                    LOG_INFO("server.loading", "[City Siege] Creature {} at invalid waypoint position ({}, {}, {}), skipping movement",
-                                             creature->GetGUID().ToString(), targetX, targetY, targetZ);
-                                }
-                                continue;
-                            }
+                            // ALWAYS use the original waypoint Z coordinate to prevent underground pathing
+                            // Do NOT let the pathfinding system adjust Z to terrain/ground level
+                            targetZ = waypointZ;
                             
                             // Update home position before movement to prevent evading
                             creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
@@ -1758,21 +1765,15 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             {
                                 event.creatureWaypointProgress[guid] = nextWP;
                                 
-                                // Randomize next position to prevent bunching
+                                // Store original waypoint Z
+                                float waypointZ = nextZ;
+                                
+                                // Randomize next position to prevent bunching (X/Y only)
                                 Map* creatureMap = creature->GetMap();
                                 RandomizePosition(nextX, nextY, nextZ, creatureMap, 5.0f);
                                 
-                                // Validate ground position before movement
-                                if (!ValidateGroundPosition(nextX, nextY, nextZ, creatureMap))
-                                {
-                                    // Position is invalid, skip movement for this cycle
-                                    if (g_DebugMode)
-                                    {
-                                        LOG_INFO("server.loading", "[City Siege] Creature {} next waypoint position ({}, {}, {}) invalid, skipping",
-                                                 creature->GetGUID().ToString(), nextX, nextY, nextZ);
-                                    }
-                                    continue;
-                                }
+                                // Restore original Z coordinate to prevent underground pathing
+                                nextZ = waypointZ;
                                 
                                 // Update home position before movement to prevent evading
                                 creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
@@ -1890,18 +1891,14 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         // If far from target and not moving, resume movement
                         if (dist > 10.0f)
                         {
+                            // Store original waypoint Z to preserve floor height
+                            float waypointZ = targetZ;
+                            
+                            // Randomize X/Y only to prevent bunching
                             RandomizePosition(targetX, targetY, targetZ, map, 5.0f);
                             
-                            // Validate ground position before movement
-                            if (!ValidateGroundPosition(targetX, targetY, targetZ, map))
-                            {
-                                if (g_DebugMode)
-                                {
-                                    LOG_INFO("server.loading", "[City Siege] Defender {} at invalid waypoint position, skipping",
-                                             creature->GetGUID().ToString());
-                                }
-                                continue;
-                            }
+                            // ALWAYS use the original waypoint Z coordinate to prevent underground pathing
+                            targetZ = waypointZ;
                             
                             creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                             
@@ -1942,18 +1939,14 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             // Update progress with defender marker
                             event.creatureWaypointProgress[guid] = nextWP + 10000;
                             
+                            // Store original waypoint Z
+                            float waypointZ = nextZ;
+                            
+                            // Randomize X/Y only
                             RandomizePosition(nextX, nextY, nextZ, map, 5.0f);
                             
-                            // Validate ground position before movement
-                            if (!ValidateGroundPosition(nextX, nextY, nextZ, map))
-                            {
-                                if (g_DebugMode)
-                                {
-                                    LOG_INFO("server.loading", "[City Siege] Defender {} next waypoint position invalid, skipping",
-                                             creature->GetGUID().ToString());
-                                }
-                                continue;
-                            }
+                            // Restore original Z coordinate
+                            nextZ = waypointZ;
                             
                             creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                             
@@ -2184,9 +2177,15 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                                 }
                             }
                             
-                            // Randomize position to prevent bunching on respawn
+                            // Store original Z coordinate
+                            float waypointZ = destZ;
+                            
+                            // Randomize position to prevent bunching on respawn (X/Y only)
                             Map* creatureMap = creature->GetMap();
                             RandomizePosition(destX, destY, destZ, creatureMap, 5.0f);
+                            
+                            // Restore original Z to prevent underground pathing
+                            destZ = waypointZ;
                             
                             // Update home position before movement to prevent evading
                             creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
