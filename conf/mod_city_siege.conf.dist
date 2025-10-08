@@ -274,8 +274,8 @@ CitySiege.Silvermoon.LeaderZ = 13.7014
 #
 #    CitySiege.Stormwind.WaypointCount
 #        Description: Number of waypoints for Stormwind siege path.
-#        Default:     12 (complete path through Stormwind to King Varian)
-CitySiege.Stormwind.WaypointCount = 10
+#        Default:     9 (complete path through Stormwind to King Varian)
+CitySiege.Stormwind.WaypointCount = 9
 
 # Waypoint 1
 CitySiege.Stormwind.Waypoint1.X = -9071.35
@@ -295,7 +295,7 @@ CitySiege.Stormwind.Waypoint3.Z = 95.10
 # Waypoint 4
 CitySiege.Stormwind.Waypoint4.X = -8771.24
 CitySiege.Stormwind.Waypoint4.Y = 608.35
-CitySiege.Stormwind.Waypoint4.Z = 98.21
+CitySiege.Stormwind.Waypoint4.Z = 98.5
 
 # Waypoint 5
 CitySiege.Stormwind.Waypoint5.X = -8749.64
@@ -318,14 +318,10 @@ CitySiege.Stormwind.Waypoint8.Y = 508.28
 CitySiege.Stormwind.Waypoint8.Z = 104.72
 
 # Waypoint 9
-CitySiege.Stormwind.Waypoint9.X = -8568.28
+CitySiege.Stormwind.Waypoint9.X = -8542.94
 CitySiege.Stormwind.Waypoint9.Y = 461.86
 CitySiege.Stormwind.Waypoint9.Z = 105.34
 
-# Waypoint 10
-CitySiege.Stormwind.Waypoint10.X = -8542.94
-CitySiege.Stormwind.Waypoint10.Y = 461.86
-CitySiege.Stormwind.Waypoint10.Z = 105.34
 
 #
 #    CitySiege.Ironforge.WaypointCount

@@ -2769,16 +2769,11 @@ public:
             marker->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             marker->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
             marker->DespawnOrUnsummon(20000); // Despawn after 20 seconds
-
-            handler->PSendSysMessage("Test waypoint marker spawned at your location for 20 seconds.");
-            handler->PSendSysMessage("(Z coordinate includes +1 yard buffer to prevent ground clipping)");
             
             // Format coordinates properly - show the config Z (with buffer)
             char coordMsg[256];
             snprintf(coordMsg, sizeof(coordMsg), "Coordinates: X=%.2f, Y=%.2f, Z=%.2f", x, y, configZ);
             handler->PSendSysMessage(coordMsg);
-            
-            handler->PSendSysMessage("Copy these coordinates to your mod_city_siege.conf file.");
         }
         else
         {
