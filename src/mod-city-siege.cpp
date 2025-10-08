@@ -1022,23 +1022,22 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         if (!creature->IsAlive())
                             continue;
                         
-                        // Skip if creature is in combat - let them fight!
+                        // Skip if creature is currently in combat
                         if (creature->IsInCombat())
                             continue;
                         
-                        // Only progress if creature has actually finished moving and is idle
-                        // Check if movement is finalized AND creature is not currently moving
+                        // Check if creature is currently moving - if so, don't interrupt
                         if (!creature->movespline->Finalized())
                             continue;
                         
                         // Get current waypoint index
                         uint32 currentWP = event.creatureWaypointProgress[guid];
                         
-                        // Check if we've already processed all waypoints and reached leader
+                        // Check if we've already completed all waypoints and reached leader
                         if (currentWP > city.waypoints.size())
-                            continue; // Already at leader, no more waypoints
+                            continue; // Already at final destination
                         
-                        // Calculate distance to current target
+                        // Determine current target location
                         float targetX, targetY, targetZ;
                         if (currentWP < city.waypoints.size())
                         {
@@ -1054,57 +1053,74 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         }
                         else
                         {
-                            continue; // Shouldn't happen
-                        }
-                        
-                        // Check if creature is close enough to target (reached waypoint)
-                        float dist = creature->GetDistance(targetX, targetY, targetZ);
-                        if (dist > 5.0f) // Not at waypoint yet
                             continue;
-                        
-                        // Creature has reached current waypoint, move to next
-                        uint32 nextWP = currentWP + 1;
-                        float nextX, nextY, nextZ;
-                        bool hasNextDestination = false;
-                        
-                        if (nextWP < city.waypoints.size())
-                        {
-                            // Move to next waypoint
-                            nextX = city.waypoints[nextWP].x;
-                            nextY = city.waypoints[nextWP].y;
-                            nextZ = city.waypoints[nextWP].z;
-                            hasNextDestination = true;
-                            
-                            if (g_DebugMode)
-                            {
-                                LOG_INFO("server.loading", "[City Siege] Creature {} reached waypoint {}, moving to waypoint {} at ({}, {}, {})",
-                                         creature->GetGUID().ToString(), currentWP + 1, nextWP + 1, nextX, nextY, nextZ);
-                            }
-                        }
-                        else if (nextWP == city.waypoints.size())
-                        {
-                            // All waypoints complete, move to leader
-                            nextX = city.leaderX;
-                            nextY = city.leaderY;
-                            nextZ = city.leaderZ;
-                            hasNextDestination = true;
-                            
-                            if (g_DebugMode)
-                            {
-                                LOG_INFO("server.loading", "[City Siege] Creature {} completed all waypoints, moving to leader at ({}, {}, {})",
-                                         creature->GetGUID().ToString(), nextX, nextY, nextZ);
-                            }
                         }
                         
-                        // Update progress and start movement
-                        if (hasNextDestination)
+                        // Check distance to current target
+                        float dist = creature->GetDistance(targetX, targetY, targetZ);
+                        
+                        // If creature is far from target (>10 yards) and not moving, resume movement to current target
+                        if (dist > 10.0f)
                         {
-                            event.creatureWaypointProgress[guid] = nextWP;
+                            if (g_DebugMode)
+                            {
+                                LOG_INFO("server.loading", "[City Siege] Creature {} resuming movement to waypoint/leader at ({}, {}, {}) - distance: {}",
+                                         creature->GetGUID().ToString(), targetX, targetY, targetZ, dist);
+                            }
                             
                             Movement::MoveSplineInit init(creature);
-                            init.MoveTo(nextX, nextY, nextZ, true, true);
+                            init.MoveTo(targetX, targetY, targetZ, true, true);
                             init.SetWalk(false);
                             init.Launch();
+                            continue;
+                        }
+                        
+                        // Creature is close to current target (within 10 yards), consider it reached
+                        if (dist <= 10.0f)
+                        {
+                            uint32 nextWP = currentWP + 1;
+                            float nextX, nextY, nextZ;
+                            bool hasNextDestination = false;
+                            
+                            if (nextWP < city.waypoints.size())
+                            {
+                                // Move to next waypoint
+                                nextX = city.waypoints[nextWP].x;
+                                nextY = city.waypoints[nextWP].y;
+                                nextZ = city.waypoints[nextWP].z;
+                                hasNextDestination = true;
+                                
+                                if (g_DebugMode)
+                                {
+                                    LOG_INFO("server.loading", "[City Siege] Creature {} reached waypoint {}, moving to waypoint {} at ({}, {}, {})",
+                                             creature->GetGUID().ToString(), currentWP + 1, nextWP + 1, nextX, nextY, nextZ);
+                                }
+                            }
+                            else if (nextWP == city.waypoints.size())
+                            {
+                                // All waypoints complete, move to leader
+                                nextX = city.leaderX;
+                                nextY = city.leaderY;
+                                nextZ = city.leaderZ;
+                                hasNextDestination = true;
+                                
+                                if (g_DebugMode)
+                                {
+                                    LOG_INFO("server.loading", "[City Siege] Creature {} completed all waypoints, moving to leader at ({}, {}, {})",
+                                             creature->GetGUID().ToString(), nextX, nextY, nextZ);
+                                }
+                            }
+                            
+                            // Update progress and start movement to next destination
+                            if (hasNextDestination)
+                            {
+                                event.creatureWaypointProgress[guid] = nextWP;
+                                
+                                Movement::MoveSplineInit init(creature);
+                                init.MoveTo(nextX, nextY, nextZ, true, true);
+                                init.SetWalk(false);
+                                init.Launch();
+                            }
                         }
                     }
                 }
