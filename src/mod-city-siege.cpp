@@ -1185,7 +1185,7 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     bool isAllianceCity = (event.cityId == CITY_STORMWIND || event.cityId == CITY_IRONFORGE || 
                           event.cityId == CITY_DARNASSUS || event.cityId == CITY_EXODAR);
 
-    // Announce the winner
+    // Announce the winner (using same logic as AnnounceSiege)
     std::string winnerAnnouncement;
     if (defendersWon)
     {
@@ -1200,16 +1200,19 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
         winnerAnnouncement = "|cffff0000[City Siege]|r The " + attackingFaction + " has conquered " + city.name + "! The city has fallen!";
     }
     
-    // Announce winner to world or in range
+    // Send announcement (same logic as AnnounceSiege)
     if (g_AnnounceRadius == 0)
     {
+        // Announce to the entire world
         sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, winnerAnnouncement);
     }
     else
     {
-        if (map)
+        // Announce to players in range
+        Map* mapForAnnounce = sMapMgr->FindMap(city.mapId, 0);
+        if (mapForAnnounce)
         {
-            Map::PlayerList const& players = map->GetPlayers();
+            Map::PlayerList const& players = mapForAnnounce->GetPlayers();
             for (auto itr = players.begin(); itr != players.end(); ++itr)
             {
                 if (Player* player = itr->GetSource())
@@ -1221,6 +1224,11 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
                 }
             }
         }
+    }
+    
+    if (g_DebugMode)
+    {
+        LOG_INFO("server.loading", "[City Siege] {}", winnerAnnouncement);
     }
 
     if (g_RewardOnDefense)
@@ -1313,6 +1321,12 @@ void DistributeRewards(const SiegeEvent& /*event*/, const CityData& city, int wi
     {
         if (Player* player = itr->GetSource())
         {
+            // Skip GM accounts if they're in GM mode
+            if (player->IsGameMaster())
+            {
+                continue;
+            }
+            
             // If winningTeam is specified, only reward players of that faction
             if (winningTeam != -1 && player->GetTeamId() != winningTeam)
             {
