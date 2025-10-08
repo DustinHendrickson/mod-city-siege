@@ -882,7 +882,7 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
         WorldObject* searchRef = nullptr;
         
         // Try to get a player as reference (if any exist)
-        if (!players.isEmpty())
+        if (players.begin() != players.end())
         {
             for (auto itr = players.begin(); itr != players.end(); ++itr)
             {
