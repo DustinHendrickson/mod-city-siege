@@ -828,7 +828,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         uint32 defenderEntry = isAllianceCity ? g_CreatureAllianceDefender : g_CreatureHordeDefender;
         
         // Spawn defenders in a formation near the leader position
-        float defenderRadius = 15.0f; // Spawn in 15-yard radius around leader
+        float defenderRadius = 10.0f; // Spawn in 10-yard radius around leader
         float defenderAngleStep = (2 * M_PI) / std::max(1u, g_DefendersCount);
         
         for (uint32 i = 0; i < g_DefendersCount; ++i)
@@ -2943,11 +2943,48 @@ public:
             {
                 if (event.isActive)
                 {
+                    const CityData& city = g_Cities[event.cityId];
                     uint32 currentTime = time(nullptr);
                     uint32 remaining = event.endTime > currentTime ? (event.endTime - currentTime) : 0;
-                    handler->PSendSysMessage(("  " + g_Cities[event.cityId].name + " - " + 
-                        std::to_string(event.spawnedCreatures.size()) + " creatures, " + 
-                        std::to_string(remaining / 60) + " minutes remaining").c_str());
+                    
+                    char siegeInfo[512];
+                    snprintf(siegeInfo, sizeof(siegeInfo), "  %s - %zu creatures, %u minutes remaining",
+                        city.name.c_str(), event.spawnedCreatures.size(), remaining / 60);
+                    handler->PSendSysMessage(siegeInfo);
+                    
+                    // Show leader status
+                    if (event.cityLeaderGuid)
+                    {
+                        Map* map = sMapMgr->FindMap(city.mapId, 0);
+                        if (map)
+                        {
+                            Creature* leader = map->GetCreature(event.cityLeaderGuid);
+                            if (leader)
+                            {
+                                char leaderInfo[512];
+                                snprintf(leaderInfo, sizeof(leaderInfo), "    Leader: %s (GUID: %s) - %s, HP: %.1f%%",
+                                    leader->GetName().c_str(),
+                                    event.cityLeaderGuid.ToString().c_str(),
+                                    leader->IsAlive() ? "ALIVE" : "DEAD",
+                                    leader->GetHealthPct());
+                                handler->PSendSysMessage(leaderInfo);
+                            }
+                            else
+                            {
+                                char leaderInfo[512];
+                                snprintf(leaderInfo, sizeof(leaderInfo), "    Leader: GUID %s - NOT FOUND",
+                                    event.cityLeaderGuid.ToString().c_str());
+                                handler->PSendSysMessage(leaderInfo);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        handler->PSendSysMessage("    Leader: NO GUID STORED (BUG!)");
+                    }
+                    
+                    // Show phase
+                    handler->PSendSysMessage(event.cinematicPhase ? "    Phase: Cinematic (RP)" : "    Phase: Combat");
                 }
             }
         }
