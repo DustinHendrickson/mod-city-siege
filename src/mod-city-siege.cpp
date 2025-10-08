@@ -286,7 +286,7 @@ void LoadCitySiegeConfiguration()
 
     // Event settings
     g_AllowMultipleCities = sConfigMgr->GetOption<bool>("CitySiege.AllowMultipleCities", false);
-    g_AnnounceRadius = sConfigMgr->GetOption<uint32>("CitySiege.AnnounceRadius", 500);
+    g_AnnounceRadius = sConfigMgr->GetOption<uint32>("CitySiege.AnnounceRadius", 1500);
     g_MinimumLevel = sConfigMgr->GetOption<uint32>("CitySiege.MinimumLevel", 1);
 
     // City enable/disable flags
@@ -1207,7 +1207,6 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     }
     else
     {
-        Map* map = sMapMgr->FindMap(city.mapId, 0);
         if (map)
         {
             Map::PlayerList const& players = map->GetPlayers();

@@ -306,7 +306,7 @@ CitySiege.TimerMin                     | Minimum time between events (minutes). 
 CitySiege.TimerMax                     | Maximum time between events (minutes).                                             | 240     | Positive Integer
 CitySiege.EventDuration                | Duration of each siege (minutes).                                                  | 30      | Positive Integer
 CitySiege.AllowMultipleCities          | Allow simultaneous sieges on multiple cities.                                      | 0       | 0 (single) / 1 (multiple)
-CitySiege.AnnounceRadius               | Announcement radius in yards (0 = world-wide).                                     | 500     | Non-negative Integer
+CitySiege.AnnounceRadius               | Announcement radius in yards (0 = world-wide).                                     | 1500     | Non-negative Integer
 CitySiege.MinimumLevel                 | Minimum player level to receive rewards.                                           | 1       | 1-80
 
 ### City-Specific Settings

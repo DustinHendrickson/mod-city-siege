@@ -46,8 +46,8 @@ CitySiege.AllowMultipleCities = 0
 #    CitySiege.AnnounceRadius
 #        Description: Radius (in yards) for announcing siege events to nearby players.
 #                     Set to 0 to announce to the entire world.
-#        Default:     500
-CitySiege.AnnounceRadius = 500
+#        Default:     1500
+CitySiege.AnnounceRadius = 1500
 
 #
 #    CitySiege.MinimumLevel
