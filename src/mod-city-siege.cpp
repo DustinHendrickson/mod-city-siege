@@ -142,11 +142,11 @@ static uint32 g_LevelMinion = 70;
 static uint32 g_LevelDefender = 70;
 
 // Scale settings for spawned units
-static float g_ScaleLeader = 1.3f;      // 30% larger
-static float g_ScaleMiniBoss = 1.15f;   // 15% larger
+static float g_ScaleLeader = 1.6f;      // 60% larger
+static float g_ScaleMiniBoss = 1.3f;   // 30% larger
 
 // Cinematic settings
-static uint32 g_CinematicDelay = 45; // seconds
+static uint32 g_CinematicDelay = 150; // seconds
 static uint32 g_YellFrequency = 30;  // seconds
 
 // Respawn settings
@@ -173,6 +173,12 @@ static std::string g_YellLeaderSpawn = "This city will fall before our might!";
 
 // Combat yells (semicolon separated)
 static std::string g_YellsCombat = "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!";
+
+// RP Phase scripts (multiple scripts per faction, randomly chosen each siege)
+// Format: Multiple scripts separated by |, lines within each script separated by ;
+// Use {LEADER} placeholder for city leader's name, {CITY} for city name
+static std::string g_RPScriptsAlliance = "Citizens of {CITY}, your time has come! We march under the banner of the Alliance!;{LEADER}, your people cry out for mercy, but you have shown none to ours!;We have crossed mountains and seas to bring justice to {CITY}. Surrender now, or face annihilation!;The Light guides our blades, and the might of Stormwind stands behind us. Your defenses will crumble!;This ends today! {LEADER}, come forth and face the Alliance, or watch {CITY} burn!|The Alliance has gathered its greatest heroes for this assault on {CITY}. You cannot stand against us!;{LEADER}, your leadership has made the Horde enemies it cannot defeat! We will tear down these walls!;Too long have you raided our villages and slaughtered our people. Today, we bring the war to {CITY}!;Your shamans' magic cannot protect you. Our priests and paladins have blessed this army!;Prepare to face the wrath of the Alliance! {LEADER}, your reign over {CITY} ends here and now!|By order of King Varian Wrynn, {CITY} is to be taken! Resistance is futile!;{LEADER}! Come forth and face us, or hide like a coward while your people suffer!;The Horde's reign of terror ends here at {CITY}. We will show no mercy to those who threaten peace!;Our siege engines are ready. The walls of {CITY} mean nothing to the might of the Alliance!;For every innocent killed by Horde aggression, {LEADER}, you will pay with your life!";
+static std::string g_RPScriptsHorde = "The Horde has come to claim {CITY}! Your precious Alliance ends today!;{LEADER}, you have oppressed our people for the last time! Come out and face your fate!;We are not savages - we are warriors! And today, we show {CITY} what true strength means!;Your guards are weak. Your walls are weak. {LEADER} hides in the throne room while we stand at the gates!;Blood and honor! Today we prove that the Horde is the superior force in Azeroth!|Citizens of {CITY}, flee while you can! We have come for your leaders, not for you!;{LEADER}! Your reign of tyranny over {CITY} ends today! The throne will belong to the Horde!;You call us monsters, but it is YOU who started this war! We finish it today at {CITY}!;The spirits of our ancestors guide us. No amount of Light magic will save {CITY} from our wrath!;Lok'tar Ogar! {LEADER}, today you fall, and the Horde claims {CITY}!|The Warchief has sent his finest warriors to end Alliance tyranny at {CITY} once and for all!;Your pitiful city guard cannot stop the Horde war machine! {LEADER}, your time has come!;We march for honor! We march for glory! We march to prove that the Horde will take {CITY}!;Every siege tower, every warrior, every drop of blood spilled today at {CITY} - it all leads to YOUR defeat!;{LEADER}, the Alliance has grown soft under your leadership. Today at {CITY}, the Horde reminds you why you should fear us!";
 
 // -----------------------------------------------------------------------------
 // CITY SIEGE DATA STRUCTURES
@@ -237,6 +243,7 @@ struct SiegeEvent
     std::vector<ObjectGuid> spawnedCreatures;
     std::vector<ObjectGuid> spawnedDefenders; // Defender creatures
     ObjectGuid cityLeaderGuid; // GUID of the city leader being defended
+    std::string cityLeaderName; // Name of the city leader (for RP script placeholders)
     bool cinematicPhase;
     uint32 lastYellTime;
     uint32 lastStatusAnnouncement; // For 5-minute countdown announcements
@@ -244,6 +251,8 @@ struct SiegeEvent
     bool countdown75Announced; // 75% time remaining announced
     bool countdown50Announced; // 50% time remaining announced
     bool countdown25Announced; // 25% time remaining announced
+    uint32 rpScriptIndex; // Current line in the RP script (sequential playback)
+    std::vector<std::string> activeRPScript; // The chosen RP script lines for this siege
     std::unordered_map<ObjectGuid, uint32> creatureWaypointProgress; // Tracks which waypoint each creature is on (attackers and defenders)
     
     // Respawn tracking: stores creature GUID, entry, and death time
@@ -337,7 +346,7 @@ void LoadCitySiegeConfiguration()
     g_ScaleMiniBoss = sConfigMgr->GetOption<float>("CitySiege.Scale.MiniBoss", 1.3f);
 
     // Cinematic settings
-    g_CinematicDelay = sConfigMgr->GetOption<uint32>("CitySiege.CinematicDelay", 45);
+    g_CinematicDelay = sConfigMgr->GetOption<uint32>("CitySiege.CinematicDelay", 150);
     g_YellFrequency = sConfigMgr->GetOption<uint32>("CitySiege.YellFrequency", 30);
 
     // Respawn settings
@@ -367,6 +376,12 @@ void LoadCitySiegeConfiguration()
         "This city will fall before our might!");
     g_YellsCombat = sConfigMgr->GetOption<std::string>("CitySiege.Yell.Combat", 
         "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!");
+    
+    // RP Phase scripts (multiple scripts separated by |, lines within each script separated by ;)
+    g_RPScriptsAlliance = sConfigMgr->GetOption<std::string>("CitySiege.RP.Alliance", 
+        "Citizens of {CITY}, your time has come! We march under the banner of the Alliance!;{LEADER}, your people cry out for mercy, but you have shown none to ours!;We have crossed mountains and seas to bring justice to {CITY}. Surrender now, or face annihilation!;The Light guides our blades, and the might of Stormwind stands behind us. Your defenses will crumble!;This ends today! {LEADER}, come forth and face the Alliance, or watch {CITY} burn!|The Alliance has gathered its greatest heroes for this assault on {CITY}. You cannot stand against us!;{LEADER}, your leadership has made the Horde enemies it cannot defeat! We will tear down these walls!;Too long have you raided our villages and slaughtered our people. Today, we bring the war to {CITY}!;Your shamans' magic cannot protect you. Our priests and paladins have blessed this army!;Prepare to face the wrath of the Alliance! {LEADER}, your reign over {CITY} ends here and now!|By order of King Varian Wrynn, {CITY} is to be taken! Resistance is futile!;{LEADER}! Come forth and face us, or hide like a coward while your people suffer!;The Horde's reign of terror ends here at {CITY}. We will show no mercy to those who threaten peace!;Our siege engines are ready. The walls of {CITY} mean nothing to the might of the Alliance!;For every innocent killed by Horde aggression, {LEADER}, you will pay with your life!");
+    g_RPScriptsHorde = sConfigMgr->GetOption<std::string>("CitySiege.RP.Horde", 
+        "The Horde has come to claim {CITY}! Your precious Alliance ends today!;{LEADER}, you have oppressed our people for the last time! Come out and face your fate!;We are not savages - we are warriors! And today, we show {CITY} what true strength means!;Your guards are weak. Your walls are weak. {LEADER} hides in the throne room while we stand at the gates!;Blood and honor! Today we prove that the Horde is the superior force in Azeroth!|Citizens of {CITY}, flee while you can! We have come for your leaders, not for you!;{LEADER}! Your reign of tyranny over {CITY} ends today! The throne will belong to the Horde!;You call us monsters, but it is YOU who started this war! We finish it today at {CITY}!;The spirits of our ancestors guide us. No amount of Light magic will save {CITY} from our wrath!;Lok'tar Ogar! {LEADER}, today you fall, and the Horde claims {CITY}!|The Warchief has sent his finest warriors to end Alliance tyranny at {CITY} once and for all!;Your pitiful city guard cannot stop the Horde war machine! {LEADER}, your time has come!;We march for honor! We march for glory! We march to prove that the Horde will take {CITY}!;Every siege tower, every warrior, every drop of blood spilled today at {CITY} - it all leads to YOUR defeat!;{LEADER}, the Alliance has grown soft under your leadership. Today at {CITY}, the Horde reminds you why you should fear us!");
 
     // Load spawn locations for each city
     g_Cities[CITY_STORMWIND].spawnX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnX", -9161.16f);
@@ -680,7 +695,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             }
             
             // Yell a random spawn message
-            if (!spawnYells.empty())
+            if (!spawnYells.empty() && creature->IsAlive())
             {
                 uint32 randomIndex = urand(0, spawnYells.size() - 1);
                 creature->Yell(spawnYells[randomIndex].c_str(), LANG_UNIVERSAL);
@@ -1055,8 +1070,9 @@ void StartSiegeEvent(int targetCityId = -1)
     newEvent.countdown75Announced = false;
     newEvent.countdown50Announced = false;
     newEvent.countdown25Announced = false;
-
-    // Find and store the city leader's GUID
+    newEvent.rpScriptIndex = 0; // Start RP script at first line
+    
+    // First, find and store the city leader's GUID and name
     Map* map = sMapMgr->FindMap(city->mapId, 0);
     if (map)
     {
@@ -1070,6 +1086,7 @@ void StartSiegeEvent(int targetCityId = -1)
             if (leader && leader->IsAlive())
             {
                 newEvent.cityLeaderGuid = leader->GetGUID();
+                newEvent.cityLeaderName = leader->GetName();
                 
                 if (g_DebugMode)
                 {
@@ -1084,6 +1101,91 @@ void StartSiegeEvent(int targetCityId = -1)
         {
             LOG_ERROR("server.loading", "[City Siege] WARNING: Could not find city leader for {} (Entry: {}). Defenders will auto-win!",
                      city->name, city->targetLeaderEntry);
+        }
+    }
+    
+    // Now choose and process RP script with leader name replacement
+    bool isAllianceCity = (city->id <= CITY_EXODAR);
+    std::string rpScriptsConfig = isAllianceCity ? g_RPScriptsHorde : g_RPScriptsAlliance;
+    
+    // Parse available scripts (pipe-separated)
+    std::vector<std::string> availableScripts;
+    std::string scriptsStr = rpScriptsConfig;
+    size_t pipePos = 0;
+    while ((pipePos = scriptsStr.find('|')) != std::string::npos)
+    {
+        std::string script = scriptsStr.substr(0, pipePos);
+        if (!script.empty())
+        {
+            availableScripts.push_back(script);
+        }
+        scriptsStr.erase(0, pipePos + 1);
+    }
+    if (!scriptsStr.empty())
+    {
+        availableScripts.push_back(scriptsStr);
+    }
+    
+    // Pick a random script
+    if (!availableScripts.empty())
+    {
+        uint32 randomScriptIndex = urand(0, availableScripts.size() - 1);
+        std::string chosenScript = availableScripts[randomScriptIndex];
+        
+        // Parse the chosen script into lines (semicolon-separated)
+        std::string lineStr = chosenScript;
+        size_t semiPos = 0;
+        while ((semiPos = lineStr.find(';')) != std::string::npos)
+        {
+            std::string line = lineStr.substr(0, semiPos);
+            if (!line.empty())
+            {
+                // Replace {LEADER} placeholder with actual leader name
+                size_t pos = 0;
+                while ((pos = line.find("{LEADER}", pos)) != std::string::npos)
+                {
+                    line.replace(pos, 8, newEvent.cityLeaderName.empty() ? "the leader" : newEvent.cityLeaderName);
+                    pos += newEvent.cityLeaderName.length();
+                }
+                
+                // Replace {CITY} placeholder with actual city name
+                pos = 0;
+                while ((pos = line.find("{CITY}", pos)) != std::string::npos)
+                {
+                    line.replace(pos, 6, city->name);
+                    pos += city->name.length();
+                }
+                
+                newEvent.activeRPScript.push_back(line);
+            }
+            lineStr.erase(0, semiPos + 1);
+        }
+        if (!lineStr.empty())
+        {
+            // Replace {LEADER} placeholder in last line
+            size_t pos = 0;
+            while ((pos = lineStr.find("{LEADER}", pos)) != std::string::npos)
+            {
+                lineStr.replace(pos, 8, newEvent.cityLeaderName.empty() ? "the leader" : newEvent.cityLeaderName);
+                pos += newEvent.cityLeaderName.length();
+            }
+            
+            // Replace {CITY} placeholder in last line
+            pos = 0;
+            while ((pos = lineStr.find("{CITY}", pos)) != std::string::npos)
+            {
+                lineStr.replace(pos, 6, city->name);
+                pos += city->name.length();
+            }
+            
+            newEvent.activeRPScript.push_back(lineStr);
+        }
+        
+        if (g_DebugMode)
+        {
+            LOG_INFO("server.loading", "[City Siege] Selected RP script {} with {} lines for {} (Leader: {})",
+                     randomScriptIndex + 1, newEvent.activeRPScript.size(), city->name, 
+                     newEvent.cityLeaderName.empty() ? "NOT FOUND" : newEvent.cityLeaderName);
         }
     }
 
@@ -1472,6 +1574,54 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 std::string countdownMsg = "|cffff0000[City Siege]|r |cffFF0000" + std::to_string(remaining) + " seconds|r until the siege of " + city.name + " begins! FINAL WARNING!";
                 sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, countdownMsg);
             }
+            
+            // RP Script execution during cinematic phase (sequential dialogue from leaders/mini-bosses)
+            if ((currentTime - event.lastYellTime) >= g_YellFrequency)
+            {
+                event.lastYellTime = currentTime;
+                
+                // Play through the pre-chosen RP script sequentially
+                if (!event.activeRPScript.empty() && event.rpScriptIndex < event.activeRPScript.size())
+                {
+                    const CityData& city = g_Cities[event.cityId];
+                    Map* map = sMapMgr->FindMap(city.mapId, 0);
+                    if (map)
+                    {
+                        std::vector<Creature*> rpCreatures;
+                        for (const auto& guid : event.spawnedCreatures)
+                        {
+                            if (Creature* creature = map->GetCreature(guid))
+                            {
+                                uint32 entry = creature->GetEntry();
+                                // Only leaders and mini-bosses do RP
+                                if (creature->IsAlive() &&
+                                    (entry == g_CreatureAllianceLeader || entry == g_CreatureHordeLeader ||
+                                     entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss))
+                                {
+                                    rpCreatures.push_back(creature);
+                                }
+                            }
+                        }
+                        
+                        if (!rpCreatures.empty())
+                        {
+                            // Pick a random creature to say the current line
+                            uint32 randomCreatureIndex = urand(0, rpCreatures.size() - 1);
+                            rpCreatures[randomCreatureIndex]->Yell(event.activeRPScript[event.rpScriptIndex].c_str(), LANG_UNIVERSAL);
+                            
+                            if (g_DebugMode)
+                            {
+                                LOG_INFO("server.loading", "[City Siege] RP Line {}/{}: '{}'",
+                                         event.rpScriptIndex + 1, event.activeRPScript.size(), 
+                                         event.activeRPScript[event.rpScriptIndex]);
+                            }
+                            
+                            // Move to next line in script
+                            event.rpScriptIndex++;
+                        }
+                    }
+                }
+            }
         }
 
         // Check if cinematic phase is over
@@ -1673,9 +1823,10 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                     if (Creature* creature = map->GetCreature(guid))
                     {
                         uint32 entry = creature->GetEntry();
-                        // Only leaders and mini-bosses yell
-                        if (entry == g_CreatureAllianceLeader || entry == g_CreatureHordeLeader ||
-                            entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss)
+                        // Only leaders and mini-bosses yell (and they must be alive)
+                        if (creature->IsAlive() && 
+                            (entry == g_CreatureAllianceLeader || entry == g_CreatureHordeLeader ||
+                            entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss))
                         {
                             // Parse combat yells from configuration (semicolon separated)
                             std::vector<std::string> yells;
@@ -2853,9 +3004,7 @@ public:
                 
                 // Distribute rewards to winning faction's players
                 DistributeRewards(event, city, winningTeam);
-                
-                handler->PSendSysMessage(("Siege stopped. " + winningFaction + " wins! " + winningFaction + " players have been rewarded.").c_str());
-                
+                                
                 // Clean up
                 DespawnSiegeCreatures(event);
                 event.isActive = false;

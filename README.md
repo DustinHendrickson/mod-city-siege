@@ -393,7 +393,7 @@ CitySiege.Scale.MiniBoss               | Scale multiplier for mini-bosses.      
 
 Setting                                | Description                                           | Default
 ---------------------------------------|-------------------------------------------------------|--------
-CitySiege.CinematicDelay               | Initial RP phase duration (seconds).                  | 45
+CitySiege.CinematicDelay               | Initial RP phase duration (seconds).                  | 150
 CitySiege.YellFrequency                | How often leaders yell (seconds).                     | 30
 
 ### Respawn Settings

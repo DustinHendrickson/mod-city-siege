@@ -583,8 +583,8 @@ CitySiege.Scale.MiniBoss = 1.30
 #
 #    CitySiege.CinematicDelay
 #        Description: Time (in seconds) for the initial cinematic/RP phase before combat.
-#        Default:     45
-CitySiege.CinematicDelay = 45
+#        Default:     150
+CitySiege.CinematicDelay = 150
 
 #
 #    CitySiege.YellFrequency
@@ -698,4 +698,24 @@ CitySiege.Yell.LeaderSpawn = "This city will fall before our might!;Prepare to w
 #                     Leaders and mini-bosses will randomly yell one of these messages.
 #        Default:     "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!"
 CitySiege.Yell.Combat = "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!"
+
+#
+#    CitySiege.RP.Alliance
+#        Description: RP scripts for Alliance attackers during cinematic phase.
+#                     Multiple scripts separated by pipe (|), lines within each script separated by semicolon (;).
+#                     One script is randomly chosen per siege and plays sequentially.
+#                     Leaders and mini-bosses will yell these lines one at a time during the RP phase.
+#                     Use {LEADER} placeholder for city leader's name, {CITY} for city name.
+#        Default:     Multiple lore-based RP scripts
+CitySiege.RP.Alliance = "Citizens of {CITY}, your time has come! We march under the banner of the Alliance!;{LEADER}, your people cry out for mercy, but you have shown none to ours!;We have crossed mountains and seas to bring justice to {CITY}. Surrender now, or face annihilation!;The Light guides our blades, and the might of Stormwind stands behind us. Your defenses will crumble!;This ends today! {LEADER}, come forth and face the Alliance, or watch {CITY} burn!|The Alliance has gathered its greatest heroes for this assault on {CITY}. You cannot stand against us!;{LEADER}, your leadership has made the Horde enemies it cannot defeat! We will tear down these walls!;Too long have you raided our villages and slaughtered our people. Today, we bring the war to {CITY}!;Your shamans' magic cannot protect you. Our priests and paladins have blessed this army!;Prepare to face the wrath of the Alliance! {LEADER}, your reign over {CITY} ends here and now!|By order of King Varian Wrynn, {CITY} is to be taken! Resistance is futile!;{LEADER}! Come forth and face us, or hide like a coward while your people suffer!;The Horde's reign of terror ends here at {CITY}. We will show no mercy to those who threaten peace!;Our siege engines are ready. The walls of {CITY} mean nothing to the might of the Alliance!;For every innocent killed by Horde aggression, {LEADER}, you will pay with your life!"
+
+#
+#    CitySiege.RP.Horde
+#        Description: RP scripts for Horde attackers during cinematic phase.
+#                     Multiple scripts separated by pipe (|), lines within each script separated by semicolon (;).
+#                     One script is randomly chosen per siege and plays sequentially.
+#                     Leaders and mini-bosses will yell these lines one at a time during the RP phase.
+#                     Use {LEADER} placeholder for city leader's name, {CITY} for city name.
+#        Default:     Multiple lore-based RP scripts
+CitySiege.RP.Horde = "The Horde has come to claim {CITY}! Your precious Alliance ends today!;{LEADER}, you have oppressed our people for the last time! Come out and face your fate!;We are not savages - we are warriors! And today, we show {CITY} what true strength means!;Your guards are weak. Your walls are weak. {LEADER} hides in the throne room while we stand at the gates!;Blood and honor! Today we prove that the Horde is the superior force in Azeroth!|Citizens of {CITY}, flee while you can! We have come for your leaders, not for you!;{LEADER}! Your reign of tyranny over {CITY} ends today! The throne will belong to the Horde!;You call us monsters, but it is YOU who started this war! We finish it today at {CITY}!;The spirits of our ancestors guide us. No amount of Light magic will save {CITY} from our wrath!;Lok'tar Ogar! {LEADER}, today you fall, and the Horde claims {CITY}!|The Warchief has sent his finest warriors to end Alliance tyranny at {CITY} once and for all!;Your pitiful city guard cannot stop the Horde war machine! {LEADER}, your time has come!;We march for honor! We march for glory! We march to prove that the Horde will take {CITY}!;Every siege tower, every warrior, every drop of blood spilled today at {CITY} - it all leads to YOUR defeat!;{LEADER}, the Alliance has grown soft under your leadership. Today at {CITY}, the Horde reminds you why you should fear us!"
 
