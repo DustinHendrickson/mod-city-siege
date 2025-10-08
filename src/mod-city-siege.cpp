@@ -45,6 +45,46 @@
 
 using namespace Acore::ChatCommands;
 
+// Custom check and searcher for finding creatures by entry without needing WorldObject reference
+namespace CitySiege
+{
+    class CreatureEntryCheck
+    {
+    public:
+        CreatureEntryCheck(uint32 entry) : _entry(entry) {}
+        
+        bool operator()(Creature* creature) const
+        {
+            return creature && creature->GetEntry() == _entry;
+        }
+        
+    private:
+        uint32 _entry;
+    };
+    
+    // Custom searcher that doesn't require WorldObject for phase checking
+    template<typename Check>
+    struct SimpleCreatureListSearcher : Acore::ContainerInserter<Creature*>
+    {
+        Check& _check;
+        
+        template<typename Container>
+        SimpleCreatureListSearcher(Container& container, Check& check)
+            : Acore::ContainerInserter<Creature*>(container), _check(check) {}
+        
+        void Visit(CreatureMapType& m)
+        {
+            for (CreatureMapType::iterator itr = m.begin(); itr != m.end(); ++itr)
+            {
+                if (_check(itr->GetSource()))
+                    this->Insert(itr->GetSource());
+            }
+        }
+        
+        template<class NOT_INTERESTED> void Visit(GridRefMgr<NOT_INTERESTED>&) {}
+    };
+}
+
 // -----------------------------------------------------------------------------
 // CONFIGURATION VARIABLES
 // -----------------------------------------------------------------------------
@@ -894,9 +934,9 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     {
         // Search around the leader's throne coordinates directly
         std::list<Creature*> leaderList;
-        Acore::AllCreaturesOfEntryInRange check(nullptr, city.targetLeaderEntry, 100.0f);
-        Acore::CreatureListSearcher<Acore::AllCreaturesOfEntryInRange> searcher(nullptr, leaderList, check);
-        Cell::VisitGridObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
+        CitySiege::CreatureEntryCheck check(city.targetLeaderEntry);
+        CitySiege::SimpleCreatureListSearcher<CitySiege::CreatureEntryCheck> searcher(leaderList, check);
+        Cell::VisitObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
         
         Creature* existingLeader = nullptr;
         
@@ -1529,9 +1569,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             {
                 // Search around the leader's throne coordinates directly
                 std::list<Creature*> leaderList;
-                Acore::AllCreaturesOfEntryInRange check(nullptr, city.targetLeaderEntry, 100.0f);
-                Acore::CreatureListSearcher<Acore::AllCreaturesOfEntryInRange> searcher(nullptr, leaderList, check);
-                Cell::VisitGridObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
+                CitySiege::CreatureEntryCheck check(city.targetLeaderEntry);
+                CitySiege::SimpleCreatureListSearcher<CitySiege::CreatureEntryCheck> searcher(leaderList, check);
+                Cell::VisitObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
                 
                 // Find the leader at the throne
                 for (Creature* leader : leaderList)
@@ -1598,9 +1638,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             {
                 // Search around the leader's throne coordinates directly - no dependency on siege creatures!
                 std::list<Creature*> leaderList;
-                Acore::AllCreaturesOfEntryInRange check(nullptr, city.targetLeaderEntry, 100.0f);
-                Acore::CreatureListSearcher<Acore::AllCreaturesOfEntryInRange> searcher(nullptr, leaderList, check);
-                Cell::VisitGridObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
+                CitySiege::CreatureEntryCheck check(city.targetLeaderEntry);
+                CitySiege::SimpleCreatureListSearcher<CitySiege::CreatureEntryCheck> searcher(leaderList, check);
+                Cell::VisitObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
                 
                 bool leaderFound = false;
                 bool leaderAlive = false;
