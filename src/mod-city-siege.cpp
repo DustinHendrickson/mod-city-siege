@@ -149,14 +149,14 @@ struct CityData
 
 // City definitions with approximate center coordinates
 static std::vector<CityData> g_Cities = {
-    { CITY_STORMWIND,   "Stormwind",      0,   -8913.23f, 554.633f,  93.7944f,  -9161.16f, 353.365f,  88.117f,   -8442.578f, 334.6064f, 122.476685f,  1748  },
-    { CITY_IRONFORGE,   "Ironforge",      0,   -4981.25f, -881.542f, 501.660f,  -5174.09f, -594.361f, 397.853f,  -4981.25f, -881.542f, 501.660f,  2784  },
-    { CITY_DARNASSUS,   "Darnassus",      1,    9947.52f, 2482.73f,  1316.21f,   9887.36f, 1856.49f,  1317.14f,   9947.52f, 2482.73f,  1316.21f,  7999  },
-    { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, -4080.80f, -12193.2f, 1.712f,    -3864.92f, -11643.7f, -137.644f, 17949 },
-    { CITY_ORGRIMMAR,   "Orgrimmar",      1,    1633.75f, -4439.39f, 15.4396f,   1114.96f, -4374.63f, 25.813f,    1633.75f, -4439.39f, 15.4396f,  4949  },
-    { CITY_UNDERCITY,   "Undercity",      0,    1633.75f, 240.167f,  -43.1034f,  1982.26f, 226.674f,  35.951f,    1633.75f, 240.167f,  -43.1034f, 10181 },
-    { CITY_THUNDERBLUFF, "Thunder Bluff", 1,   -1043.11f, 285.809f,  135.165f,  -1558.61f, -5.071f,   5.384f,    -1043.11f, 285.809f,  135.165f,  3057  },
-    { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f,   9230.47f, -6962.67f, 5.004f,     9338.74f, -7277.27f, 13.7014f,  16283 }
+    { CITY_STORMWIND,   "Stormwind",      0,   -8913.23f, 554.633f,  93.7944f,  -9161.16f, 353.365f,  88.117f,   -8442.578f, 334.6064f, 122.476685f,  1748,  {} },
+    { CITY_IRONFORGE,   "Ironforge",      0,   -4981.25f, -881.542f, 501.660f,  -5174.09f, -594.361f, 397.853f,  -4981.25f, -881.542f, 501.660f,  2784,  {} },
+    { CITY_DARNASSUS,   "Darnassus",      1,    9947.52f, 2482.73f,  1316.21f,   9887.36f, 1856.49f,  1317.14f,   9947.52f, 2482.73f,  1316.21f,  7999,  {} },
+    { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, -4080.80f, -12193.2f, 1.712f,    -3864.92f, -11643.7f, -137.644f, 17949, {} },
+    { CITY_ORGRIMMAR,   "Orgrimmar",      1,    1633.75f, -4439.39f, 15.4396f,   1114.96f, -4374.63f, 25.813f,    1633.75f, -4439.39f, 15.4396f,  4949,  {} },
+    { CITY_UNDERCITY,   "Undercity",      0,    1633.75f, 240.167f,  -43.1034f,  1982.26f, 226.674f,  35.951f,    1633.75f, 240.167f,  -43.1034f, 10181, {} },
+    { CITY_THUNDERBLUFF, "Thunder Bluff", 1,   -1043.11f, 285.809f,  135.165f,  -1558.61f, -5.071f,   5.384f,    -1043.11f, 285.809f,  135.165f,  3057,  {} },
+    { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f,   9230.47f, -6962.67f, 5.004f,     9338.74f, -7277.27f, 13.7014f,  16283, {} }
 };
 
 struct SiegeEvent
@@ -1018,59 +1018,93 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 {
                     if (Creature* creature = map->GetCreature(guid))
                     {
-                        // Skip if creature is in combat or dead
-                        if (creature->IsInCombat() || !creature->IsAlive())
+                        // Skip if creature is dead
+                        if (!creature->IsAlive())
                             continue;
                         
-                        // Check if creature has finished its current movement
-                        if (creature->movespline->Finalized())
+                        // Skip if creature is in combat - let them fight!
+                        if (creature->IsInCombat())
+                            continue;
+                        
+                        // Only progress if creature has actually finished moving and is idle
+                        // Check if movement is finalized AND creature is not currently moving
+                        if (!creature->movespline->Finalized())
+                            continue;
+                        
+                        // Get current waypoint index
+                        uint32 currentWP = event.creatureWaypointProgress[guid];
+                        
+                        // Check if we've already processed all waypoints and reached leader
+                        if (currentWP > city.waypoints.size())
+                            continue; // Already at leader, no more waypoints
+                        
+                        // Calculate distance to current target
+                        float targetX, targetY, targetZ;
+                        if (currentWP < city.waypoints.size())
                         {
-                            // Get current waypoint index
-                            uint32 currentWP = event.creatureWaypointProgress[guid];
+                            targetX = city.waypoints[currentWP].x;
+                            targetY = city.waypoints[currentWP].y;
+                            targetZ = city.waypoints[currentWP].z;
+                        }
+                        else if (currentWP == city.waypoints.size())
+                        {
+                            targetX = city.leaderX;
+                            targetY = city.leaderY;
+                            targetZ = city.leaderZ;
+                        }
+                        else
+                        {
+                            continue; // Shouldn't happen
+                        }
+                        
+                        // Check if creature is close enough to target (reached waypoint)
+                        float dist = creature->GetDistance(targetX, targetY, targetZ);
+                        if (dist > 5.0f) // Not at waypoint yet
+                            continue;
+                        
+                        // Creature has reached current waypoint, move to next
+                        uint32 nextWP = currentWP + 1;
+                        float nextX, nextY, nextZ;
+                        bool hasNextDestination = false;
+                        
+                        if (nextWP < city.waypoints.size())
+                        {
+                            // Move to next waypoint
+                            nextX = city.waypoints[nextWP].x;
+                            nextY = city.waypoints[nextWP].y;
+                            nextZ = city.waypoints[nextWP].z;
+                            hasNextDestination = true;
                             
-                            // Determine next destination
-                            float nextX, nextY, nextZ;
-                            bool hasNextDestination = false;
+                            if (g_DebugMode)
+                            {
+                                LOG_INFO("server.loading", "[City Siege] Creature {} reached waypoint {}, moving to waypoint {} at ({}, {}, {})",
+                                         creature->GetGUID().ToString(), currentWP + 1, nextWP + 1, nextX, nextY, nextZ);
+                            }
+                        }
+                        else if (nextWP == city.waypoints.size())
+                        {
+                            // All waypoints complete, move to leader
+                            nextX = city.leaderX;
+                            nextY = city.leaderY;
+                            nextZ = city.leaderZ;
+                            hasNextDestination = true;
                             
-                            if (currentWP < city.waypoints.size())
+                            if (g_DebugMode)
                             {
-                                // Move to next waypoint
-                                nextX = city.waypoints[currentWP].x;
-                                nextY = city.waypoints[currentWP].y;
-                                nextZ = city.waypoints[currentWP].z;
-                                event.creatureWaypointProgress[guid]++;
-                                hasNextDestination = true;
-                                
-                                if (g_DebugMode)
-                                {
-                                    LOG_INFO("server.loading", "[City Siege] Creature {} reached waypoint {}, moving to waypoint {} at ({}, {}, {})",
-                                             creature->GetGUID().ToString(), currentWP, currentWP + 1, nextX, nextY, nextZ);
-                                }
+                                LOG_INFO("server.loading", "[City Siege] Creature {} completed all waypoints, moving to leader at ({}, {}, {})",
+                                         creature->GetGUID().ToString(), nextX, nextY, nextZ);
                             }
-                            else if (currentWP == city.waypoints.size())
-                            {
-                                // All waypoints complete, move to leader
-                                nextX = city.leaderX;
-                                nextY = city.leaderY;
-                                nextZ = city.leaderZ;
-                                event.creatureWaypointProgress[guid]++;
-                                hasNextDestination = true;
-                                
-                                if (g_DebugMode)
-                                {
-                                    LOG_INFO("server.loading", "[City Siege] Creature {} completed all waypoints, moving to leader at ({}, {}, {})",
-                                             creature->GetGUID().ToString(), nextX, nextY, nextZ);
-                                }
-                            }
+                        }
+                        
+                        // Update progress and start movement
+                        if (hasNextDestination)
+                        {
+                            event.creatureWaypointProgress[guid] = nextWP;
                             
-                            // Start movement to next destination
-                            if (hasNextDestination)
-                            {
-                                Movement::MoveSplineInit init(creature);
-                                init.MoveTo(nextX, nextY, nextZ, true, true);
-                                init.SetWalk(false);
-                                init.Launch();
-                            }
+                            Movement::MoveSplineInit init(creature);
+                            init.MoveTo(nextX, nextY, nextZ, true, true);
+                            init.SetWalk(false);
+                            init.Launch();
                         }
                     }
                 }

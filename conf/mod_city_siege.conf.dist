@@ -278,19 +278,19 @@ CitySiege.Silvermoon.LeaderZ = 13.7014
 CitySiege.Stormwind.WaypointCount = 3
 
 # Waypoint 1: Inside the main gates
-CitySiege.Stormwind.Waypoint1.X = -8960.0
-CitySiege.Stormwind.Waypoint1.Y = 515.0
-CitySiege.Stormwind.Waypoint1.Z = 96.35
+CitySiege.Stormwind.Waypoint1.X = -8829.0
+CitySiege.Stormwind.Waypoint1.Y = 640.530
+CitySiege.Stormwind.Waypoint1.Z = 94.11582
 
 # Waypoint 2: Trade District
-CitySiege.Stormwind.Waypoint2.X = -8860.0
-CitySiege.Stormwind.Waypoint2.Y = 675.0
-CitySiege.Stormwind.Waypoint2.Z = 97.9
+CitySiege.Stormwind.Waypoint2.X = -8749.465
+CitySiege.Stormwind.Waypoint2.Y = 560.5182
+CitySiege.Stormwind.Waypoint2.Z = 97.400345
 
 # Waypoint 3: Stormwind Keep entrance
-CitySiege.Stormwind.Waypoint3.X = -8511.0
-CitySiege.Stormwind.Waypoint3.Y = 337.0
-CitySiege.Stormwind.Waypoint3.Z = 104.6
+CitySiege.Stormwind.Waypoint3.X = -8609.125
+CitySiege.Stormwind.Waypoint3.Y = 507.26778
+CitySiege.Stormwind.Waypoint3.Z = 103.72089
 
 #
 #    CitySiege.Ironforge.WaypointCount
