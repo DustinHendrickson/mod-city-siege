@@ -175,6 +175,11 @@ struct SiegeEvent
     std::vector<ObjectGuid> spawnedCreatures;
     bool cinematicPhase;
     uint32 lastYellTime;
+    uint32 lastStatusAnnouncement; // For 5-minute countdown announcements
+    uint32 cinematicStartTime; // When RP phase started (for pre-battle countdown)
+    bool countdown75Announced; // 75% time remaining announced
+    bool countdown50Announced; // 50% time remaining announced
+    bool countdown25Announced; // 25% time remaining announced
     std::unordered_map<ObjectGuid, uint32> creatureWaypointProgress; // Tracks which waypoint each creature is on
     
     // Respawn tracking: stores creature GUID, entry, and death time
@@ -780,6 +785,15 @@ void StartSiegeEvent(int targetCityId = -1)
     newEvent.isActive = true;
     newEvent.cinematicPhase = true;
     newEvent.lastYellTime = currentTime;
+    newEvent.lastStatusAnnouncement = currentTime;
+    newEvent.cinematicStartTime = currentTime;
+    newEvent.countdown75Announced = false;
+    newEvent.countdown50Announced = false;
+    newEvent.countdown25Announced = false;
+
+    // Announce siege is coming (before RP phase)
+    std::string preAnnounce = "|cffff0000[City Siege]|r |cffFFFF00WARNING!|r A siege force is preparing to attack " + city->name + "! The battle will begin in " + std::to_string(g_CinematicDelay) + " seconds. Defenders, prepare yourselves!";
+    sWorld->SendServerMessage(SERVER_MSG_STRING, preAnnounce.c_str());
 
     g_ActiveSieges.push_back(newEvent);
 
@@ -860,16 +874,36 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     // Respawn city leader if they were killed during the siege
     if (leaderKilled && map)
     {
-        // Find if the leader exists (dead or alive) by checking through players
+        // Find if the leader exists (dead or alive) - no dependency on players!
         Creature* existingLeader = nullptr;
         
+        // We need a WorldObject as reference - use the map center coordinates
         Map::PlayerList const& players = map->GetPlayers();
-        for (auto itr = players.begin(); itr != players.end(); ++itr)
+        WorldObject* searchRef = nullptr;
+        
+        // Try to get a player as reference (if any exist)
+        if (!players.isEmpty())
         {
-            if (Player* player = itr->GetSource())
+            for (auto itr = players.begin(); itr != players.end(); ++itr)
             {
-                // Search for leader (dead or alive) near throne
-                if (Creature* leader = player->FindNearestCreature(city.targetLeaderEntry, 200.0f, false))
+                if (Player* player = itr->GetSource())
+                {
+                    searchRef = player;
+                    break;
+                }
+            }
+        }
+        
+        // If we have a reference, search for the leader
+        if (searchRef)
+        {
+            std::list<Creature*> leaderList;
+            searchRef->GetCreatureListWithEntryInGrid(leaderList, city.targetLeaderEntry, 1000.0f);
+            
+            // Find the leader at the throne
+            for (Creature* leader : leaderList)
+            {
+                if (leader)
                 {
                     float dist = leader->GetDistance(city.leaderX, city.leaderY, city.leaderZ);
                     if (dist < 100.0f)
@@ -994,17 +1028,54 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             continue;
         }
 
+        // Countdown announcements during cinematic phase (percentage-based)
+        if (event.cinematicPhase)
+        {
+            const CityData& city = g_Cities[event.cityId];
+            uint32 elapsed = currentTime - event.cinematicStartTime;
+            uint32 remaining = g_CinematicDelay > elapsed ? g_CinematicDelay - elapsed : 0;
+            
+            // Calculate percentage of time remaining
+            float percentRemaining = g_CinematicDelay > 0 ? (static_cast<float>(remaining) / static_cast<float>(g_CinematicDelay)) * 100.0f : 0.0f;
+            
+            // Announce at 75%, 50%, and 25% time remaining
+            if (percentRemaining <= 75.0f && !event.countdown75Announced)
+            {
+                event.countdown75Announced = true;
+                std::string countdownMsg = "|cffff0000[City Siege]|r |cffFFFF00" + std::to_string(remaining) + " seconds|r until the siege of " + city.name + " begins! Defenders, prepare!";
+                sWorld->SendServerMessage(SERVER_MSG_STRING, countdownMsg.c_str());
+            }
+            else if (percentRemaining <= 50.0f && !event.countdown50Announced)
+            {
+                event.countdown50Announced = true;
+                std::string countdownMsg = "|cffff0000[City Siege]|r |cffFF8800" + std::to_string(remaining) + " seconds|r until the siege of " + city.name + " begins! Defenders, to your posts!";
+                sWorld->SendServerMessage(SERVER_MSG_STRING, countdownMsg.c_str());
+            }
+            else if (percentRemaining <= 25.0f && !event.countdown25Announced)
+            {
+                event.countdown25Announced = true;
+                std::string countdownMsg = "|cffff0000[City Siege]|r |cffFF0000" + std::to_string(remaining) + " seconds|r until the siege of " + city.name + " begins! FINAL WARNING!";
+                sWorld->SendServerMessage(SERVER_MSG_STRING, countdownMsg.c_str());
+            }
+        }
+
         // Check if cinematic phase is over
         if (event.cinematicPhase && (currentTime - event.startTime) >= g_CinematicDelay)
         {
             event.cinematicPhase = false;
+            
+            const CityData& city = g_Cities[event.cityId];
+            
+            // Announce battle has begun!
+            std::string battleStart = "|cffff0000[City Siege]|r |cffFF0000THE BATTLE HAS BEGUN!|r The siege of " + city.name + " is now underway! Defenders, to arms!";
+            sWorld->SendServerMessage(SERVER_MSG_STRING, battleStart.c_str());
+            
             if (g_DebugMode)
             {
                 LOG_INFO("server.loading", "[City Siege] Cinematic phase ended, combat begins");
             }
             
             // Determine the city faction
-            const CityData& city = g_Cities[event.cityId];
             bool isAllianceCity = (event.cityId <= CITY_EXODAR);
             
             // Make creatures aggressive after cinematic phase
@@ -1436,63 +1507,148 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             }
         }
 
+        // Status announcements every 5 minutes (300 seconds) during active combat
+        if (!event.cinematicPhase && (currentTime - event.lastStatusAnnouncement) >= 300)
+        {
+            event.lastStatusAnnouncement = currentTime;
+            
+            const CityData& city = g_Cities[event.cityId];
+            Map* map = sMapMgr->FindMap(city.mapId, 0);
+            
+            // Calculate time remaining
+            uint32 timeRemaining = event.endTime > currentTime ? event.endTime - currentTime : 0;
+            uint32 minutesLeft = timeRemaining / 60;
+            
+            // Try to get leader health percentage
+            uint32 leaderHealthPct = 100;
+            bool leaderHealthAvailable = false;
+            
+            if (map && !event.spawnedCreatures.empty())
+            {
+                // Get a siege creature as reference
+                WorldObject* searchRef = nullptr;
+                for (const ObjectGuid& guid : event.spawnedCreatures)
+                {
+                    if (Creature* siegeCreature = map->GetCreature(guid))
+                    {
+                        searchRef = siegeCreature;
+                        break;
+                    }
+                }
+                
+                // Search for the city leader
+                if (searchRef)
+                {
+                    std::list<Creature*> leaderList;
+                    searchRef->GetCreatureListWithEntryInGrid(leaderList, city.targetLeaderEntry, 1000.0f);
+                    
+                    for (Creature* leader : leaderList)
+                    {
+                        if (leader && leader->IsAlive())
+                        {
+                            float dist = leader->GetDistance(city.leaderX, city.leaderY, city.leaderZ);
+                            if (dist < 100.0f)
+                            {
+                                leaderHealthPct = leader->GetHealthPct();
+                                leaderHealthAvailable = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Build announcement message
+            std::string statusMsg = "|cffff0000[City Siege]|r |cffFFFF00STATUS UPDATE:|r ";
+            statusMsg += city.name + " siege - ";
+            statusMsg += std::to_string(minutesLeft) + " minutes remaining. ";
+            
+            if (leaderHealthAvailable)
+            {
+                statusMsg += "Leader health: |cff";
+                // Color code based on health
+                if (leaderHealthPct > 75)
+                    statusMsg += "00FF00"; // Green
+                else if (leaderHealthPct > 50)
+                    statusMsg += "FFFF00"; // Yellow
+                else if (leaderHealthPct > 25)
+                    statusMsg += "FF8800"; // Orange
+                else
+                    statusMsg += "FF0000"; // Red
+                    
+                statusMsg += std::to_string(leaderHealthPct) + "%|r";
+                
+                // Add dramatic messages for critical health
+                if (leaderHealthPct <= 25)
+                {
+                    statusMsg += " |cffFF0000CRITICAL!|r The city leader is in grave danger!";
+                }
+                else if (leaderHealthPct <= 50)
+                {
+                    statusMsg += " The city leader is under heavy assault!";
+                }
+            }
+            else
+            {
+                statusMsg += "Leader status: Unknown (not in combat yet)";
+            }
+            
+            // Add time warning if less than 10 minutes left
+            if (minutesLeft <= 5 && minutesLeft > 0)
+            {
+                statusMsg += " |cffFFFF00FINAL MINUTES!|r";
+            }
+            
+            sWorld->SendServerMessage(SERVER_MSG_STRING, statusMsg.c_str());
+        }
+
         // Check if city leader is dead (attackers win)
         if (!event.cinematicPhase)
         {
             const CityData& city = g_Cities[event.cityId];
             Map* map = sMapMgr->FindMap(city.mapId, 0);
-            if (map)
+            if (map && !event.spawnedCreatures.empty())
             {
-                // Find the city leader by checking nearby players
+                // Use our siege creatures as search reference (no dependency on players!)
+                bool leaderFound = false;
                 bool leaderAlive = false;
                 
-                Map::PlayerList const& players = map->GetPlayers();
-                for (auto itr = players.begin(); itr != players.end(); ++itr)
+                // Get a valid siege creature to use as search reference
+                WorldObject* searchRef = nullptr;
+                for (const ObjectGuid& guid : event.spawnedCreatures)
                 {
-                    if (Player* player = itr->GetSource())
+                    if (Creature* siegeCreature = map->GetCreature(guid))
                     {
-                        // Search for the city leader near the throne
-                        if (Creature* leader = player->FindNearestCreature(city.targetLeaderEntry, 200.0f, true))
+                        searchRef = siegeCreature;
+                        break;
+                    }
+                }
+                
+                // If we have a reference point, search for ALL leaders in a huge radius
+                if (searchRef)
+                {
+                    std::list<Creature*> leaderList;
+                    searchRef->GetCreatureListWithEntryInGrid(leaderList, city.targetLeaderEntry, 1000.0f);
+                    
+                    // Check if any of the found leaders is at the throne
+                    for (Creature* leader : leaderList)
+                    {
+                        if (leader)
                         {
-                            // Verify the leader is actually near the throne coordinates
                             float dist = leader->GetDistance(city.leaderX, city.leaderY, city.leaderZ);
                             if (dist < 100.0f)
                             {
-                                leaderAlive = true;
+                                leaderFound = true;
+                                leaderAlive = leader->IsAlive();
                                 break;
                             }
                         }
                     }
                 }
                 
-                // If we didn't find the leader through players, they might be dead or no players nearby
-                if (!leaderAlive)
-                {
-                    // Double-check by searching all creatures near throne (backup check)
-                    for (auto itr = players.begin(); itr != players.end(); ++itr)
-                    {
-                        if (Player* player = itr->GetSource())
-                        {
-                            // Check distance to throne
-                            if (player->GetDistance(city.leaderX, city.leaderY, city.leaderZ) < 200.0f)
-                            {
-                                // If a player is near throne, search again including dead creatures
-                                if (Creature* leader = player->FindNearestCreature(city.targetLeaderEntry, 200.0f, false))
-                                {
-                                    float dist = leader->GetDistance(city.leaderX, city.leaderY, city.leaderZ);
-                                    if (dist < 100.0f && leader->IsAlive())
-                                    {
-                                        leaderAlive = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // If leader is dead, attackers win - end siege
-                if (!leaderAlive)
+                // Only end siege if we actually FOUND the leader and they are DEAD
+                // If we can't find them, assume they're alive (creatures haven't reached throne yet)
+                if (leaderFound && !leaderAlive)
                 {
                     if (g_DebugMode)
                     {
