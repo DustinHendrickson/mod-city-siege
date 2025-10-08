@@ -122,6 +122,13 @@ enum CityId
     CITY_MAX
 };
 
+struct Waypoint
+{
+    float x;
+    float y;
+    float z;
+};
+
 struct CityData
 {
     CityId id;
@@ -137,6 +144,7 @@ struct CityData
     float leaderY;
     float leaderZ;
     uint32 targetLeaderEntry; // Entry ID of the city leader to attack
+    std::vector<Waypoint> waypoints; // Waypoints for creatures to follow to reach the leader
 };
 
 // City definitions with approximate center coordinates
@@ -160,6 +168,7 @@ struct SiegeEvent
     std::vector<ObjectGuid> spawnedCreatures;
     bool cinematicPhase;
     uint32 lastYellTime;
+    std::unordered_map<ObjectGuid, uint32> creatureWaypointProgress; // Tracks which waypoint each creature is on
 };
 
 // Active siege events
@@ -310,6 +319,43 @@ void LoadCitySiegeConfiguration()
     g_Cities[CITY_SILVERMOON].leaderX = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.LeaderX", 9338.74f);
     g_Cities[CITY_SILVERMOON].leaderY = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.LeaderY", -7277.27f);
     g_Cities[CITY_SILVERMOON].leaderZ = sConfigMgr->GetOption<float>("CitySiege.Silvermoon.LeaderZ", 13.7014f);
+
+    // Load waypoints for each city
+    for (auto& city : g_Cities)
+    {
+        city.waypoints.clear();
+        
+        // Get waypoint count for this city
+        std::string waypointCountKey = "CitySiege." + city.name + ".WaypointCount";
+        uint32 waypointCount = sConfigMgr->GetOption<uint32>(waypointCountKey, 0);
+        
+        if (g_DebugMode)
+        {
+            LOG_INFO("server.loading", "[City Siege] Loading {} waypoints for {}", waypointCount, city.name);
+        }
+        
+        // Load each waypoint
+        for (uint32 i = 0; i < waypointCount; ++i)
+        {
+            std::string baseKey = "CitySiege." + city.name + ".Waypoint" + std::to_string(i + 1);
+            Waypoint wp;
+            wp.x = sConfigMgr->GetOption<float>(baseKey + ".X", 0.0f);
+            wp.y = sConfigMgr->GetOption<float>(baseKey + ".Y", 0.0f);
+            wp.z = sConfigMgr->GetOption<float>(baseKey + ".Z", 0.0f);
+            
+            // Only add waypoint if coordinates are valid
+            if (wp.x != 0.0f || wp.y != 0.0f || wp.z != 0.0f)
+            {
+                city.waypoints.push_back(wp);
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege]   Waypoint {}: ({}, {}, {})", 
+                             i + 1, wp.x, wp.y, wp.z);
+                }
+            }
+        }
+    }
 
     if (g_DebugMode)
     {
@@ -876,36 +922,37 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         creature->SetHover(false);
                         creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
                         
-                        // Get destination coordinates
-                        float destX = city.leaderX;
-                        float destY = city.leaderY;
-                        float destZ = city.leaderZ;
+                        // Initialize waypoint progress for this creature
+                        event.creatureWaypointProgress[guid] = 0;
                         
-                        // Get the ACTUAL ground height at destination - use same method as spawn code
-                        float groundZ = map->GetHeight(destX, destY, destZ + 50.0f, true, 50.0f);
-                        if (groundZ > INVALID_HEIGHT)
+                        // Determine first destination
+                        float destX, destY, destZ;
+                        if (!city.waypoints.empty())
                         {
-                            destZ = groundZ + 0.5f; // Slightly above ground to prevent getting stuck
+                            // Start with first waypoint
+                            destX = city.waypoints[0].x;
+                            destY = city.waypoints[0].y;
+                            destZ = city.waypoints[0].z;
+                        }
+                        else
+                        {
+                            // No waypoints, go directly to leader
+                            destX = city.leaderX;
+                            destY = city.leaderY;
+                            destZ = city.leaderZ;
                         }
                         
                         if (g_DebugMode)
                         {
-                            LOG_INFO("server.loading", "[City Siege] Moving creature from ({}, {}, {}) to leader at ({}, {}, {})", 
-                                     creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(),
-                                     destX, destY, destZ);
+                            LOG_INFO("server.loading", "[City Siege] Creature {} starting movement to waypoint/leader at ({}, {}, {})", 
+                                     creature->GetGUID().ToString(), destX, destY, destZ);
                         }
                         
-                        // Use MoveSplineInit exactly like WaypointMovementGenerator does for proper pathfinding
+                        // Use MoveSplineInit for proper pathfinding
                         Movement::MoveSplineInit init(creature);
-                        init.MoveTo(destX, destY, destZ, true, true); // Both parameters = true for pathfinding!
-                        init.SetWalk(false); // Run to the leader
+                        init.MoveTo(destX, destY, destZ, true, true);
+                        init.SetWalk(false);
                         init.Launch();
-                        
-                        if (g_DebugMode)
-                        {
-                            LOG_INFO("server.loading", "[City Siege] Creature {} activated, faction set to {}, moving to ({}, {}, {})", 
-                                     creature->GetEntry(), isAllianceCity ? 83 : 84, city.leaderX, city.leaderY, destZ);
-                        }
                     }
                 }
             }
@@ -954,6 +1001,76 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                                 creature->Yell(yells[randomIndex].c_str(), LANG_UNIVERSAL);
                             }
                             break; // Only one creature yells per cycle
+                        }
+                    }
+                }
+            }
+        }
+
+        // Handle waypoint progression - check if creatures have reached their current waypoint
+        if (!event.cinematicPhase)
+        {
+            const CityData& city = g_Cities[event.cityId];
+            Map* map = sMapMgr->FindMap(city.mapId, 0);
+            if (map)
+            {
+                for (const auto& guid : event.spawnedCreatures)
+                {
+                    if (Creature* creature = map->GetCreature(guid))
+                    {
+                        // Skip if creature is in combat or dead
+                        if (creature->IsInCombat() || !creature->IsAlive())
+                            continue;
+                        
+                        // Check if creature has finished its current movement
+                        if (creature->movespline->Finalized())
+                        {
+                            // Get current waypoint index
+                            uint32 currentWP = event.creatureWaypointProgress[guid];
+                            
+                            // Determine next destination
+                            float nextX, nextY, nextZ;
+                            bool hasNextDestination = false;
+                            
+                            if (currentWP < city.waypoints.size())
+                            {
+                                // Move to next waypoint
+                                nextX = city.waypoints[currentWP].x;
+                                nextY = city.waypoints[currentWP].y;
+                                nextZ = city.waypoints[currentWP].z;
+                                event.creatureWaypointProgress[guid]++;
+                                hasNextDestination = true;
+                                
+                                if (g_DebugMode)
+                                {
+                                    LOG_INFO("server.loading", "[City Siege] Creature {} reached waypoint {}, moving to waypoint {} at ({}, {}, {})",
+                                             creature->GetGUID().ToString(), currentWP, currentWP + 1, nextX, nextY, nextZ);
+                                }
+                            }
+                            else if (currentWP == city.waypoints.size())
+                            {
+                                // All waypoints complete, move to leader
+                                nextX = city.leaderX;
+                                nextY = city.leaderY;
+                                nextZ = city.leaderZ;
+                                event.creatureWaypointProgress[guid]++;
+                                hasNextDestination = true;
+                                
+                                if (g_DebugMode)
+                                {
+                                    LOG_INFO("server.loading", "[City Siege] Creature {} completed all waypoints, moving to leader at ({}, {}, {})",
+                                             creature->GetGUID().ToString(), nextX, nextY, nextZ);
+                                }
+                            }
+                            
+                            // Start movement to next destination
+                            if (hasNextDestination)
+                            {
+                                Movement::MoveSplineInit init(creature);
+                                init.MoveTo(nextX, nextY, nextZ, true, true);
+                                init.SetWalk(false);
+                                init.Launch();
+                            }
                         }
                     }
                 }

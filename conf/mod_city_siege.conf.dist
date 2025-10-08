@@ -255,6 +255,86 @@ CitySiege.Silvermoon.LeaderY = -7277.27
 CitySiege.Silvermoon.LeaderZ = 13.7014
 
 ###############################################
+# City Waypoint Configurations
+###############################################
+# Waypoints guide siege creatures from spawn point to leader location.
+# Creatures will move through waypoints in order before reaching the leader.
+# This ensures proper pathfinding through complex city layouts.
+#
+# Format:
+#   CitySiege.<CityName>.WaypointCount = <number>
+#   CitySiege.<CityName>.Waypoint1.X/Y/Z = coordinates
+#   CitySiege.<CityName>.Waypoint2.X/Y/Z = coordinates
+#   etc.
+#
+# Example waypoint path for Stormwind:
+#   Spawn (outside gates) -> WP1 (inside gates) -> WP2 (trade district) -> 
+#   WP3 (keep entrance) -> Leader (throne room)
+
+#
+#    CitySiege.Stormwind.WaypointCount
+#        Description: Number of waypoints for Stormwind siege path.
+#        Default:     3 (inside gates, trade district, keep entrance)
+CitySiege.Stormwind.WaypointCount = 3
+
+# Waypoint 1: Inside the main gates
+CitySiege.Stormwind.Waypoint1.X = -8960.0
+CitySiege.Stormwind.Waypoint1.Y = 515.0
+CitySiege.Stormwind.Waypoint1.Z = 96.35
+
+# Waypoint 2: Trade District
+CitySiege.Stormwind.Waypoint2.X = -8860.0
+CitySiege.Stormwind.Waypoint2.Y = 675.0
+CitySiege.Stormwind.Waypoint2.Z = 97.9
+
+# Waypoint 3: Stormwind Keep entrance
+CitySiege.Stormwind.Waypoint3.X = -8511.0
+CitySiege.Stormwind.Waypoint3.Y = 337.0
+CitySiege.Stormwind.Waypoint3.Z = 104.6
+
+#
+#    CitySiege.Ironforge.WaypointCount
+#        Description: Number of waypoints for Ironforge siege path.
+#        Default:     0 (direct path - add waypoints if needed)
+CitySiege.Ironforge.WaypointCount = 0
+
+#
+#    CitySiege.Darnassus.WaypointCount
+#        Description: Number of waypoints for Darnassus siege path.
+#        Default:     0 (direct path - add waypoints if needed)
+CitySiege.Darnassus.WaypointCount = 0
+
+#
+#    CitySiege.Exodar.WaypointCount
+#        Description: Number of waypoints for Exodar siege path.
+#        Default:     0 (direct path - add waypoints if needed)
+CitySiege.Exodar.WaypointCount = 0
+
+#
+#    CitySiege.Orgrimmar.WaypointCount
+#        Description: Number of waypoints for Orgrimmar siege path.
+#        Default:     0 (direct path - add waypoints if needed)
+CitySiege.Orgrimmar.WaypointCount = 0
+
+#
+#    CitySiege.Undercity.WaypointCount
+#        Description: Number of waypoints for Undercity siege path.
+#        Default:     0 (direct path - add waypoints if needed)
+CitySiege.Undercity.WaypointCount = 0
+
+#
+#    CitySiege.ThunderBluff.WaypointCount
+#        Description: Number of waypoints for Thunder Bluff siege path.
+#        Default:     0 (direct path - add waypoints if needed)
+CitySiege.ThunderBluff.WaypointCount = 0
+
+#
+#    CitySiege.Silvermoon.WaypointCount
+#        Description: Number of waypoints for Silvermoon siege path.
+#        Default:     0 (direct path - add waypoints if needed)
+CitySiege.Silvermoon.WaypointCount = 0
+
+###############################################
 # Spawn Configurations
 ###############################################
 
