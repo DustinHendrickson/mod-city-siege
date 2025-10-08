@@ -33,6 +33,10 @@
 #include "MotionMaster.h"
 #include "Language.h"
 #include "ScriptedCreature.h"
+#include "Cell.h"
+#include "CellImpl.h"
+#include "GridNotifiers.h"
+#include "GridNotifiersImpl.h"
 #include <vector>
 #include <unordered_map>
 #include <string>
@@ -566,7 +570,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->GetMotionMaster()->MoveIdle();
             
             // Set home position to spawn location to prevent evading back
-            creature->SetHomePosition(x, y, z, o);
+            creature->SetHomePosition(x, y, z, 0.0f);
             
             // Enforce ground position immediately after spawn
             creature->UpdateGroundPositionZ(x, y, z);
@@ -888,44 +892,21 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     // Respawn city leader if they were killed during the siege
     if (leaderKilled && map)
     {
-        // Find if the leader exists (dead or alive) - no dependency on players!
+        // Search around the leader's throne coordinates directly
+        std::list<Creature*> leaderList;
+        Acore::AllCreaturesOfEntryInRange check(nullptr, city.targetLeaderEntry, 100.0f);
+        Acore::CreatureListSearcher<Acore::AllCreaturesOfEntryInRange> searcher(nullptr, leaderList, check);
+        Cell::VisitGridObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
+        
         Creature* existingLeader = nullptr;
         
-        // We need a WorldObject as reference - use the map center coordinates
-        Map::PlayerList const& players = map->GetPlayers();
-        WorldObject* searchRef = nullptr;
-        
-        // Try to get a player as reference (if any exist)
-        if (players.begin() != players.end())
+        // Find the leader at the throne
+        for (Creature* leader : leaderList)
         {
-            for (auto itr = players.begin(); itr != players.end(); ++itr)
+            if (leader)
             {
-                if (Player* player = itr->GetSource())
-                {
-                    searchRef = player;
-                    break;
-                }
-            }
-        }
-        
-        // If we have a reference, search for the leader
-        if (searchRef)
-        {
-            std::list<Creature*> leaderList;
-            searchRef->GetCreatureListWithEntryInGrid(leaderList, city.targetLeaderEntry, 1000.0f);
-            
-            // Find the leader at the throne
-            for (Creature* leader : leaderList)
-            {
-                if (leader)
-                {
-                    float dist = leader->GetDistance(city.leaderX, city.leaderY, city.leaderZ);
-                    if (dist < 100.0f)
-                    {
-                        existingLeader = leader;
-                        break;
-                    }
-                }
+                existingLeader = leader;
+                break;
             }
         }
         
@@ -1540,41 +1521,26 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             uint32 timeRemaining = event.endTime > currentTime ? event.endTime - currentTime : 0;
             uint32 minutesLeft = timeRemaining / 60;
             
-            // Try to get leader health percentage
+            // Try to get leader health percentage - SEARCH FROM LEADER COORDINATES!
             uint32 leaderHealthPct = 100;
             bool leaderHealthAvailable = false;
             
-            if (map && !event.spawnedCreatures.empty())
+            if (map)
             {
-                // Get a siege creature as reference
-                WorldObject* searchRef = nullptr;
-                for (const ObjectGuid& guid : event.spawnedCreatures)
-                {
-                    if (Creature* siegeCreature = map->GetCreature(guid))
-                    {
-                        searchRef = siegeCreature;
-                        break;
-                    }
-                }
+                // Search around the leader's throne coordinates directly
+                std::list<Creature*> leaderList;
+                Acore::AllCreaturesOfEntryInRange check(nullptr, city.targetLeaderEntry, 100.0f);
+                Acore::CreatureListSearcher<Acore::AllCreaturesOfEntryInRange> searcher(nullptr, leaderList, check);
+                Cell::VisitGridObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
                 
-                // Search for the city leader
-                if (searchRef)
+                // Find the leader at the throne
+                for (Creature* leader : leaderList)
                 {
-                    std::list<Creature*> leaderList;
-                    searchRef->GetCreatureListWithEntryInGrid(leaderList, city.targetLeaderEntry, 1000.0f);
-                    
-                    for (Creature* leader : leaderList)
+                    if (leader && leader->IsAlive())
                     {
-                        if (leader && leader->IsAlive())
-                        {
-                            float dist = leader->GetDistance(city.leaderX, city.leaderY, city.leaderZ);
-                            if (dist < 100.0f)
-                            {
-                                leaderHealthPct = leader->GetHealthPct();
-                                leaderHealthAvailable = true;
-                                break;
-                            }
-                        }
+                        leaderHealthPct = leader->GetHealthPct();
+                        leaderHealthAvailable = true;
+                        break;
                     }
                 }
             }
@@ -1628,47 +1594,29 @@ void UpdateSiegeEvents(uint32 /*diff*/)
         {
             const CityData& city = g_Cities[event.cityId];
             Map* map = sMapMgr->FindMap(city.mapId, 0);
-            if (map && !event.spawnedCreatures.empty())
+            if (map)
             {
-                // Use our siege creatures as search reference (no dependency on players!)
+                // Search around the leader's throne coordinates directly - no dependency on siege creatures!
+                std::list<Creature*> leaderList;
+                Acore::AllCreaturesOfEntryInRange check(nullptr, city.targetLeaderEntry, 100.0f);
+                Acore::CreatureListSearcher<Acore::AllCreaturesOfEntryInRange> searcher(nullptr, leaderList, check);
+                Cell::VisitGridObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
+                
                 bool leaderFound = false;
                 bool leaderAlive = false;
                 
-                // Get a valid siege creature to use as search reference
-                WorldObject* searchRef = nullptr;
-                for (const ObjectGuid& guid : event.spawnedCreatures)
+                // Check if we found the leader at the throne
+                for (Creature* leader : leaderList)
                 {
-                    if (Creature* siegeCreature = map->GetCreature(guid))
+                    if (leader)
                     {
-                        searchRef = siegeCreature;
+                        leaderFound = true;
+                        leaderAlive = leader->IsAlive();
                         break;
                     }
                 }
                 
-                // If we have a reference point, search for ALL leaders in a huge radius
-                if (searchRef)
-                {
-                    std::list<Creature*> leaderList;
-                    searchRef->GetCreatureListWithEntryInGrid(leaderList, city.targetLeaderEntry, 1000.0f);
-                    
-                    // Check if any of the found leaders is at the throne
-                    for (Creature* leader : leaderList)
-                    {
-                        if (leader)
-                        {
-                            float dist = leader->GetDistance(city.leaderX, city.leaderY, city.leaderZ);
-                            if (dist < 100.0f)
-                            {
-                                leaderFound = true;
-                                leaderAlive = leader->IsAlive();
-                                break;
-                            }
-                        }
-                    }
-                }
-                
                 // Only end siege if we actually FOUND the leader and they are DEAD
-                // If we can't find them, assume they're alive (creatures haven't reached throne yet)
                 if (leaderFound && !leaderAlive)
                 {
                     if (g_DebugMode)
