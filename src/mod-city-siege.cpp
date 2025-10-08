@@ -177,9 +177,10 @@ struct SiegeEvent
     uint32 lastYellTime;
     std::unordered_map<ObjectGuid, uint32> creatureWaypointProgress; // Tracks which waypoint each creature is on
     
-    // Respawn tracking: stores creature entry and death time
+    // Respawn tracking: stores creature GUID, entry, and death time
     struct RespawnData
     {
+        ObjectGuid guid;
         uint32 entry;
         uint32 deathTime;
     };
@@ -554,6 +555,11 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35);
             
+            // Prevent return to home position after combat
+            creature->SetWalk(false);
+            creature->GetMotionMaster()->Clear(false);
+            creature->GetMotionMaster()->MoveIdle();
+            
             // Enforce ground position immediately after spawn
             creature->UpdateGroundPositionZ(x, y, z);
             
@@ -586,6 +592,11 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35);
             
+            // Prevent return to home position after combat
+            creature->SetWalk(false);
+            creature->GetMotionMaster()->Clear(false);
+            creature->GetMotionMaster()->MoveIdle();
+            
             // Enforce ground position immediately after spawn
             creature->UpdateGroundPositionZ(x, y, z);
             
@@ -617,6 +628,11 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35);
             
+            // Prevent return to home position after combat
+            creature->SetWalk(false);
+            creature->GetMotionMaster()->Clear(false);
+            creature->GetMotionMaster()->MoveIdle();
+            
             // Enforce ground position immediately after spawn
             creature->UpdateGroundPositionZ(x, y, z);
             
@@ -647,6 +663,11 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35);
+            
+            // Prevent return to home position after combat
+            creature->SetWalk(false);
+            creature->GetMotionMaster()->Clear(false);
+            creature->GetMotionMaster()->MoveIdle();
             
             // Enforce ground position immediately after spawn
             creature->UpdateGroundPositionZ(x, y, z);
@@ -775,7 +796,7 @@ void StartSiegeEvent(int targetCityId = -1)
  * @brief Ends an active siege event.
  * @param event The siege event to end.
  */
-void EndSiegeEvent(SiegeEvent& event)
+void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
 {
     if (!event.isActive)
     {
@@ -787,6 +808,7 @@ void EndSiegeEvent(SiegeEvent& event)
 
     // Check if defenders won (city leader still alive)
     bool defendersWon = false;
+    bool leaderKilled = false;
     Map* map = sMapMgr->FindMap(city.mapId, 0);
     if (map)
     {
@@ -802,6 +824,13 @@ void EndSiegeEvent(SiegeEvent& event)
                     break;
                 }
             }
+        }
+        
+        // If winningTeam was explicitly passed (leader died), mark it
+        if (winningTeam != -1)
+        {
+            defendersWon = false;
+            leaderKilled = true;
         }
     }
 
@@ -825,6 +854,50 @@ void EndSiegeEvent(SiegeEvent& event)
             // Attackers won (city leader killed) - reward attacking faction
             int winningTeam = isAllianceCity ? 1 : 0; // Opposite faction
             DistributeRewards(event, city, winningTeam);
+        }
+    }
+
+    // Respawn city leader if they were killed during the siege
+    if (leaderKilled && map)
+    {
+        // Find if the leader exists (dead or alive)
+        Creature* existingLeader = nullptr;
+        std::list<Creature*> creatureList;
+        Acore::AllCreaturesOfEntryInRange check(city.leaderX, city.leaderY, city.leaderZ, 100.0f, city.targetLeaderEntry, nullptr);
+        Acore::CreatureListSearcher<Acore::AllCreaturesOfEntryInRange> searcher(nullptr, creatureList, check);
+        Cell::VisitAllObjects(Position(city.leaderX, city.leaderY, city.leaderZ), searcher, map, 100.0f);
+        
+        for (Creature* creature : creatureList)
+        {
+            if (creature)
+            {
+                existingLeader = creature;
+                break;
+            }
+        }
+        
+        // Respawn the leader
+        if (existingLeader)
+        {
+            if (!existingLeader->IsAlive())
+            {
+                existingLeader->Respawn();
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Respawned city leader {} (entry {}) at {}", 
+                             city.name, city.targetLeaderEntry, existingLeader->GetName());
+                }
+            }
+        }
+        else
+        {
+            // Leader doesn't exist in world - log warning
+            if (g_DebugMode)
+            {
+                LOG_WARN("server.loading", "[City Siege] Could not find city leader {} (entry {}) to respawn!", 
+                         city.name, city.targetLeaderEntry);
+            }
         }
     }
 
@@ -972,6 +1045,11 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             creature->Relocate(creatureX, creatureY, groundZ, creature->GetOrientation());
                         }
                         
+                        // Prevent return to home position after combat - clear motion master
+                        creature->SetWalk(false);
+                        creature->GetMotionMaster()->Clear(false);
+                        creature->GetMotionMaster()->MoveIdle();
+                        
                         // Initialize waypoint progress for this creature
                         event.creatureWaypointProgress[guid] = 0;
                         
@@ -1071,18 +1149,14 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         // Track dead creatures for respawning
                         if (!creature->IsAlive())
                         {
-                            // Check if this creature entry is already in the dead list (avoid duplicates)
+                            // Check if this specific creature GUID is already in the dead list (avoid duplicates)
                             bool alreadyTracked = false;
                             for (const auto& deadData : event.deadCreatures)
                             {
-                                if (deadData.entry == creature->GetEntry())
+                                if (deadData.guid == guid)
                                 {
-                                    // Check if it's the same death (within reasonable time window)
-                                    if ((currentTime - deadData.deathTime) < 5)
-                                    {
-                                        alreadyTracked = true;
-                                        break;
-                                    }
+                                    alreadyTracked = true;
+                                    break;
                                 }
                             }
                             
@@ -1090,6 +1164,7 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             if (!alreadyTracked && g_RespawnEnabled)
                             {
                                 SiegeEvent::RespawnData respawnData;
+                                respawnData.guid = guid;
                                 respawnData.entry = creature->GetEntry();
                                 respawnData.deathTime = currentTime;
                                 event.deadCreatures.push_back(respawnData);
@@ -1299,9 +1374,24 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
                             creature->UpdateGroundPositionZ(spawnX, spawnY, spawnZ);
                             
-                            // Add to spawned creatures list and reset waypoint progress to 0 (start from first waypoint)
-                            event.spawnedCreatures.push_back(creature->GetGUID());
-                            event.creatureWaypointProgress[creature->GetGUID()] = 0;
+                            // Prevent return to home position after combat - clear motion master
+                            creature->SetWalk(false);
+                            creature->GetMotionMaster()->Clear(false);
+                            creature->GetMotionMaster()->MoveIdle();
+                            
+                            // Replace the old GUID with the new one in spawned creatures list
+                            for (auto& spawnedGuid : event.spawnedCreatures)
+                            {
+                                if (spawnedGuid == respawnData.guid)
+                                {
+                                    spawnedGuid = creature->GetGUID();
+                                    break;
+                                }
+                            }
+                            
+                            // Reset waypoint progress to 0 (start from first waypoint)
+                            event.creatureWaypointProgress.erase(respawnData.guid); // Remove old GUID
+                            event.creatureWaypointProgress[creature->GetGUID()] = 0; // Add new GUID
                             
                             // Start movement to first waypoint or leader
                             float destX, destY, destZ;
@@ -1341,7 +1431,50 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             }
         }
 
-        // Check if event should end
+        // Check if city leader is dead (attackers win)
+        if (!event.cinematicPhase)
+        {
+            const CityData& city = g_Cities[event.cityId];
+            Map* map = sMapMgr->FindMap(city.mapId, 0);
+            if (map)
+            {
+                // Find the city leader by searching near leader coordinates
+                bool leaderAlive = false;
+                
+                // Get all creatures within 100 yards of the leader position
+                std::list<Creature*> creatureList;
+                Acore::AllCreaturesOfEntryInRange check(city.leaderX, city.leaderY, city.leaderZ, 100.0f, city.targetLeaderEntry, nullptr);
+                Acore::CreatureListSearcher<Acore::AllCreaturesOfEntryInRange> searcher(nullptr, creatureList, check);
+                Cell::VisitAllObjects(Position(city.leaderX, city.leaderY, city.leaderZ), searcher, map, 100.0f);
+                
+                // Check if any leader creature is alive
+                for (Creature* creature : creatureList)
+                {
+                    if (creature && creature->IsAlive())
+                    {
+                        leaderAlive = true;
+                        break;
+                    }
+                }
+                
+                // If leader is dead, attackers win - end siege
+                if (!leaderAlive)
+                {
+                    if (g_DebugMode)
+                    {
+                        LOG_INFO("server.loading", "[City Siege] City leader killed! Attackers win. Ending siege of {}", city.name);
+                    }
+                    
+                    // Determine winning team: opposite of the city's faction
+                    bool isAllianceCity = (event.cityId <= CITY_EXODAR);
+                    int winningTeam = isAllianceCity ? 1 : 0; // 0 = Alliance, 1 = Horde
+                    
+                    EndSiegeEvent(event, winningTeam);
+                }
+            }
+        }
+
+        // Check if event should end (time limit reached - defenders win)
         if (currentTime >= event.endTime)
         {
             EndSiegeEvent(event);
