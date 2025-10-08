@@ -128,6 +128,23 @@ static uint32 g_CreatureHordeLeader = 17936;      // Horde Shaman (commander)
 static bool g_AggroPlayers = true;
 static bool g_AggroNPCs = true;
 
+// Defender settings
+static bool g_DefendersEnabled = true;
+static uint32 g_DefendersCount = 10;
+static uint32 g_CreatureAllianceDefender = 17919;  // Alliance Footman
+static uint32 g_CreatureHordeDefender = 17932;     // Horde Grunt
+
+// Level settings for spawned units
+static uint32 g_LevelLeader = 80;
+static uint32 g_LevelMiniBoss = 80;
+static uint32 g_LevelElite = 75;
+static uint32 g_LevelMinion = 70;
+static uint32 g_LevelDefender = 70;
+
+// Scale settings for spawned units
+static float g_ScaleLeader = 1.3f;      // 30% larger
+static float g_ScaleMiniBoss = 1.15f;   // 15% larger
+
 // Cinematic settings
 static uint32 g_CinematicDelay = 45; // seconds
 static uint32 g_YellFrequency = 30;  // seconds
@@ -138,6 +155,7 @@ static uint32 g_RespawnTimeLeader = 300;    // 5 minutes in seconds
 static uint32 g_RespawnTimeMiniBoss = 180;  // 3 minutes in seconds
 static uint32 g_RespawnTimeElite = 120;     // 2 minutes in seconds
 static uint32 g_RespawnTimeMinion = 60;     // 1 minute in seconds
+static uint32 g_RespawnTimeDefender = 45;   // 45 seconds
 
 // Reward settings
 static bool g_RewardOnDefense = true;
@@ -217,6 +235,7 @@ struct SiegeEvent
     uint32 endTime;
     bool isActive;
     std::vector<ObjectGuid> spawnedCreatures;
+    std::vector<ObjectGuid> spawnedDefenders; // Defender creatures
     bool cinematicPhase;
     uint32 lastYellTime;
     uint32 lastStatusAnnouncement; // For 5-minute countdown announcements
@@ -224,7 +243,7 @@ struct SiegeEvent
     bool countdown75Announced; // 75% time remaining announced
     bool countdown50Announced; // 50% time remaining announced
     bool countdown25Announced; // 25% time remaining announced
-    std::unordered_map<ObjectGuid, uint32> creatureWaypointProgress; // Tracks which waypoint each creature is on
+    std::unordered_map<ObjectGuid, uint32> creatureWaypointProgress; // Tracks which waypoint each creature is on (attackers and defenders)
     
     // Respawn tracking: stores creature GUID, entry, and death time
     struct RespawnData
@@ -232,6 +251,7 @@ struct SiegeEvent
         ObjectGuid guid;
         uint32 entry;
         uint32 deathTime;
+        bool isDefender; // Track if this is a defender for correct respawn
     };
     std::vector<RespawnData> deadCreatures; // Creatures waiting to respawn
 };
@@ -295,6 +315,23 @@ void LoadCitySiegeConfiguration()
     g_AggroPlayers = sConfigMgr->GetOption<bool>("CitySiege.AggroPlayers", true);
     g_AggroNPCs = sConfigMgr->GetOption<bool>("CitySiege.AggroNPCs", true);
 
+    // Defender settings
+    g_DefendersEnabled = sConfigMgr->GetOption<bool>("CitySiege.Defenders.Enabled", true);
+    g_DefendersCount = sConfigMgr->GetOption<uint32>("CitySiege.Defenders.Count", 10);
+    g_CreatureAllianceDefender = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Defender", 17919);
+    g_CreatureHordeDefender = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Defender", 17932);
+
+    // Level settings
+    g_LevelLeader = sConfigMgr->GetOption<uint32>("CitySiege.Level.Leader", 80);
+    g_LevelMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Level.MiniBoss", 80);
+    g_LevelElite = sConfigMgr->GetOption<uint32>("CitySiege.Level.Elite", 75);
+    g_LevelMinion = sConfigMgr->GetOption<uint32>("CitySiege.Level.Minion", 70);
+    g_LevelDefender = sConfigMgr->GetOption<uint32>("CitySiege.Level.Defender", 70);
+
+    // Scale settings
+    g_ScaleLeader = sConfigMgr->GetOption<float>("CitySiege.Scale.Leader", 1.3f);
+    g_ScaleMiniBoss = sConfigMgr->GetOption<float>("CitySiege.Scale.MiniBoss", 1.15f);
+
     // Cinematic settings
     g_CinematicDelay = sConfigMgr->GetOption<uint32>("CitySiege.CinematicDelay", 45);
     g_YellFrequency = sConfigMgr->GetOption<uint32>("CitySiege.YellFrequency", 30);
@@ -305,6 +342,7 @@ void LoadCitySiegeConfiguration()
     g_RespawnTimeMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Respawn.MiniBossTime", 180);
     g_RespawnTimeElite = sConfigMgr->GetOption<uint32>("CitySiege.Respawn.EliteTime", 120);
     g_RespawnTimeMinion = sConfigMgr->GetOption<uint32>("CitySiege.Respawn.MinionTime", 60);
+    g_RespawnTimeDefender = sConfigMgr->GetOption<uint32>("CitySiege.Defenders.RespawnTime", 45);
 
     // Reward settings
     g_RewardOnDefense = sConfigMgr->GetOption<bool>("CitySiege.RewardOnDefense", true);
@@ -597,6 +635,8 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         
         if (Creature* creature = map->SummonCreature(leaderEntry, Position(x, y, z, 0)))
         {
+            creature->SetLevel(g_LevelLeader);
+            creature->SetObjectScale(g_ScaleLeader);
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
@@ -616,7 +656,31 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->UpdateGroundPositionZ(x, y, z);
             
             event.spawnedCreatures.push_back(creature->GetGUID());
-            creature->Yell(g_YellLeaderSpawn.c_str(), LANG_UNIVERSAL);
+            
+            // Parse leader spawn yells from configuration (semicolon separated for random selection)
+            std::vector<std::string> spawnYells;
+            std::string yellStr = g_YellLeaderSpawn;
+            size_t pos = 0;
+            while ((pos = yellStr.find(';')) != std::string::npos)
+            {
+                std::string yell = yellStr.substr(0, pos);
+                if (!yell.empty())
+                {
+                    spawnYells.push_back(yell);
+                }
+                yellStr.erase(0, pos + 1);
+            }
+            if (!yellStr.empty())
+            {
+                spawnYells.push_back(yellStr);
+            }
+            
+            // Yell a random spawn message
+            if (!spawnYells.empty())
+            {
+                uint32 randomIndex = urand(0, spawnYells.size() - 1);
+                creature->Yell(spawnYells[randomIndex].c_str(), LANG_UNIVERSAL);
+            }
         }
     }
 
@@ -637,6 +701,8 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         
         if (Creature* creature = map->SummonCreature(miniBossEntry, Position(x, y, z, 0)))
         {
+            creature->SetLevel(g_LevelMiniBoss);
+            creature->SetObjectScale(g_ScaleMiniBoss);
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
@@ -676,6 +742,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         
         if (Creature* creature = map->SummonCreature(eliteEntry, Position(x, y, z, 0)))
         {
+            creature->SetLevel(g_LevelElite);
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
@@ -715,6 +782,7 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         
         if (Creature* creature = map->SummonCreature(minionEntry, Position(x, y, z, 0)))
         {
+            creature->SetLevel(g_LevelMinion);
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
@@ -744,8 +812,65 @@ void SpawnSiegeCreatures(SiegeEvent& event)
         }
     }
 
-    LOG_INFO("server.loading", "[City Siege] Spawned {} total creatures in military formation for siege at {}", 
+    LOG_INFO("server.loading", "[City Siege] Spawned {} total attacker creatures in military formation for siege at {}", 
              event.spawnedCreatures.size(), city.name);
+    
+    // === SPAWN DEFENDERS ===
+    // Defenders spawn near the leader and march towards the attackers (reverse waypoint order)
+    if (g_DefendersEnabled && g_DefendersCount > 0)
+    {
+        // Determine defender entry based on city faction (same faction as city)
+        bool isAllianceCity = (event.cityId <= CITY_EXODAR);
+        uint32 defenderEntry = isAllianceCity ? g_CreatureAllianceDefender : g_CreatureHordeDefender;
+        
+        // Spawn defenders in a formation near the leader position
+        float defenderRadius = 15.0f; // Spawn in 15-yard radius around leader
+        float defenderAngleStep = (2 * M_PI) / std::max(1u, g_DefendersCount);
+        
+        for (uint32 i = 0; i < g_DefendersCount; ++i)
+        {
+            float angle = defenderAngleStep * i;
+            float x = city.leaderX + defenderRadius * cos(angle);
+            float y = city.leaderY + defenderRadius * sin(angle);
+            float z = city.leaderZ;
+            
+            float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
+            if (groundZ > INVALID_HEIGHT)
+                z = groundZ + 0.5f;
+            
+            if (Creature* creature = map->SummonCreature(defenderEntry, Position(x, y, z, 0)))
+            {
+                creature->SetLevel(g_LevelDefender);
+                creature->SetDisableGravity(false);
+                creature->SetCanFly(false);
+                creature->SetHover(false);
+                creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
+                creature->SetReactState(REACT_PASSIVE);
+                creature->SetFaction(35);
+                
+                // Prevent return to home position after combat
+                creature->SetWalk(false);
+                creature->GetMotionMaster()->Clear(false);
+                creature->GetMotionMaster()->MoveIdle();
+                
+                // Set home position to spawn location
+                creature->SetHomePosition(x, y, z, 0);
+                
+                // Enforce ground position immediately after spawn
+                creature->UpdateGroundPositionZ(x, y, z);
+                
+                event.spawnedDefenders.push_back(creature->GetGUID());
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Spawned defender at ({}, {}, {})", x, y, z);
+                }
+            }
+        }
+        
+        LOG_INFO("server.loading", "[City Siege] Spawned {} defender creatures for {}", 
+                 event.spawnedDefenders.size(), city.name);
+    }
 }
 
 /**
@@ -766,13 +891,23 @@ void DespawnSiegeCreatures(SiegeEvent& event)
                 creature->DespawnOrUnsummon();
             }
         }
+        
+        // Despawn defenders
+        for (const ObjectGuid& guid : event.spawnedDefenders)
+        {
+            if (Creature* creature = map->GetCreature(guid))
+            {
+                creature->DespawnOrUnsummon();
+            }
+        }
     }
     
     event.spawnedCreatures.clear();
+    event.spawnedDefenders.clear();
 
     if (g_DebugMode)
     {
-        LOG_INFO("server.loading", "[City Siege] Despawned creatures for siege at {}", city.name);
+        LOG_INFO("server.loading", "[City Siege] Despawned attackers and defenders for siege at {}", city.name);
     }
 }
 
@@ -1221,6 +1356,74 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         init.Launch();
                     }
                 }
+                
+                // Initialize defenders - they move in REVERSE order through waypoints
+                for (const auto& guid : event.spawnedDefenders)
+                {
+                    if (Creature* creature = map->GetCreature(guid))
+                    {
+                        // Set proper defender faction (same as city faction)
+                        creature->SetFaction(isAllianceCity ? 84 : 83); // 84 = Alliance, 83 = Horde
+                        creature->SetReactState(REACT_AGGRESSIVE);
+                        
+                        // Ensure creature is grounded
+                        creature->SetDisableGravity(false);
+                        creature->SetCanFly(false);
+                        creature->SetHover(false);
+                        creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
+                        
+                        // Ground the creature
+                        float creatureX = creature->GetPositionX();
+                        float creatureY = creature->GetPositionY();
+                        float creatureZ = creature->GetPositionZ();
+                        float groundZ = creature->GetMap()->GetHeight(creatureX, creatureY, creatureZ + 5.0f, true, 50.0f);
+                        
+                        if (groundZ > INVALID_HEIGHT)
+                        {
+                            creature->UpdateGroundPositionZ(creatureX, creatureY, groundZ);
+                            creature->Relocate(creatureX, creatureY, groundZ, creature->GetOrientation());
+                        }
+                        
+                        creature->SetWalk(false);
+                        creature->GetMotionMaster()->Clear(false);
+                        creature->GetMotionMaster()->MoveIdle();
+                        
+                        // Defenders start at the LAST waypoint (highest index) and go backwards
+                        // Set progress to MAX so they start at the end
+                        uint32 startWaypoint = city.waypoints.empty() ? 0 : city.waypoints.size();
+                        event.creatureWaypointProgress[guid] = startWaypoint + 10000; // Add 10000 to mark as defender
+                        
+                        // Determine first destination (last waypoint, or spawn point if no waypoints)
+                        float destX, destY, destZ;
+                        if (!city.waypoints.empty())
+                        {
+                            // Start at last waypoint and move backwards
+                            destX = city.waypoints[city.waypoints.size() - 1].x;
+                            destY = city.waypoints[city.waypoints.size() - 1].y;
+                            destZ = city.waypoints[city.waypoints.size() - 1].z;
+                        }
+                        else
+                        {
+                            // No waypoints, go directly to spawn point
+                            destX = city.spawnX;
+                            destY = city.spawnY;
+                            destZ = city.spawnZ;
+                        }
+                        
+                        // Randomize position to prevent bunching
+                        Map* creatureMap = creature->GetMap();
+                        RandomizePosition(destX, destY, destZ, creatureMap, 5.0f);
+                        
+                        // Update home position
+                        creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
+                        
+                        // Start movement
+                        Movement::MoveSplineInit init(creature);
+                        init.MoveTo(destX, destY, destZ, true, true);
+                        init.SetWalk(false);
+                        init.Launch();
+                    }
+                }
             }
         }
 
@@ -1305,11 +1508,12 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                                 respawnData.guid = guid;
                                 respawnData.entry = creature->GetEntry();
                                 respawnData.deathTime = currentTime;
+                                respawnData.isDefender = false; // This is an attacker
                                 event.deadCreatures.push_back(respawnData);
                                 
                                 if (g_DebugMode)
                                 {
-                                    LOG_INFO("server.loading", "[City Siege] Creature {} (entry {}) died, will respawn at siege spawn point in {} seconds",
+                                    LOG_INFO("server.loading", "[City Siege] Attacker {} (entry {}) died, will respawn at siege spawn point in {} seconds",
                                              creature->GetGUID().ToString(), respawnData.entry,
                                              respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader ? g_RespawnTimeLeader :
                                              respawnData.entry == g_CreatureAllianceMiniBoss || respawnData.entry == g_CreatureHordeMiniBoss ? g_RespawnTimeMiniBoss :
@@ -1326,6 +1530,10 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         
                         // Skip movement updates if creature is currently in combat
                         if (creature->IsInCombat())
+                            continue;
+                        
+                        // Check if creature is currently moving - if so, don't interrupt
+                        if (!creature->movespline->Finalized())
                             continue;
                         
                         // Check if creature is currently moving - if so, don't interrupt
@@ -1354,27 +1562,61 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         // Get current waypoint index
                         uint32 currentWP = event.creatureWaypointProgress[guid];
                         
-                        // Check if we've already completed all waypoints and reached leader
-                        if (currentWP > city.waypoints.size())
-                            continue; // Already at final destination
+                        // Check if this is a defender (marked with +10000)
+                        bool isDefender = (currentWP >= 10000);
+                        if (isDefender)
+                            currentWP -= 10000; // Remove marker to get actual waypoint
+                        
+                        // Check if we've reached final destination
+                        if (!isDefender && currentWP > city.waypoints.size())
+                            continue; // Attacker already at leader
+                        if (isDefender && currentWP == 0 && city.waypoints.empty())
+                            continue; // Defender at spawn point with no waypoints
                         
                         // Determine current target location
                         float targetX, targetY, targetZ;
-                        if (currentWP < city.waypoints.size())
+                        
+                        if (isDefender)
                         {
-                            targetX = city.waypoints[currentWP].x;
-                            targetY = city.waypoints[currentWP].y;
-                            targetZ = city.waypoints[currentWP].z;
-                        }
-                        else if (currentWP == city.waypoints.size())
-                        {
-                            targetX = city.leaderX;
-                            targetY = city.leaderY;
-                            targetZ = city.leaderZ;
+                            // DEFENDERS: Move backwards through waypoints (high to low), then to spawn
+                            if (currentWP > 0 && currentWP <= city.waypoints.size())
+                            {
+                                // Moving towards a waypoint (backwards)
+                                targetX = city.waypoints[currentWP - 1].x;
+                                targetY = city.waypoints[currentWP - 1].y;
+                                targetZ = city.waypoints[currentWP - 1].z;
+                            }
+                            else if (currentWP == 0)
+                            {
+                                // At first waypoint, now go to spawn point
+                                targetX = city.spawnX;
+                                targetY = city.spawnY;
+                                targetZ = city.spawnZ;
+                            }
+                            else
+                            {
+                                continue; // Invalid state
+                            }
                         }
                         else
                         {
-                            continue;
+                            // ATTACKERS: Move forwards through waypoints (low to high), then to leader
+                            if (currentWP < city.waypoints.size())
+                            {
+                                targetX = city.waypoints[currentWP].x;
+                                targetY = city.waypoints[currentWP].y;
+                                targetZ = city.waypoints[currentWP].z;
+                            }
+                            else if (currentWP == city.waypoints.size())
+                            {
+                                targetX = city.leaderX;
+                                targetY = city.leaderY;
+                                targetZ = city.leaderZ;
+                            }
+                            else
+                            {
+                                continue;
+                            }
                         }
                         
                         // Check distance to current target
@@ -1400,36 +1642,57 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         // Creature is close to current target (within 10 yards), consider it reached
                         if (dist <= 10.0f)
                         {
-                            uint32 nextWP = currentWP + 1;
                             float nextX, nextY, nextZ;
                             bool hasNextDestination = false;
+                            uint32 nextWP;
                             
-                            if (nextWP < city.waypoints.size())
+                            if (isDefender)
                             {
-                                // Move to next waypoint
-                                nextX = city.waypoints[nextWP].x;
-                                nextY = city.waypoints[nextWP].y;
-                                nextZ = city.waypoints[nextWP].z;
-                                hasNextDestination = true;
-                                
-                                if (g_DebugMode)
+                                // DEFENDERS: Move backwards (decrement waypoint)
+                                if (currentWP > 0)
                                 {
-                                    LOG_INFO("server.loading", "[City Siege] Creature {} reached waypoint {}, moving to waypoint {} at ({}, {}, {})",
-                                             creature->GetGUID().ToString(), currentWP + 1, nextWP + 1, nextX, nextY, nextZ);
+                                    nextWP = currentWP - 1;
+                                    
+                                    if (nextWP > 0)
+                                    {
+                                        // Move to previous waypoint
+                                        nextX = city.waypoints[nextWP - 1].x;
+                                        nextY = city.waypoints[nextWP - 1].y;
+                                        nextZ = city.waypoints[nextWP - 1].z;
+                                        hasNextDestination = true;
+                                    }
+                                    else
+                                    {
+                                        // Reached first waypoint, now go to spawn
+                                        nextX = city.spawnX;
+                                        nextY = city.spawnY;
+                                        nextZ = city.spawnZ;
+                                        hasNextDestination = true;
+                                    }
+                                    
+                                    nextWP += 10000; // Re-add defender marker
                                 }
                             }
-                            else if (nextWP == city.waypoints.size())
+                            else
                             {
-                                // All waypoints complete, move to leader
-                                nextX = city.leaderX;
-                                nextY = city.leaderY;
-                                nextZ = city.leaderZ;
-                                hasNextDestination = true;
+                                // ATTACKERS: Move forwards (increment waypoint)
+                                nextWP = currentWP + 1;
                                 
-                                if (g_DebugMode)
+                                if (nextWP < city.waypoints.size())
                                 {
-                                    LOG_INFO("server.loading", "[City Siege] Creature {} completed all waypoints, moving to leader at ({}, {}, {})",
-                                             creature->GetGUID().ToString(), nextX, nextY, nextZ);
+                                    // Move to next waypoint
+                                    nextX = city.waypoints[nextWP].x;
+                                    nextY = city.waypoints[nextWP].y;
+                                    nextZ = city.waypoints[nextWP].z;
+                                    hasNextDestination = true;
+                                }
+                                else if (nextWP == city.waypoints.size())
+                                {
+                                    // All waypoints complete, move to leader
+                                    nextX = city.leaderX;
+                                    nextY = city.leaderY;
+                                    nextZ = city.leaderZ;
+                                    hasNextDestination = true;
                                 }
                             }
                             
@@ -1453,6 +1716,161 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         }
                     }
                 }
+                
+                // Check defenders for deaths (separate tracking from attackers)
+                for (const auto& guid : event.spawnedDefenders)
+                {
+                    if (Creature* creature = map->GetCreature(guid))
+                    {
+                        // Track dead defenders for respawning
+                        if (!creature->IsAlive())
+                        {
+                            // Check if this specific defender GUID is already in the dead list (avoid duplicates)
+                            bool alreadyTracked = false;
+                            for (const auto& deadData : event.deadCreatures)
+                            {
+                                if (deadData.guid == guid)
+                                {
+                                    alreadyTracked = true;
+                                    break;
+                                }
+                            }
+                            
+                            // Add to dead creatures list if not already tracked
+                            if (!alreadyTracked && g_RespawnEnabled)
+                            {
+                                SiegeEvent::RespawnData respawnData;
+                                respawnData.guid = guid;
+                                respawnData.entry = creature->GetEntry();
+                                respawnData.deathTime = currentTime;
+                                respawnData.isDefender = true; // This is a defender
+                                event.deadCreatures.push_back(respawnData);
+                                
+                                if (g_DebugMode)
+                                {
+                                    LOG_INFO("server.loading", "[City Siege] Defender {} (entry {}) died, will respawn near leader position in {} seconds",
+                                             creature->GetGUID().ToString(), respawnData.entry, g_RespawnTimeDefender);
+                                }
+                            }
+                            continue;
+                        }
+                        
+                        // IMPORTANT: ALWAYS set home position to current position to prevent evading/returning
+                        creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
+                        
+                        // Skip movement updates if creature is currently in combat
+                        if (creature->IsInCombat())
+                            continue;
+                        
+                        // Check if creature is currently moving - if so, don't interrupt
+                        if (!creature->movespline->Finalized())
+                            continue;
+                        
+                        // Force creature to ground level
+                        float creatureX = creature->GetPositionX();
+                        float creatureY = creature->GetPositionY();
+                        float creatureZ = creature->GetPositionZ();
+                        float groundZ = creature->GetMap()->GetHeight(creatureX, creatureY, creatureZ + 5.0f, true, 50.0f);
+                        
+                        if (groundZ > INVALID_HEIGHT && std::abs(creatureZ - groundZ) > 2.0f)
+                        {
+                            creature->UpdateGroundPositionZ(creatureX, creatureY, groundZ);
+                            creature->Relocate(creatureX, creatureY, groundZ, creature->GetOrientation());
+                        }
+                        
+                        creature->SetDisableGravity(false);
+                        creature->SetCanFly(false);
+                        creature->SetHover(false);
+                        creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
+                        
+                        // Get current waypoint - defenders have +10000 marker
+                        uint32 currentWP = event.creatureWaypointProgress[guid];
+                        if (currentWP < 10000)
+                            continue; // Not a defender marker, skip
+                        
+                        currentWP -= 10000; // Remove defender marker
+                        
+                        // Check if defender has reached spawn point (waypoint 0)
+                        if (currentWP == 0 && city.waypoints.empty())
+                            continue; // Already at spawn
+                        
+                        // Defenders move backwards through waypoints
+                        float targetX, targetY, targetZ;
+                        if (currentWP > 0 && currentWP <= city.waypoints.size())
+                        {
+                            // Moving towards previous waypoint
+                            targetX = city.waypoints[currentWP - 1].x;
+                            targetY = city.waypoints[currentWP - 1].y;
+                            targetZ = city.waypoints[currentWP - 1].z;
+                        }
+                        else if (currentWP == 0)
+                        {
+                            // Go to spawn point
+                            targetX = city.spawnX;
+                            targetY = city.spawnY;
+                            targetZ = city.spawnZ;
+                        }
+                        else
+                        {
+                            continue; // Invalid state
+                        }
+                        
+                        // Check distance to target
+                        float dist = creature->GetDistance(targetX, targetY, targetZ);
+                        
+                        // If far from target and not moving, resume movement
+                        if (dist > 10.0f)
+                        {
+                            RandomizePosition(targetX, targetY, targetZ, map, 5.0f);
+                            creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
+                            
+                            Movement::MoveSplineInit init(creature);
+                            init.MoveTo(targetX, targetY, targetZ, true, true);
+                            init.SetWalk(false);
+                            init.Launch();
+                        }
+                        // If close to target waypoint, advance to next
+                        else if (dist <= 5.0f)
+                        {
+                            uint32 nextWP;
+                            float nextX, nextY, nextZ;
+                            
+                            if (currentWP > 0)
+                            {
+                                // Move to previous waypoint
+                                nextWP = currentWP - 1;
+                                if (nextWP > 0)
+                                {
+                                    nextX = city.waypoints[nextWP - 1].x;
+                                    nextY = city.waypoints[nextWP - 1].y;
+                                    nextZ = city.waypoints[nextWP - 1].z;
+                                }
+                                else
+                                {
+                                    // Go to spawn point
+                                    nextX = city.spawnX;
+                                    nextY = city.spawnY;
+                                    nextZ = city.spawnZ;
+                                }
+                            }
+                            else
+                            {
+                                continue; // Already at spawn
+                            }
+                            
+                            // Update progress with defender marker
+                            event.creatureWaypointProgress[guid] = nextWP + 10000;
+                            
+                            RandomizePosition(nextX, nextY, nextZ, map, 5.0f);
+                            creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
+                            
+                            Movement::MoveSplineInit init(creature);
+                            init.MoveTo(nextX, nextY, nextZ, true, true);
+                            init.SetWalk(false);
+                            init.Launch();
+                        }
+                    }
+                }
             }
         }
 
@@ -1468,53 +1886,125 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 {
                     const auto& respawnData = *it;
                     
-                    // Determine respawn time based on creature type
-                    uint32 respawnDelay = g_RespawnTimeMinion; // Default
-                    if (respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader)
+                    // Determine respawn time based on creature type and whether it's a defender
+                    uint32 respawnDelay;
+                    
+                    if (respawnData.isDefender)
                     {
-                        respawnDelay = g_RespawnTimeLeader;
+                        // Defenders use their own respawn time
+                        respawnDelay = g_RespawnTimeDefender;
                     }
-                    else if (respawnData.entry == g_CreatureAllianceMiniBoss || respawnData.entry == g_CreatureHordeMiniBoss)
+                    else
                     {
-                        respawnDelay = g_RespawnTimeMiniBoss;
-                    }
-                    else if (respawnData.entry == g_CreatureAllianceElite || respawnData.entry == g_CreatureHordeElite)
-                    {
-                        respawnDelay = g_RespawnTimeElite;
+                        // Attackers use type-based respawn times
+                        respawnDelay = g_RespawnTimeMinion; // Default
+                        if (respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader)
+                        {
+                            respawnDelay = g_RespawnTimeLeader;
+                        }
+                        else if (respawnData.entry == g_CreatureAllianceMiniBoss || respawnData.entry == g_CreatureHordeMiniBoss)
+                        {
+                            respawnDelay = g_RespawnTimeMiniBoss;
+                        }
+                        else if (respawnData.entry == g_CreatureAllianceElite || respawnData.entry == g_CreatureHordeElite)
+                        {
+                            respawnDelay = g_RespawnTimeElite;
+                        }
                     }
                     
                     // Check if enough time has passed
                     if (currentTime >= (respawnData.deathTime + respawnDelay))
                     {
-                        // Calculate spawn position at the siege spawn point (same as initial spawn)
-                        float spawnX = city.spawnX;
-                        float spawnY = city.spawnY;
-                        float spawnZ = city.spawnZ;
+                        // Calculate spawn position based on whether this is a defender or attacker
+                        float spawnX, spawnY, spawnZ;
+                        
+                        if (respawnData.isDefender)
+                        {
+                            // Defenders respawn near the city leader position
+                            spawnX = city.leaderX;
+                            spawnY = city.leaderY;
+                            spawnZ = city.leaderZ;
+                            
+                            // Randomize spawn position in a circle around leader (15 yards)
+                            float angle = frand(0.0f, 2.0f * M_PI);
+                            float dist = frand(10.0f, 15.0f);
+                            spawnX += dist * cos(angle);
+                            spawnY += dist * sin(angle);
+                        }
+                        else
+                        {
+                            // Attackers respawn at the siege spawn point
+                            spawnX = city.spawnX;
+                            spawnY = city.spawnY;
+                            spawnZ = city.spawnZ;
+                        }
                         
                         // Get proper ground height at spawn location
                         float groundZ = map->GetHeight(spawnX, spawnY, spawnZ + 50.0f, true, 50.0f);
                         if (groundZ > INVALID_HEIGHT)
                             spawnZ = groundZ + 0.5f;
                         
-                        // Respawn the creature at the siege spawn point
+                        // Respawn the creature
                         if (Creature* creature = map->SummonCreature(respawnData.entry, Position(spawnX, spawnY, spawnZ, 0)))
                         {
                             // Set up the respawned creature
                             bool isAllianceCity = (event.cityId <= CITY_EXODAR);
-                            creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
                             
-                            // Set react state based on configuration
-                            if (g_AggroPlayers && g_AggroNPCs)
+                            // Set level and scale based on creature type
+                            if (respawnData.isDefender)
                             {
-                                creature->SetReactState(REACT_AGGRESSIVE);
-                            }
-                            else if (g_AggroPlayers)
-                            {
-                                creature->SetReactState(REACT_DEFENSIVE);
+                                creature->SetLevel(g_LevelDefender);
+                                // Defenders use default scale (1.0)
                             }
                             else
                             {
-                                creature->SetReactState(REACT_DEFENSIVE);
+                                // Determine attacker level and scale by entry
+                                if (respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader)
+                                {
+                                    creature->SetLevel(g_LevelLeader);
+                                    creature->SetObjectScale(g_ScaleLeader);
+                                }
+                                else if (respawnData.entry == g_CreatureAllianceMiniBoss || respawnData.entry == g_CreatureHordeMiniBoss)
+                                {
+                                    creature->SetLevel(g_LevelMiniBoss);
+                                    creature->SetObjectScale(g_ScaleMiniBoss);
+                                }
+                                else if (respawnData.entry == g_CreatureAllianceElite || respawnData.entry == g_CreatureHordeElite)
+                                {
+                                    creature->SetLevel(g_LevelElite);
+                                    // Elites use default scale (1.0)
+                                }
+                                else
+                                {
+                                    creature->SetLevel(g_LevelMinion);
+                                    // Minions use default scale (1.0)
+                                }
+                            }
+                            
+                            if (respawnData.isDefender)
+                            {
+                                // Defenders use city faction
+                                creature->SetFaction(isAllianceCity ? 84 : 83); // 84 = Alliance, 83 = Horde
+                                creature->SetReactState(REACT_AGGRESSIVE);
+                            }
+                            else
+                            {
+                                // Attackers use opposing faction
+                                creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
+                                
+                                // Set react state based on configuration
+                                if (g_AggroPlayers && g_AggroNPCs)
+                                {
+                                    creature->SetReactState(REACT_AGGRESSIVE);
+                                }
+                                else if (g_AggroPlayers)
+                                {
+                                    creature->SetReactState(REACT_DEFENSIVE);
+                                }
+                                else
+                                {
+                                    creature->SetReactState(REACT_DEFENSIVE);
+                                }
                             }
                             
                             // Enforce ground movement
@@ -1532,33 +2022,73 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             // Set home position to spawn location to prevent evading back
                             creature->SetHomePosition(spawnX, spawnY, spawnZ, 0);
                             
-                            // Replace the old GUID with the new one in spawned creatures list
-                            for (auto& spawnedGuid : event.spawnedCreatures)
+                            // Replace the old GUID with the new one in appropriate spawned list
+                            if (respawnData.isDefender)
                             {
-                                if (spawnedGuid == respawnData.guid)
+                                for (auto& spawnedGuid : event.spawnedDefenders)
                                 {
-                                    spawnedGuid = creature->GetGUID();
-                                    break;
+                                    if (spawnedGuid == respawnData.guid)
+                                    {
+                                        spawnedGuid = creature->GetGUID();
+                                        break;
+                                    }
                                 }
-                            }
-                            
-                            // Reset waypoint progress to 0 (start from first waypoint)
-                            event.creatureWaypointProgress.erase(respawnData.guid); // Remove old GUID
-                            event.creatureWaypointProgress[creature->GetGUID()] = 0; // Add new GUID
-                            
-                            // Start movement to first waypoint or leader
-                            float destX, destY, destZ;
-                            if (!city.waypoints.empty())
-                            {
-                                destX = city.waypoints[0].x;
-                                destY = city.waypoints[0].y;
-                                destZ = city.waypoints[0].z;
                             }
                             else
                             {
-                                destX = city.leaderX;
-                                destY = city.leaderY;
-                                destZ = city.leaderZ;
+                                for (auto& spawnedGuid : event.spawnedCreatures)
+                                {
+                                    if (spawnedGuid == respawnData.guid)
+                                    {
+                                        spawnedGuid = creature->GetGUID();
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // Set waypoint progress and initial movement destination
+                            event.creatureWaypointProgress.erase(respawnData.guid); // Remove old GUID
+                            
+                            float destX, destY, destZ;
+                            
+                            if (respawnData.isDefender)
+                            {
+                                // Defenders start at last waypoint and move backwards
+                                uint32 startWaypoint = city.waypoints.empty() ? 0 : city.waypoints.size();
+                                event.creatureWaypointProgress[creature->GetGUID()] = startWaypoint + 10000; // Add defender marker
+                                
+                                // Start moving to last waypoint (or spawn point if no waypoints)
+                                if (!city.waypoints.empty())
+                                {
+                                    destX = city.waypoints[city.waypoints.size() - 1].x;
+                                    destY = city.waypoints[city.waypoints.size() - 1].y;
+                                    destZ = city.waypoints[city.waypoints.size() - 1].z;
+                                }
+                                else
+                                {
+                                    destX = city.spawnX;
+                                    destY = city.spawnY;
+                                    destZ = city.spawnZ;
+                                }
+                            }
+                            else
+                            {
+                                // Attackers start from waypoint 0 and move forward
+                                event.creatureWaypointProgress[creature->GetGUID()] = 0;
+                                
+                                // Start movement to first waypoint or leader
+                                if (!city.waypoints.empty())
+                                {
+                                    destX = city.waypoints[0].x;
+                                    destY = city.waypoints[0].y;
+                                    destZ = city.waypoints[0].z;
+                                }
+                                else
+                                {
+                                    destX = city.leaderX;
+                                    destY = city.leaderY;
+                                    destZ = city.leaderZ;
+                                }
                             }
                             
                             // Randomize position to prevent bunching on respawn
@@ -1575,8 +2105,12 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             
                             if (g_DebugMode)
                             {
-                                LOG_INFO("server.loading", "[City Siege] Respawned creature {} at siege spawn point ({}, {}, {}), starting movement to first waypoint",
-                                         creature->GetGUID().ToString(), spawnX, spawnY, spawnZ);
+                                LOG_INFO("server.loading", "[City Siege] Respawned {} {} at {} ({}, {}, {}), starting movement to {} waypoint",
+                                         respawnData.isDefender ? "defender" : "attacker",
+                                         creature->GetGUID().ToString(),
+                                         respawnData.isDefender ? "leader position" : "siege spawn point",
+                                         spawnX, spawnY, spawnZ,
+                                         respawnData.isDefender ? "last" : "first");
                             }
                         }
                         

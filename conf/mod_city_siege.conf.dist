@@ -468,6 +468,93 @@ CitySiege.AggroPlayers = 1
 CitySiege.AggroNPCs = 1
 
 ###############################################
+# Defender Settings
+###############################################
+
+#
+#    CitySiege.Defenders.Enabled
+#        Description: Enable spawning of city defenders during siege.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Defenders.Enabled = 1
+
+#
+#    CitySiege.Defenders.Count
+#        Description: Number of defender minions to spawn.
+#        Default:     10
+CitySiege.Defenders.Count = 10
+
+#
+#    CitySiege.Creature.Alliance.Defender
+#        Description: Creature entry for Alliance city defenders.
+#        Default:     17919 (Alliance Footman from Mount Hyjal)
+CitySiege.Creature.Alliance.Defender = 17919
+
+#
+#    CitySiege.Creature.Horde.Defender
+#        Description: Creature entry for Horde city defenders.
+#        Default:     17932 (Horde Grunt from Mount Hyjal)
+CitySiege.Creature.Horde.Defender = 17932
+
+#
+#    CitySiege.Defenders.RespawnTime
+#        Description: Respawn time (in seconds) for city defenders.
+#        Default:     45 (45 seconds)
+CitySiege.Defenders.RespawnTime = 45
+
+###############################################
+# Level Settings
+###############################################
+
+#
+#    CitySiege.Level.Leader
+#        Description: Level for siege leaders (attackers).
+#        Default:     80
+CitySiege.Level.Leader = 80
+
+#
+#    CitySiege.Level.MiniBoss
+#        Description: Level for siege mini-bosses (attackers).
+#        Default:     80
+CitySiege.Level.MiniBoss = 80
+
+#
+#    CitySiege.Level.Elite
+#        Description: Level for siege elite units (attackers).
+#        Default:     75
+CitySiege.Level.Elite = 75
+
+#
+#    CitySiege.Level.Minion
+#        Description: Level for siege minion units (attackers).
+#        Default:     70
+CitySiege.Level.Minion = 70
+
+#
+#    CitySiege.Level.Defender
+#        Description: Level for city defender units.
+#        Default:     70
+CitySiege.Level.Defender = 70
+
+###############################################
+# Scale Settings
+###############################################
+
+#
+#    CitySiege.Scale.Leader
+#        Description: Scale multiplier for siege leaders (1.0 = normal size).
+#                     Makes leaders visually larger and easier to identify.
+#        Default:     1.3 (30% larger)
+CitySiege.Scale.Leader = 1.3
+
+#
+#    CitySiege.Scale.MiniBoss
+#        Description: Scale multiplier for siege mini-bosses (1.0 = normal size).
+#                     Makes mini-bosses visually larger than regular units.
+#        Default:     1.15 (15% larger)
+CitySiege.Scale.MiniBoss = 1.15
+
+###############################################
 # Cinematic and RP Settings
 ###############################################
 
@@ -514,7 +601,7 @@ CitySiege.Respawn.EliteTime = 120
 
 #
 #    CitySiege.Respawn.MinionTime
-#        Description: Respawn time (in seconds) for siege minions.
+#        Description: Respawn time (in seconds) for siege minions (attackers).
 #        Default:     60 (1 minute)
 CitySiege.Respawn.MinionTime = 60
 
@@ -579,8 +666,9 @@ CitySiege.Message.Reward = "|cff00ff00[City Siege]|r You have been rewarded for 
 #
 #    CitySiege.Yell.LeaderSpawn
 #        Description: Message that siege leaders yell when they spawn.
+#                     Separate multiple yells with semicolons (;) for random selection.
 #        Default:     "This city will fall before our might!"
-CitySiege.Yell.LeaderSpawn = "This city will fall before our might!"
+CitySiege.Yell.LeaderSpawn = "This city will fall before our might!;Prepare to witness your doom!;We have come to raze your walls!;Today, this city falls!;Your defenses will not hold!"
 
 #
 #    CitySiege.Yell.Combat
