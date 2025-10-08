@@ -860,19 +860,24 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     // Respawn city leader if they were killed during the siege
     if (leaderKilled && map)
     {
-        // Find if the leader exists (dead or alive)
+        // Find if the leader exists (dead or alive) by checking through players
         Creature* existingLeader = nullptr;
-        std::list<Creature*> creatureList;
-        Acore::AllCreaturesOfEntryInRange check(city.leaderX, city.leaderY, city.leaderZ, 100.0f, city.targetLeaderEntry, nullptr);
-        Acore::CreatureListSearcher<Acore::AllCreaturesOfEntryInRange> searcher(nullptr, creatureList, check);
-        Cell::VisitAllObjects(Position(city.leaderX, city.leaderY, city.leaderZ), searcher, map, 100.0f);
         
-        for (Creature* creature : creatureList)
+        Map::PlayerList const& players = map->GetPlayers();
+        for (auto itr = players.begin(); itr != players.end(); ++itr)
         {
-            if (creature)
+            if (Player* player = itr->GetSource())
             {
-                existingLeader = creature;
-                break;
+                // Search for leader (dead or alive) near throne
+                if (Creature* leader = player->FindNearestCreature(city.targetLeaderEntry, 200.0f, false))
+                {
+                    float dist = leader->GetDistance(city.leaderX, city.leaderY, city.leaderZ);
+                    if (dist < 100.0f)
+                    {
+                        existingLeader = leader;
+                        break;
+                    }
+                }
             }
         }
         
@@ -1438,22 +1443,51 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             Map* map = sMapMgr->FindMap(city.mapId, 0);
             if (map)
             {
-                // Find the city leader by searching near leader coordinates
+                // Find the city leader by checking nearby players
                 bool leaderAlive = false;
                 
-                // Get all creatures within 100 yards of the leader position
-                std::list<Creature*> creatureList;
-                Acore::AllCreaturesOfEntryInRange check(city.leaderX, city.leaderY, city.leaderZ, 100.0f, city.targetLeaderEntry, nullptr);
-                Acore::CreatureListSearcher<Acore::AllCreaturesOfEntryInRange> searcher(nullptr, creatureList, check);
-                Cell::VisitAllObjects(Position(city.leaderX, city.leaderY, city.leaderZ), searcher, map, 100.0f);
-                
-                // Check if any leader creature is alive
-                for (Creature* creature : creatureList)
+                Map::PlayerList const& players = map->GetPlayers();
+                for (auto itr = players.begin(); itr != players.end(); ++itr)
                 {
-                    if (creature && creature->IsAlive())
+                    if (Player* player = itr->GetSource())
                     {
-                        leaderAlive = true;
-                        break;
+                        // Search for the city leader near the throne
+                        if (Creature* leader = player->FindNearestCreature(city.targetLeaderEntry, 200.0f, true))
+                        {
+                            // Verify the leader is actually near the throne coordinates
+                            float dist = leader->GetDistance(city.leaderX, city.leaderY, city.leaderZ);
+                            if (dist < 100.0f)
+                            {
+                                leaderAlive = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // If we didn't find the leader through players, they might be dead or no players nearby
+                if (!leaderAlive)
+                {
+                    // Double-check by searching all creatures near throne (backup check)
+                    for (auto itr = players.begin(); itr != players.end(); ++itr)
+                    {
+                        if (Player* player = itr->GetSource())
+                        {
+                            // Check distance to throne
+                            if (player->GetDistance(city.leaderX, city.leaderY, city.leaderZ) < 200.0f)
+                            {
+                                // If a player is near throne, search again including dead creatures
+                                if (Creature* leader = player->FindNearestCreature(city.targetLeaderEntry, 200.0f, false))
+                                {
+                                    float dist = leader->GetDistance(city.leaderX, city.leaderY, city.leaderZ);
+                                    if (dist < 100.0f && leader->IsAlive())
+                                    {
+                                        leaderAlive = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 
