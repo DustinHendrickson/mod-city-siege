@@ -6,7 +6,16 @@
 
 Overview
 --------
-The City Siege module for AzerothCore adds dynamic, timed siege events to all major cities in World of Warcraft. On a random, configurable timer, opposing faction forces assault a major city, spawning enemy units outside the city limits who march toward the city leader while engaging defenders. Enemy forces spawn at the city outskirts and use pathfinding and waypoints to march into the city, attacking the faction leader as their primary objective. 
+The City Siege module for AzerothCore adds dynamic, timed siege events to all major cities in World of Warcraft. On a random, configurable timer, opposing faction forces assault a major ci8. **Periodic Yells:**  
+   Every 30 seconds (configurable), leaders and mini-bosses yell threatening messages configured in `CitySiege.Yell.Combat`.
+
+9. **Event Duration:**  
+   The siege lasts for the configured duration (default 30 minutes).
+
+10. **Victory Check:**  
+   System verifies if the city leader survived using configured leader positions.
+
+11. **Resolution:**ng enemy units outside the city limits who march toward the city leader while engaging defenders. Enemy forces spawn at the city outskirts and use pathfinding and waypoints to march into the city, attacking the faction leader as their primary objective. 
 
 **Both factions can win rewards:** Defenders earn rewards if they protect their city leader until the event ends, while attackers earn rewards if they successfully kill the city leader. This creates competitive PvE content where both Alliance and Horde players have incentive to participate. The module features fully configurable spawn locations, creature entries, reward scaling, and RP elements to create exciting world events that encourage faction participation and creates a more dynamic, living world experience.
 
@@ -20,10 +29,16 @@ Features
 - **All Major Cities Supported:**  
   Alliance: Stormwind, Ironforge, Darnassus, Exodar  
   Horde: Orgrimmar, Undercity, Thunder Bluff, Silvermoon
+- **Intelligent Waypoint System:**  
+  Siege units follow configurable waypoint paths to navigate through cities to reach their targets. Each city can have multiple waypoints configured for optimal pathing (e.g., Stormwind units go through main gate → trade district → keep entrance → throne room).
+- **Dynamic Unit Respawning:**  
+  Fallen siege units automatically respawn at the siege spawn point during active sieges, with configurable respawn timers based on unit type (Leaders: 5 min, Mini-bosses: 3 min, Elites: 2 min, Minions: 1 min). Creates sustained pressure throughout the event.
 - **4-Tier Enemy System:**  
   Regular minions, Elite soldiers, Mini-bosses, and Faction leaders with configurable spawn counts.
 - **Strategic Spawning:**  
   Enemies spawn at configurable X/Y/Z locations outside each city (manually positioned at city gates) in tight formation and march toward the city leader.
+- **Advanced Pathfinding:**  
+  Siege units use server pathfinding with ground movement enforcement to navigate naturally through cities, avoiding obstacles and following proper paths.
 - **Cinematic RP Phase:**  
   Configurable delay (default 45s) where siege forces stand passive and yell RP messages before combat begins.
 - **Periodic Yells:**  
@@ -247,6 +262,48 @@ Setting                                | Description                            
 CitySiege.CinematicDelay               | Initial RP phase duration (seconds).                  | 45
 CitySiege.YellFrequency                | How often leaders yell (seconds).                     | 30
 
+### Respawn Settings
+
+Setting                                | Description                                           | Default
+---------------------------------------|-------------------------------------------------------|--------
+CitySiege.Respawn.Enabled              | Enable automatic respawning during sieges.            | 1
+CitySiege.Respawn.LeaderTime           | Respawn time for leaders (seconds).                   | 300 (5 min)
+CitySiege.Respawn.MiniBossTime         | Respawn time for mini-bosses (seconds).               | 180 (3 min)
+CitySiege.Respawn.EliteTime            | Respawn time for elites (seconds).                    | 120 (2 min)
+CitySiege.Respawn.MinionTime           | Respawn time for minions (seconds).                   | 60 (1 min)
+
+### Waypoint Settings
+
+Each city can have custom waypoints configured to guide siege units through the city:
+
+Setting                                | Description                                           | Example
+---------------------------------------|-------------------------------------------------------|--------
+CitySiege.CITYNAME.WaypointCount       | Number of waypoints for this city (0 = direct path). | 3
+CitySiege.CITYNAME.Waypoint1.X/Y/Z     | Coordinates for first waypoint.                       | -8829.0, 640.530, 94.11582
+CitySiege.CITYNAME.Waypoint2.X/Y/Z     | Coordinates for second waypoint.                      | -8749.465, 560.5182, 97.400345
+CitySiege.CITYNAME.WaypointN.X/Y/Z     | Additional waypoints as needed.                       | Continues for WaypointCount
+
+**Example - Stormwind with 3 waypoints:**
+```
+CitySiege.Stormwind.WaypointCount = 3
+CitySiege.Stormwind.Waypoint1.X = -8829.0
+CitySiege.Stormwind.Waypoint1.Y = 640.530
+CitySiege.Stormwind.Waypoint1.Z = 94.11582
+CitySiege.Stormwind.Waypoint2.X = -8749.465
+CitySiege.Stormwind.Waypoint2.Y = 560.5182
+CitySiege.Stormwind.Waypoint2.Z = 97.400345
+CitySiege.Stormwind.Waypoint3.X = -8609.125
+CitySiege.Stormwind.Waypoint3.Y = 507.26778
+CitySiege.Stormwind.Waypoint3.Z = 103.72089
+```
+
+**Notes:**
+- Waypoints guide units through the city: Spawn → WP1 → WP2 → WP3 → Leader
+- Units progress to next waypoint when within 10 yards of current waypoint
+- Units resume movement to their current waypoint after combat ends
+- Setting WaypointCount to 0 makes units path directly to the leader
+- Use `.gps` command in-game to get coordinates for waypoints
+
 ### Reward Settings
 
 Setting                                | Description                                           | Default
@@ -295,9 +352,18 @@ How It Works
    For the configured delay (default 45 seconds), enemies remain passive and leaders yell RP messages configured in `CitySiege.Yell.LeaderSpawn`.
 
 6. **Combat Phase:**  
-   After the cinematic delay, enemies become aggressive and use pathfinding (GetMotionMaster()->MovePoint()) to march toward the city leader. Enemies will engage any hostile players or NPCs in their path based on aggro settings.
+   After the cinematic delay, enemies become aggressive and use advanced pathfinding to navigate through the city. Units follow their configured waypoint paths (e.g., Stormwind: main gate → trade district → keep entrance → throne room) before reaching the city leader. Enemies will engage any hostile players or NPCs in their path based on aggro settings, then resume their waypoint progression after combat.
 
-7. **Periodic Yells:**  
+7. **Respawn System:**  
+   During active sieges, fallen units automatically respawn at the siege spawn point and rejoin the attack. Respawn times vary by unit type:
+   - Minions: 60 seconds
+   - Elites: 120 seconds (2 minutes)
+   - Mini-bosses: 180 seconds (3 minutes)
+   - Leaders: 300 seconds (5 minutes)
+   
+   Respawned units reset to the first waypoint and begin their march again.
+
+8. **Periodic Yells:**  
    Every 30 seconds (configurable), leaders and mini-bosses yell threatening messages configured in `CitySiege.Yell.Combat`.
 
 8. **Event Duration:**  
@@ -312,6 +378,15 @@ How It Works
     - Creatures despawn and event ends
 
 ### Event Mechanics
+
+- **Waypoint Navigation:**  
+  Siege forces follow configured waypoint paths through the city. Units progress sequentially (Spawn → WP1 → WP2 → WP3 → Leader), advancing to the next waypoint when within 10 yards. After combat, units automatically resume movement to their current waypoint target.
+
+- **Respawn Mechanics:**  
+  Dead siege units respawn at the original siege spawn point (not where they died) after their configured timer expires. Respawned units start fresh at the first waypoint, maintaining constant pressure throughout the event. Respawning only occurs during active sieges and stops when the event ends.
+
+- **Ground Movement:**  
+  All siege units use enforced ground movement with pathfinding to navigate naturally through cities. Units cannot fly, float, or clip through terrain.
 
 - **Target Priority:**  
   Siege forces prioritize the city leader but will attack players and NPCs in their path based on aggro configuration.
@@ -381,6 +456,37 @@ CitySiege.Stormwind.SpawnZ = 95.0
 
 Enemies will spawn in a 30-yard radius circular formation around this point.
 
+### Configuring Waypoints
+
+Waypoints allow you to create custom paths for siege units through each city:
+
+1. **Enable waypoints for a city:**
+   ```
+   CitySiege.Stormwind.WaypointCount = 3
+   ```
+
+2. **Use `.gps` command in-game** to get coordinates at key locations:
+   - City entrance/gates
+   - Main roads or districts
+   - Near the leader location
+
+3. **Add waypoint coordinates** to your config file:
+   ```
+   CitySiege.Stormwind.Waypoint1.X = -8829.0
+   CitySiege.Stormwind.Waypoint1.Y = 640.530
+   CitySiege.Stormwind.Waypoint1.Z = 94.11582
+   ```
+
+4. **Repeat for each waypoint** (numbered sequentially: Waypoint1, Waypoint2, Waypoint3, etc.)
+
+5. **Restart the worldserver** for changes to take effect.
+
+**Tips:**
+- Waypoints should form a logical path from spawn point to leader
+- Space waypoints 50-100 yards apart for smooth movement
+- Test with `.citysiege start CITYNAME` to verify pathing
+- Set WaypointCount to 0 to disable waypoints and use direct pathing
+
 Debugging
 ---------
 To enable detailed debug logging, update the configuration file:
@@ -388,9 +494,11 @@ To enable detailed debug logging, update the configuration file:
     CitySiege.DebugMode = 1
 
 This will output comprehensive information about:
-- Configuration loading
+- Configuration loading (including waypoint paths)
 - Event scheduling
 - Creature spawning
+- Waypoint progression (which waypoint each unit is moving toward)
+- Respawn timers and respawn events
 - AI state changes
 - Reward distribution
 
@@ -407,6 +515,15 @@ Troubleshooting
 
 > **Creatures not spawning.**  
 > Enable debug mode and check logs for spawning errors. Verify that the configured creature entries exist in your database.
+
+> **Creatures clipping through walls or ground.**  
+> Ensure waypoints are configured for the city. Units need proper waypoint paths to navigate complex city layouts. Use `.gps` to get coordinates along the intended path and configure waypoints in the config file.
+
+> **Creatures not moving or getting stuck.**  
+> Check that waypoint coordinates are valid and accessible. Verify waypoints form a logical path with no obstructions. Enable debug mode to see which waypoint each unit is targeting.
+
+> **Respawned units not appearing.**  
+> Verify `CitySiege.Respawn.Enabled = 1` in config. Check that the siege is still active (respawning stops when event ends). Enable debug mode to see respawn timer logs.
 
 > **Rewards not being distributed.**  
 > Ensure `CitySiege.RewardOnDefense = 1` and that players meet the minimum level requirement. Players must be within the announcement radius of the city center when the event ends successfully.
