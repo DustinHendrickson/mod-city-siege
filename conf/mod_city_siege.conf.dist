@@ -449,6 +449,41 @@ CitySiege.CinematicDelay = 45
 CitySiege.YellFrequency = 30
 
 ###############################################
+# Respawn Settings
+###############################################
+
+#
+#    CitySiege.Respawn.Enabled
+#        Description: Enable automatic respawning of siege units during active sieges.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Respawn.Enabled = 1
+
+#
+#    CitySiege.Respawn.LeaderTime
+#        Description: Respawn time (in seconds) for siege leaders.
+#        Default:     300 (5 minutes)
+CitySiege.Respawn.LeaderTime = 300
+
+#
+#    CitySiege.Respawn.MiniBossTime
+#        Description: Respawn time (in seconds) for siege mini-bosses.
+#        Default:     180 (3 minutes)
+CitySiege.Respawn.MiniBossTime = 180
+
+#
+#    CitySiege.Respawn.EliteTime
+#        Description: Respawn time (in seconds) for siege elites.
+#        Default:     120 (2 minutes)
+CitySiege.Respawn.EliteTime = 120
+
+#
+#    CitySiege.Respawn.MinionTime
+#        Description: Respawn time (in seconds) for siege minions.
+#        Default:     60 (1 minute)
+CitySiege.Respawn.MinionTime = 60
+
+###############################################
 # Reward Settings
 ###############################################
 

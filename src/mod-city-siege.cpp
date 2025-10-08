@@ -88,6 +88,13 @@ static bool g_AggroNPCs = true;
 static uint32 g_CinematicDelay = 45; // seconds
 static uint32 g_YellFrequency = 30;  // seconds
 
+// Respawn settings
+static bool g_RespawnEnabled = true;
+static uint32 g_RespawnTimeLeader = 300;    // 5 minutes in seconds
+static uint32 g_RespawnTimeMiniBoss = 180;  // 3 minutes in seconds
+static uint32 g_RespawnTimeElite = 120;     // 2 minutes in seconds
+static uint32 g_RespawnTimeMinion = 60;     // 1 minute in seconds
+
 // Reward settings
 static bool g_RewardOnDefense = true;
 static uint32 g_RewardHonor = 100;
@@ -169,6 +176,14 @@ struct SiegeEvent
     bool cinematicPhase;
     uint32 lastYellTime;
     std::unordered_map<ObjectGuid, uint32> creatureWaypointProgress; // Tracks which waypoint each creature is on
+    
+    // Respawn tracking: stores creature entry and death time
+    struct RespawnData
+    {
+        uint32 entry;
+        uint32 deathTime;
+    };
+    std::vector<RespawnData> deadCreatures; // Creatures waiting to respawn
 };
 
 // Active siege events
@@ -233,6 +248,13 @@ void LoadCitySiegeConfiguration()
     // Cinematic settings
     g_CinematicDelay = sConfigMgr->GetOption<uint32>("CitySiege.CinematicDelay", 45);
     g_YellFrequency = sConfigMgr->GetOption<uint32>("CitySiege.YellFrequency", 30);
+
+    // Respawn settings
+    g_RespawnEnabled = sConfigMgr->GetOption<bool>("CitySiege.Respawn.Enabled", true);
+    g_RespawnTimeLeader = sConfigMgr->GetOption<uint32>("CitySiege.Respawn.LeaderTime", 300);
+    g_RespawnTimeMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Respawn.MiniBossTime", 180);
+    g_RespawnTimeElite = sConfigMgr->GetOption<uint32>("CitySiege.Respawn.EliteTime", 120);
+    g_RespawnTimeMinion = sConfigMgr->GetOption<uint32>("CitySiege.Respawn.MinionTime", 60);
 
     // Reward settings
     g_RewardOnDefense = sConfigMgr->GetOption<bool>("CitySiege.RewardOnDefense", true);
@@ -528,9 +550,13 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
-            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35);
+            
+            // Enforce ground position immediately after spawn
+            creature->UpdateGroundPositionZ(x, y, z);
+            
             event.spawnedCreatures.push_back(creature->GetGUID());
             creature->Yell(g_YellLeaderSpawn.c_str(), LANG_UNIVERSAL);
         }
@@ -556,9 +582,13 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
-            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35);
+            
+            // Enforce ground position immediately after spawn
+            creature->UpdateGroundPositionZ(x, y, z);
+            
             event.spawnedCreatures.push_back(creature->GetGUID());
         }
     }
@@ -583,9 +613,13 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
-            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35);
+            
+            // Enforce ground position immediately after spawn
+            creature->UpdateGroundPositionZ(x, y, z);
+            
             event.spawnedCreatures.push_back(creature->GetGUID());
         }
     }
@@ -610,9 +644,13 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetDisableGravity(false);
             creature->SetCanFly(false);
             creature->SetHover(false);
-            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
+            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
             creature->SetReactState(REACT_PASSIVE);
             creature->SetFaction(35);
+            
+            // Enforce ground position immediately after spawn
+            creature->UpdateGroundPositionZ(x, y, z);
+            
             event.spawnedCreatures.push_back(creature->GetGUID());
             
             if (g_DebugMode)
@@ -920,7 +958,19 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         creature->SetDisableGravity(false);
                         creature->SetCanFly(false);
                         creature->SetHover(false);
-                        creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
+                        creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
+                        
+                        // Force creature to ground level before starting movement
+                        float creatureX = creature->GetPositionX();
+                        float creatureY = creature->GetPositionY();
+                        float creatureZ = creature->GetPositionZ();
+                        float groundZ = creature->GetMap()->GetHeight(creatureX, creatureY, creatureZ + 5.0f, true, 50.0f);
+                        
+                        if (groundZ > INVALID_HEIGHT)
+                        {
+                            creature->UpdateGroundPositionZ(creatureX, creatureY, groundZ);
+                            creature->Relocate(creatureX, creatureY, groundZ, creature->GetOrientation());
+                        }
                         
                         // Initialize waypoint progress for this creature
                         event.creatureWaypointProgress[guid] = 0;
@@ -952,6 +1002,8 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         Movement::MoveSplineInit init(creature);
                         init.MoveTo(destX, destY, destZ, true, true);
                         init.SetWalk(false);
+                        init.SetFly(false); // Explicitly disable flying
+                        init.SetSmooth(); // Smooth ground following
                         init.Launch();
                     }
                 }
@@ -1018,9 +1070,44 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 {
                     if (Creature* creature = map->GetCreature(guid))
                     {
-                        // Skip if creature is dead
+                        // Track dead creatures for respawning
                         if (!creature->IsAlive())
+                        {
+                            // Check if this creature entry is already in the dead list (avoid duplicates)
+                            bool alreadyTracked = false;
+                            for (const auto& deadData : event.deadCreatures)
+                            {
+                                if (deadData.entry == creature->GetEntry())
+                                {
+                                    // Check if it's the same death (within reasonable time window)
+                                    if ((currentTime - deadData.deathTime) < 5)
+                                    {
+                                        alreadyTracked = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // Add to dead creatures list if not already tracked
+                            if (!alreadyTracked && g_RespawnEnabled)
+                            {
+                                SiegeEvent::RespawnData respawnData;
+                                respawnData.entry = creature->GetEntry();
+                                respawnData.deathTime = currentTime;
+                                event.deadCreatures.push_back(respawnData);
+                                
+                                if (g_DebugMode)
+                                {
+                                    LOG_INFO("server.loading", "[City Siege] Creature {} (entry {}) died, will respawn at siege spawn point in {} seconds",
+                                             creature->GetGUID().ToString(), respawnData.entry,
+                                             respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader ? g_RespawnTimeLeader :
+                                             respawnData.entry == g_CreatureAllianceMiniBoss || respawnData.entry == g_CreatureHordeMiniBoss ? g_RespawnTimeMiniBoss :
+                                             respawnData.entry == g_CreatureAllianceElite || respawnData.entry == g_CreatureHordeElite ? g_RespawnTimeElite :
+                                             g_RespawnTimeMinion);
+                                }
+                            }
                             continue;
+                        }
                         
                         // Skip if creature is currently in combat
                         if (creature->IsInCombat())
@@ -1029,6 +1116,25 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         // Check if creature is currently moving - if so, don't interrupt
                         if (!creature->movespline->Finalized())
                             continue;
+                        
+                        // Force creature to ground level to prevent floating/clipping
+                        float creatureX = creature->GetPositionX();
+                        float creatureY = creature->GetPositionY();
+                        float creatureZ = creature->GetPositionZ();
+                        float groundZ = creature->GetMap()->GetHeight(creatureX, creatureY, creatureZ + 5.0f, true, 50.0f);
+                        
+                        // If ground Z is valid and creature is significantly off the ground, update position
+                        if (groundZ > INVALID_HEIGHT && std::abs(creatureZ - groundZ) > 2.0f)
+                        {
+                            creature->UpdateGroundPositionZ(creatureX, creatureY, groundZ);
+                            creature->Relocate(creatureX, creatureY, groundZ, creature->GetOrientation());
+                        }
+                        
+                        // Continuously enforce ground movement flags
+                        creature->SetDisableGravity(false);
+                        creature->SetCanFly(false);
+                        creature->SetHover(false);
+                        creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
                         
                         // Get current waypoint index
                         uint32 currentWP = event.creatureWaypointProgress[guid];
@@ -1071,6 +1177,8 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             Movement::MoveSplineInit init(creature);
                             init.MoveTo(targetX, targetY, targetZ, true, true);
                             init.SetWalk(false);
+                            init.SetFly(false); // Explicitly disable flying
+                            init.SetSmooth(); // Smooth ground following
                             init.Launch();
                             continue;
                         }
@@ -1119,9 +1227,123 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                                 Movement::MoveSplineInit init(creature);
                                 init.MoveTo(nextX, nextY, nextZ, true, true);
                                 init.SetWalk(false);
+                                init.SetFly(false); // Explicitly disable flying
+                                init.SetSmooth(); // Smooth ground following
                                 init.Launch();
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // Handle respawning of dead creatures (only during active siege, not during cinematic)
+        if (!event.cinematicPhase && g_RespawnEnabled && !event.deadCreatures.empty())
+        {
+            const CityData& city = g_Cities[event.cityId];
+            Map* map = sMapMgr->FindMap(city.mapId, 0);
+            if (map)
+            {
+                // Check each dead creature to see if it's time to respawn
+                for (auto it = event.deadCreatures.begin(); it != event.deadCreatures.end();)
+                {
+                    const auto& respawnData = *it;
+                    
+                    // Determine respawn time based on creature type
+                    uint32 respawnDelay = g_RespawnTimeMinion; // Default
+                    if (respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader)
+                    {
+                        respawnDelay = g_RespawnTimeLeader;
+                    }
+                    else if (respawnData.entry == g_CreatureAllianceMiniBoss || respawnData.entry == g_CreatureHordeMiniBoss)
+                    {
+                        respawnDelay = g_RespawnTimeMiniBoss;
+                    }
+                    else if (respawnData.entry == g_CreatureAllianceElite || respawnData.entry == g_CreatureHordeElite)
+                    {
+                        respawnDelay = g_RespawnTimeElite;
+                    }
+                    
+                    // Check if enough time has passed
+                    if (currentTime >= (respawnData.deathTime + respawnDelay))
+                    {
+                        // Calculate spawn position at the siege spawn point (same as initial spawn)
+                        float spawnX = city.spawnX;
+                        float spawnY = city.spawnY;
+                        float spawnZ = city.spawnZ;
+                        
+                        // Get proper ground height at spawn location
+                        float groundZ = map->GetHeight(spawnX, spawnY, spawnZ + 50.0f, true, 50.0f);
+                        if (groundZ > INVALID_HEIGHT)
+                            spawnZ = groundZ + 0.5f;
+                        
+                        // Respawn the creature at the siege spawn point
+                        if (Creature* creature = map->SummonCreature(respawnData.entry, Position(spawnX, spawnY, spawnZ, 0)))
+                        {
+                            // Set up the respawned creature
+                            bool isAllianceCity = (event.cityId <= CITY_EXODAR);
+                            creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
+                            
+                            // Set react state based on configuration
+                            if (g_AggroPlayers && g_AggroNPCs)
+                            {
+                                creature->SetReactState(REACT_AGGRESSIVE);
+                            }
+                            else if (g_AggroPlayers)
+                            {
+                                creature->SetReactState(REACT_DEFENSIVE);
+                            }
+                            else
+                            {
+                                creature->SetReactState(REACT_DEFENSIVE);
+                            }
+                            
+                            // Enforce ground movement
+                            creature->SetDisableGravity(false);
+                            creature->SetCanFly(false);
+                            creature->SetHover(false);
+                            creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
+                            creature->UpdateGroundPositionZ(spawnX, spawnY, spawnZ);
+                            
+                            // Add to spawned creatures list and reset waypoint progress to 0 (start from first waypoint)
+                            event.spawnedCreatures.push_back(creature->GetGUID());
+                            event.creatureWaypointProgress[creature->GetGUID()] = 0;
+                            
+                            // Start movement to first waypoint or leader
+                            float destX, destY, destZ;
+                            if (!city.waypoints.empty())
+                            {
+                                destX = city.waypoints[0].x;
+                                destY = city.waypoints[0].y;
+                                destZ = city.waypoints[0].z;
+                            }
+                            else
+                            {
+                                destX = city.leaderX;
+                                destY = city.leaderY;
+                                destZ = city.leaderZ;
+                            }
+                            
+                            Movement::MoveSplineInit init(creature);
+                            init.MoveTo(destX, destY, destZ, true, true);
+                            init.SetWalk(false);
+                            init.SetFly(false);
+                            init.SetSmooth();
+                            init.Launch();
+                            
+                            if (g_DebugMode)
+                            {
+                                LOG_INFO("server.loading", "[City Siege] Respawned creature {} at siege spawn point ({}, {}, {}), starting movement to first waypoint",
+                                         creature->GetGUID().ToString(), spawnX, spawnY, spawnZ);
+                            }
+                        }
+                        
+                        // Remove from dead creatures list
+                        it = event.deadCreatures.erase(it);
+                    }
+                    else
+                    {
+                        ++it;
                     }
                 }
             }
