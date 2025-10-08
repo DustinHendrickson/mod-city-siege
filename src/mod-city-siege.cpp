@@ -1211,11 +1211,8 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         Map* creatureMap = creature->GetMap();
                         RandomizePosition(destX, destY, destZ, creatureMap, 5.0f);
                         
-                        if (g_DebugMode)
-                        {
-                            LOG_INFO("server.loading", "[City Siege] Creature {} starting movement to randomized waypoint/leader at ({}, {}, {})", 
-                                     creature->GetGUID().ToString(), destX, destY, destZ);
-                        }
+                        // Update home position before movement to prevent evading
+                        creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                         
                         // Use MoveSplineInit for proper pathfinding
                         Movement::MoveSplineInit init(creature);
@@ -1323,13 +1320,13 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             continue;
                         }
                         
-                        // Skip if creature is currently in combat
+                        // IMPORTANT: ALWAYS set home position to current position to prevent evading/returning
+                        // This must be done continuously - even during combat - because combat reset can restore original home
+                        creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
+                        
+                        // Skip movement updates if creature is currently in combat
                         if (creature->IsInCombat())
                             continue;
-                        
-                        // IMPORTANT: Set home position to current position to prevent evading/returning
-                        // This must be done continuously because combat reset can restore original home
-                        creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                         
                         // Check if creature is currently moving - if so, don't interrupt
                         if (!creature->movespline->Finalized())
@@ -1390,11 +1387,8 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             Map* creatureMap = creature->GetMap();
                             RandomizePosition(targetX, targetY, targetZ, creatureMap, 5.0f);
                             
-                            if (g_DebugMode)
-                            {
-                                LOG_INFO("server.loading", "[City Siege] Creature {} resuming movement to randomized waypoint/leader at ({}, {}, {}) - distance: {}",
-                                         creature->GetGUID().ToString(), targetX, targetY, targetZ, dist);
-                            }
+                            // Update home position before movement to prevent evading
+                            creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                             
                             Movement::MoveSplineInit init(creature);
                             init.MoveTo(targetX, targetY, targetZ, true, true);
@@ -1448,11 +1442,8 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                                 Map* creatureMap = creature->GetMap();
                                 RandomizePosition(nextX, nextY, nextZ, creatureMap, 5.0f);
                                 
-                                if (g_DebugMode)
-                                {
-                                    LOG_INFO("server.loading", "[City Siege] Creature {} moving to randomized next position at ({}, {}, {})",
-                                             creature->GetGUID().ToString(), nextX, nextY, nextZ);
-                                }
+                                // Update home position before movement to prevent evading
+                                creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                                 
                                 Movement::MoveSplineInit init(creature);
                                 init.MoveTo(nextX, nextY, nextZ, true, true);
@@ -1573,6 +1564,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             // Randomize position to prevent bunching on respawn
                             Map* creatureMap = creature->GetMap();
                             RandomizePosition(destX, destY, destZ, creatureMap, 5.0f);
+                            
+                            // Update home position before movement to prevent evading
+                            creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                             
                             Movement::MoveSplineInit init(creature);
                             init.MoveTo(destX, destY, destZ, true, true);
