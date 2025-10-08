@@ -870,37 +870,36 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             creature->SetReactState(REACT_DEFENSIVE);
                         }
                         
-                        // Ensure creature is grounded BEFORE any movement
+                        // Ensure creature is grounded and cannot fly
                         creature->SetDisableGravity(false);
                         creature->SetCanFly(false);
                         creature->SetHover(false);
                         creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
                         
-                        // Get proper ground height at current position
-                        float currentX = creature->GetPositionX();
-                        float currentY = creature->GetPositionY();
-                        float currentZ = creature->GetPositionZ();
-                        creature->UpdateAllowedPositionZ(currentX, currentY, currentZ);
-                        
-                        // Update ground height at destination
+                        // Get destination coordinates
                         float destX = city.leaderX;
                         float destY = city.leaderY;
                         float destZ = city.leaderZ;
                         
-                        // Use map->GetHeight to get proper ground Z
+                        // Get the ACTUAL ground height at destination - use same method as spawn code
                         float groundZ = map->GetHeight(destX, destY, destZ + 50.0f, true, 50.0f);
                         if (groundZ > INVALID_HEIGHT)
                         {
-                            destZ = groundZ + 0.5f;
+                            destZ = groundZ + 0.5f; // Slightly above ground to prevent getting stuck
                         }
                         
-                        // Clear any existing movement and wait a moment
-                        creature->GetMotionMaster()->Clear(false);
-                        creature->GetMotionMaster()->MoveIdle();
+                        if (g_DebugMode)
+                        {
+                            LOG_INFO("server.loading", "[City Siege] Moving creature from ({}, {}, {}) to leader at ({}, {}, {})", 
+                                     creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(),
+                                     destX, destY, destZ);
+                        }
                         
-                        // Use MotionMaster->MovePoint for proper pathfinding on ground
-                        creature->SetWalk(false); // Run to the leader
-                        creature->GetMotionMaster()->MovePoint(1, destX, destY, destZ, true);
+                        // Use MoveSplineInit exactly like WaypointMovementGenerator does for proper pathfinding
+                        Movement::MoveSplineInit init(creature);
+                        init.MoveTo(destX, destY, destZ, true, true); // Both parameters = true for pathfinding!
+                        init.SetWalk(false); // Run to the leader
+                        init.Launch();
                         
                         if (g_DebugMode)
                         {
