@@ -94,9 +94,17 @@ Installation
 
 GM Commands
 -----------
-Game Masters with `SEC_GAMEMASTER` security level have access to manual siege control commands. These commands allow you to trigger, stop, and manage siege events for testing or special events.
+Game Masters with `SEC_GAMEMASTER` security level have access to manual siege control commands. Administrators with `SEC_ADMINISTRATOR` level can also reload configuration. These commands allow you to trigger, stop, and manage siege events for testing or special events.
 
 ### Available Commands
+
+- `.citysiege start [cityname]` - Manually start a siege event
+- `.citysiege stop <cityname> <faction>` - Stop an active siege and declare a winner
+- `.citysiege cleanup [cityname]` - Force cleanup of siege creatures
+- `.citysiege status` - Display current siege events and module status
+- `.citysiege testwaypoint` - Spawn a temporary test marker at your position (20 seconds)
+- `.citysiege waypoints <cityname>` - Toggle visualization of siege waypoint path
+- `.citysiege reload` - Reload configuration from file (Administrator only)
 
 #### `.citysiege start [cityname]`
 Starts a siege event immediately in the specified city or a random enabled city if no name is provided.
@@ -219,6 +227,40 @@ Toggles visualization of the siege waypoint path for a specific city. Shows tall
 - If markers are missing, check the output messages for spawn failures
 - Enable debug mode to see detailed spawn logs in server console
 
+#### `.citysiege reload`
+Reloads all configuration values from `mod_city_siege.conf` without restarting the server. Allows you to make changes to waypoints, timers, spawn counts, and other settings on the fly.
+
+**Usage:**
+```
+.citysiege reload
+```
+
+**What Gets Reloaded:**
+- All timer settings (min/max spawn timer, event duration)
+- Spawn counts (minions, elites, mini-bosses, leaders, defenders)
+- Level and scale settings
+- City enable/disable flags
+- Waypoint configurations for all cities
+- Spawn and leader positions
+- Creature entry IDs
+- Aggro and respawn settings
+- Reward settings
+- Messages and yells
+
+**Output:**
+- Confirmation message when reload is complete
+- Displays current status (enabled/disabled, debug mode, timers, duration)
+- Lists waypoint counts for each city that has waypoints configured
+- Note about active sieges continuing with old settings
+
+**Notes:**
+- Requires Administrator security level (SEC_ADMINISTRATOR)
+- Active sieges will continue using their original configuration
+- Only new sieges started after reload will use updated settings
+- Useful for testing different waypoint configurations without server restarts
+- Perfect for adjusting spawn counts, timers, and other balance settings
+- Changes to waypoints take effect immediately for new siege events
+
 ### Command Examples
 
 ```
@@ -236,6 +278,9 @@ Toggles visualization of the siege waypoint path for a specific city. Shows tall
 
 # Hide the waypoint markers when done diagnosing
 .citysiege waypoints Stormwind
+
+# Reload configuration after making changes to the .conf file
+.citysiege reload
 
 # GM observes and decides Alliance wins - Alliance players get rewards
 .citysiege stop Stormwind alliance
@@ -341,8 +386,8 @@ Configure the visual size of siege units (1.0 = normal size):
 
 Setting                                | Description                                    | Default
 ---------------------------------------|------------------------------------------------|--------
-CitySiege.Scale.Leader                 | Scale multiplier for leaders.                  | 1.3 (30% larger)
-CitySiege.Scale.MiniBoss               | Scale multiplier for mini-bosses.              | 1.15 (15% larger)
+CitySiege.Scale.Leader                 | Scale multiplier for leaders.                  | 1.6 (60% larger)
+CitySiege.Scale.MiniBoss               | Scale multiplier for mini-bosses.              | 1.3 (30% larger)
 
 ### Cinematic and RP Settings
 

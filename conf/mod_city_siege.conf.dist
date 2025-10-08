@@ -274,8 +274,8 @@ CitySiege.Silvermoon.LeaderZ = 13.7014
 #
 #    CitySiege.Stormwind.WaypointCount
 #        Description: Number of waypoints for Stormwind siege path.
-#        Default:     13 (complete path through Stormwind to King Varian)
-CitySiege.Stormwind.WaypointCount = 13
+#        Default:     14 (complete path through Stormwind to King Varian)
+CitySiege.Stormwind.WaypointCount = 14
 
 # Waypoint 1 - Outside gates
 CitySiege.Stormwind.Waypoint1.X = -9070.56
@@ -298,49 +298,54 @@ CitySiege.Stormwind.Waypoint4.Y = 723.27
 CitySiege.Stormwind.Waypoint4.Z = 98.11
 
 # Waypoint 5
-CitySiege.Stormwind.Waypoint5.X = -8824.29
-CitySiege.Stormwind.Waypoint5.Y = 811.57
-CitySiege.Stormwind.Waypoint5.Z = 99.70
+CitySiege.Stormwind.Waypoint5.X = -8869.63
+CitySiege.Stormwind.Waypoint5.Y = 760.62
+CitySiege.Stormwind.Waypoint5.Z = 98.5
 
 # Waypoint 6
-CitySiege.Stormwind.Waypoint6.X = -8817.26
-CitySiege.Stormwind.Waypoint6.Y = 956.38
-CitySiege.Stormwind.Waypoint6.Z = 101.51
+CitySiege.Stormwind.Waypoint6.X = -8824.29
+CitySiege.Stormwind.Waypoint6.Y = 811.57
+CitySiege.Stormwind.Waypoint6.Z = 99.70
 
 # Waypoint 7
-CitySiege.Stormwind.Waypoint7.X = -8760.37
-CitySiege.Stormwind.Waypoint7.Y = 892.38
-CitySiege.Stormwind.Waypoint7.Z = 102.60
+CitySiege.Stormwind.Waypoint7.X = -8817.26
+CitySiege.Stormwind.Waypoint7.Y = 956.38
+CitySiege.Stormwind.Waypoint7.Z = 101.51
 
 # Waypoint 8
-CitySiege.Stormwind.Waypoint8.X = -8697.61
-CitySiege.Stormwind.Waypoint8.Y = 865.26
-CitySiege.Stormwind.Waypoint8.Z = 98.08
+CitySiege.Stormwind.Waypoint8.X = -8760.37
+CitySiege.Stormwind.Waypoint8.Y = 892.38
+CitySiege.Stormwind.Waypoint8.Z = 102.60
 
 # Waypoint 9
-CitySiege.Stormwind.Waypoint9.X = -8620.92
-CitySiege.Stormwind.Waypoint9.Y = 777.78
-CitySiege.Stormwind.Waypoint9.Z = 97.65
+CitySiege.Stormwind.Waypoint9.X = -8697.61
+CitySiege.Stormwind.Waypoint9.Y = 865.26
+CitySiege.Stormwind.Waypoint9.Z = 98.08
 
 # Waypoint 10
-CitySiege.Stormwind.Waypoint10.X = -8538.03
-CitySiege.Stormwind.Waypoint10.Y = 688.95
-CitySiege.Stormwind.Waypoint10.Z = 98.68
+CitySiege.Stormwind.Waypoint10.X = -8620.92
+CitySiege.Stormwind.Waypoint10.Y = 777.78
+CitySiege.Stormwind.Waypoint10.Z = 97.65
 
 # Waypoint 11
-CitySiege.Stormwind.Waypoint11.X = -8400.78
-CitySiege.Stormwind.Waypoint11.Y = 671.10
-CitySiege.Stormwind.Waypoint11.Z = 95.90
+CitySiege.Stormwind.Waypoint11.X = -8538.03
+CitySiege.Stormwind.Waypoint11.Y = 688.95
+CitySiege.Stormwind.Waypoint11.Z = 98.68
 
 # Waypoint 12
-CitySiege.Stormwind.Waypoint12.X = -8497.73
-CitySiege.Stormwind.Waypoint12.Y = 542.96
-CitySiege.Stormwind.Waypoint12.Z = 98.21
+CitySiege.Stormwind.Waypoint12.X = -8400.78
+CitySiege.Stormwind.Waypoint12.Y = 671.10
+CitySiege.Stormwind.Waypoint12.Z = 95.90
 
-# Waypoint 13 - Near throne room
-CitySiege.Stormwind.Waypoint13.X = -8547.18
-CitySiege.Stormwind.Waypoint13.Y = 466.92
-CitySiege.Stormwind.Waypoint13.Z = 105.53
+# Waypoint 13
+CitySiege.Stormwind.Waypoint13.X = -8497.73
+CitySiege.Stormwind.Waypoint13.Y = 542.96
+CitySiege.Stormwind.Waypoint13.Z = 98.21
+
+# Waypoint 14 - Near throne room
+CitySiege.Stormwind.Waypoint14.X = -8547.18
+CitySiege.Stormwind.Waypoint14.Y = 466.92
+CitySiege.Stormwind.Waypoint14.Z = 105.53
 
 
 
@@ -561,15 +566,15 @@ CitySiege.Level.Defender = 70
 #    CitySiege.Scale.Leader
 #        Description: Scale multiplier for siege leaders (1.0 = normal size).
 #                     Makes leaders visually larger and easier to identify.
-#        Default:     1.3 (30% larger)
-CitySiege.Scale.Leader = 1.3
+#        Default:     1.6 (60% larger)
+CitySiege.Scale.Leader = 1.6
 
 #
 #    CitySiege.Scale.MiniBoss
 #        Description: Scale multiplier for siege mini-bosses (1.0 = normal size).
 #                     Makes mini-bosses visually larger than regular units.
-#        Default:     1.15 (15% larger)
-CitySiege.Scale.MiniBoss = 1.15
+#        Default:     1.30 (30% larger)
+CitySiege.Scale.MiniBoss = 1.30
 
 ###############################################
 # Cinematic and RP Settings

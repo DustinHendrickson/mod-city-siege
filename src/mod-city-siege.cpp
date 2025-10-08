@@ -332,8 +332,8 @@ void LoadCitySiegeConfiguration()
     g_LevelDefender = sConfigMgr->GetOption<uint32>("CitySiege.Level.Defender", 70);
 
     // Scale settings
-    g_ScaleLeader = sConfigMgr->GetOption<float>("CitySiege.Scale.Leader", 1.3f);
-    g_ScaleMiniBoss = sConfigMgr->GetOption<float>("CitySiege.Scale.MiniBoss", 1.15f);
+    g_ScaleLeader = sConfigMgr->GetOption<float>("CitySiege.Scale.Leader", 1.6f);
+    g_ScaleMiniBoss = sConfigMgr->GetOption<float>("CitySiege.Scale.MiniBoss", 1.3f);
 
     // Cinematic settings
     g_CinematicDelay = sConfigMgr->GetOption<uint32>("CitySiege.CinematicDelay", 45);
@@ -1119,6 +1119,45 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     bool isAllianceCity = (event.cityId == CITY_STORMWIND || event.cityId == CITY_IRONFORGE || 
                           event.cityId == CITY_DARNASSUS || event.cityId == CITY_EXODAR);
 
+    // Announce the winner
+    std::string winnerAnnouncement;
+    if (defendersWon)
+    {
+        // Defenders won - announce defending faction victory
+        std::string defendingFaction = isAllianceCity ? "Alliance" : "Horde";
+        winnerAnnouncement = "|cff00ff00[City Siege]|r The " + defendingFaction + " has successfully defended " + city.name + "! Victory to the defenders!";
+    }
+    else
+    {
+        // Attackers won (city leader killed) - announce attacking faction victory
+        std::string attackingFaction = isAllianceCity ? "Horde" : "Alliance";
+        winnerAnnouncement = "|cffff0000[City Siege]|r The " + attackingFaction + " has conquered " + city.name + "! The city has fallen!";
+    }
+    
+    // Announce winner to world or in range
+    if (g_AnnounceRadius == 0)
+    {
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, winnerAnnouncement);
+    }
+    else
+    {
+        Map* map = sMapMgr->FindMap(city.mapId, 0);
+        if (map)
+        {
+            Map::PlayerList const& players = map->GetPlayers();
+            for (auto itr = players.begin(); itr != players.end(); ++itr)
+            {
+                if (Player* player = itr->GetSource())
+                {
+                    if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                    {
+                        ChatHandler(player->GetSession()).PSendSysMessage(winnerAnnouncement.c_str());
+                    }
+                }
+            }
+        }
+    }
+
     if (g_RewardOnDefense)
     {
         if (defendersWon)
@@ -1219,27 +1258,89 @@ void DistributeRewards(const SiegeEvent& /*event*/, const CityData& city, int wi
             if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius &&
                 player->GetLevel() >= g_MinimumLevel)
             {
+                uint32 honorAwarded = 0;
+                uint32 goldAwarded = 0;
+                
                 // Award honor
                 if (g_RewardHonor > 0)
                 {
                     player->RewardHonor(nullptr, 1, g_RewardHonor);
+                    honorAwarded = g_RewardHonor;
                 }
                 
                 // Award gold scaled by player level
                 if (g_RewardGoldBase > 0 || g_RewardGoldPerLevel > 0)
                 {
-                    uint32 goldAmount = g_RewardGoldBase + (g_RewardGoldPerLevel * player->GetLevel());
-                    player->ModifyMoney(goldAmount);
+                    goldAwarded = g_RewardGoldBase + (g_RewardGoldPerLevel * player->GetLevel());
+                    player->ModifyMoney(goldAwarded);
                 }
                 
-                // Send confirmation message
-                std::string rewardMsg = g_MessageReward;
-                size_t pos = rewardMsg.find("{CITYNAME}");
-                if (pos != std::string::npos)
+                // Send detailed confirmation message with rewards
+                char rewardMsg[512];
+                uint32 goldCoins = goldAwarded / 10000;
+                uint32 silverCoins = (goldAwarded % 10000) / 100;
+                uint32 copperCoins = goldAwarded % 100;
+                
+                if (honorAwarded > 0 && goldAwarded > 0)
                 {
-                    rewardMsg.replace(pos, 10, city.name);
+                    // Both honor and gold
+                    if (goldCoins > 0)
+                    {
+                        snprintf(rewardMsg, sizeof(rewardMsg), 
+                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%u Honor|r and |cffFFD700%ug %us %uc|r",
+                            city.name.c_str(), honorAwarded, goldCoins, silverCoins, copperCoins);
+                    }
+                    else if (silverCoins > 0)
+                    {
+                        snprintf(rewardMsg, sizeof(rewardMsg), 
+                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%u Honor|r and |cffFFD700%us %uc|r",
+                            city.name.c_str(), honorAwarded, silverCoins, copperCoins);
+                    }
+                    else
+                    {
+                        snprintf(rewardMsg, sizeof(rewardMsg), 
+                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%u Honor|r and |cffFFD700%uc|r",
+                            city.name.c_str(), honorAwarded, copperCoins);
+                    }
                 }
-                ChatHandler(player->GetSession()).PSendSysMessage(rewardMsg.c_str());
+                else if (honorAwarded > 0)
+                {
+                    // Only honor
+                    snprintf(rewardMsg, sizeof(rewardMsg), 
+                        "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%u Honor|r",
+                        city.name.c_str(), honorAwarded);
+                }
+                else if (goldAwarded > 0)
+                {
+                    // Only gold
+                    if (goldCoins > 0)
+                    {
+                        snprintf(rewardMsg, sizeof(rewardMsg), 
+                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%ug %us %uc|r",
+                            city.name.c_str(), goldCoins, silverCoins, copperCoins);
+                    }
+                    else if (silverCoins > 0)
+                    {
+                        snprintf(rewardMsg, sizeof(rewardMsg), 
+                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%us %uc|r",
+                            city.name.c_str(), silverCoins, copperCoins);
+                    }
+                    else
+                    {
+                        snprintf(rewardMsg, sizeof(rewardMsg), 
+                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%uc|r",
+                            city.name.c_str(), copperCoins);
+                    }
+                }
+                else
+                {
+                    // No rewards configured
+                    snprintf(rewardMsg, sizeof(rewardMsg), 
+                        "|cff00ff00[City Siege]|r You have been rewarded for defending %s!",
+                        city.name.c_str());
+                }
+                
+                ChatHandler(player->GetSession()).PSendSysMessage(rewardMsg);
                 
                 rewardedPlayers++;
             }
@@ -2450,7 +2551,8 @@ public:
             { "cleanup",      HandleCitySiegeCleanupCommand,      SEC_GAMEMASTER, Console::No },
             { "status",       HandleCitySiegeStatusCommand,       SEC_GAMEMASTER, Console::No },
             { "testwaypoint", HandleCitySiegeTestWaypointCommand, SEC_GAMEMASTER, Console::No },
-            { "waypoints",    HandleCitySiegeWaypointsCommand,    SEC_GAMEMASTER, Console::No }
+            { "waypoints",    HandleCitySiegeWaypointsCommand,    SEC_GAMEMASTER, Console::No },
+            { "reload",       HandleCitySiegeReloadCommand,       SEC_ADMINISTRATOR, Console::No }
         };
 
         static ChatCommandTable commandTable =
@@ -2600,13 +2702,56 @@ public:
             {
                 found = true;
                 
+                const CityData& city = g_Cities[cityId];
+                
                 // Determine winning team (0 = Alliance, 1 = Horde)
                 int winningTeam = allianceWins ? 0 : 1;
                 
-                // Distribute rewards to winning faction's players
-                DistributeRewards(event, g_Cities[cityId], winningTeam);
-                
+                // Announce winner to world or in range
+                std::string winnerAnnouncement;
                 std::string winningFaction = allianceWins ? "Alliance" : "Horde";
+                bool isAllianceCity = (cityId == CITY_STORMWIND || cityId == CITY_IRONFORGE || 
+                                      cityId == CITY_DARNASSUS || cityId == CITY_EXODAR);
+                
+                // Check if winners were defenders or attackers
+                bool defendersWon = (allianceWins && isAllianceCity) || (!allianceWins && !isAllianceCity);
+                
+                if (defendersWon)
+                {
+                    winnerAnnouncement = "|cff00ff00[City Siege]|r The " + winningFaction + " has successfully defended " + city.name + "! Victory to the defenders!";
+                }
+                else
+                {
+                    winnerAnnouncement = "|cffff0000[City Siege]|r The " + winningFaction + " has conquered " + city.name + "! The city has fallen!";
+                }
+                
+                // Announce to world or in range
+                if (g_AnnounceRadius == 0)
+                {
+                    sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, winnerAnnouncement);
+                }
+                else
+                {
+                    Map* map = sMapMgr->FindMap(city.mapId, 0);
+                    if (map)
+                    {
+                        Map::PlayerList const& players = map->GetPlayers();
+                        for (auto itr = players.begin(); itr != players.end(); ++itr)
+                        {
+                            if (Player* player = itr->GetSource())
+                            {
+                                if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                                {
+                                    ChatHandler(player->GetSession()).PSendSysMessage(winnerAnnouncement.c_str());
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Distribute rewards to winning faction's players
+                DistributeRewards(event, city, winningTeam);
+                
                 handler->PSendSysMessage(("Siege stopped. " + winningFaction + " wins! " + winningFaction + " players have been rewarded.").c_str());
                 
                 // Clean up
@@ -2997,6 +3142,49 @@ public:
         if (g_DebugMode)
         {
             LOG_INFO("module", "[City Siege] Total visualization markers spawned: {}", visualizations.size());
+        }
+        
+        return true;
+    }
+    
+    static bool HandleCitySiegeReloadCommand(ChatHandler* handler)
+    {
+        handler->PSendSysMessage("|cff00ff00[City Siege]|r Reloading configuration from mod_city_siege.conf...");
+        
+        // Reload configuration file
+        sConfigMgr->Reload();
+        
+        // Reload all City Siege settings
+        LoadCitySiegeConfiguration();
+        
+        handler->PSendSysMessage("|cff00ff00[City Siege]|r Configuration reloaded successfully!");
+        handler->PSendSysMessage("Note: Active sieges will continue with old settings. New sieges will use the updated configuration.");
+        
+        // Display some key settings
+        char msg[512];
+        snprintf(msg, sizeof(msg), "Status: %s | Debug: %s | Timer: %u-%u min | Duration: %u min",
+            g_CitySiegeEnabled ? "Enabled" : "Disabled",
+            g_DebugMode ? "On" : "Off",
+            g_TimerMin / 60, g_TimerMax / 60,
+            g_EventDuration / 60);
+        handler->PSendSysMessage(msg);
+        
+        // Show waypoint counts
+        handler->PSendSysMessage("Waypoints loaded:");
+        for (const auto& city : g_Cities)
+        {
+            if (!city.waypoints.empty())
+            {
+                char wpMsg[256];
+                snprintf(wpMsg, sizeof(wpMsg), "  %s: %zu waypoints", 
+                    city.name.c_str(), city.waypoints.size());
+                handler->PSendSysMessage(wpMsg);
+            }
+        }
+        
+        if (g_DebugMode)
+        {
+            LOG_INFO("module", "[City Siege] Configuration reloaded by {}", handler->GetSession()->GetPlayerName());
         }
         
         return true;
