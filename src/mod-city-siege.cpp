@@ -260,6 +260,9 @@ struct SiegeEvent
 static std::vector<SiegeEvent> g_ActiveSieges;
 static uint32 g_NextSiegeTime = 0;
 
+// Waypoint visualization tracking
+static std::unordered_map<uint32, std::vector<ObjectGuid>> g_WaypointVisualizations; // cityId -> vector of creature GUIDs
+
 // -----------------------------------------------------------------------------
 // HELPER FUNCTIONS
 // -----------------------------------------------------------------------------
@@ -938,6 +941,48 @@ void RandomizePosition(float& x, float& y, float& z, Map* map, float radius = 5.
         if (groundZ > INVALID_HEIGHT)
             z = groundZ + 0.5f;
     }
+}
+
+/**
+ * @brief Validates and corrects ground position before movement to prevent floating/stuck units.
+ * @param x X coordinate
+ * @param y Y coordinate  
+ * @param z Reference to Z coordinate to adjust
+ * @param map Map to check ground height
+ * @return true if position is valid, false if position is invalid/unreachable
+ */
+bool ValidateGroundPosition(float x, float y, float& z, Map* map)
+{
+    if (!map)
+        return false;
+
+    // Get ground height with generous search range
+    float groundZ = map->GetHeight(x, y, z + 100.0f, true, 100.0f);
+    
+    // If ground height is invalid, try searching from below
+    if (groundZ <= INVALID_HEIGHT)
+    {
+        groundZ = map->GetHeight(x, y, z - 50.0f, true, 100.0f);
+    }
+    
+    // Still invalid - position is not reachable
+    if (groundZ <= INVALID_HEIGHT)
+    {
+        return false;
+    }
+    
+    // Clamp Z to be no more than 5 yards from ground (prevent high-altitude floating)
+    if (z > groundZ + 5.0f)
+    {
+        z = groundZ + 0.5f;
+    }
+    else if (z < groundZ - 2.0f)
+    {
+        // Too far below ground, raise to ground level
+        z = groundZ + 0.5f;
+    }
+    
+    return true;
 }
 
 /**
@@ -1629,6 +1674,18 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             Map* creatureMap = creature->GetMap();
                             RandomizePosition(targetX, targetY, targetZ, creatureMap, 5.0f);
                             
+                            // Validate ground position before movement
+                            if (!ValidateGroundPosition(targetX, targetY, targetZ, creatureMap))
+                            {
+                                // Position is invalid, skip movement for this cycle
+                                if (g_DebugMode)
+                                {
+                                    LOG_INFO("server.loading", "[City Siege] Creature {} at invalid waypoint position ({}, {}, {}), skipping movement",
+                                             creature->GetGUID().ToString(), targetX, targetY, targetZ);
+                                }
+                                continue;
+                            }
+                            
                             // Update home position before movement to prevent evading
                             creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                             
@@ -1704,6 +1761,18 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                                 // Randomize next position to prevent bunching
                                 Map* creatureMap = creature->GetMap();
                                 RandomizePosition(nextX, nextY, nextZ, creatureMap, 5.0f);
+                                
+                                // Validate ground position before movement
+                                if (!ValidateGroundPosition(nextX, nextY, nextZ, creatureMap))
+                                {
+                                    // Position is invalid, skip movement for this cycle
+                                    if (g_DebugMode)
+                                    {
+                                        LOG_INFO("server.loading", "[City Siege] Creature {} next waypoint position ({}, {}, {}) invalid, skipping",
+                                                 creature->GetGUID().ToString(), nextX, nextY, nextZ);
+                                    }
+                                    continue;
+                                }
                                 
                                 // Update home position before movement to prevent evading
                                 creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
@@ -1822,6 +1891,18 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         if (dist > 10.0f)
                         {
                             RandomizePosition(targetX, targetY, targetZ, map, 5.0f);
+                            
+                            // Validate ground position before movement
+                            if (!ValidateGroundPosition(targetX, targetY, targetZ, map))
+                            {
+                                if (g_DebugMode)
+                                {
+                                    LOG_INFO("server.loading", "[City Siege] Defender {} at invalid waypoint position, skipping",
+                                             creature->GetGUID().ToString());
+                                }
+                                continue;
+                            }
+                            
                             creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                             
                             Movement::MoveSplineInit init(creature);
@@ -1862,6 +1943,18 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             event.creatureWaypointProgress[guid] = nextWP + 10000;
                             
                             RandomizePosition(nextX, nextY, nextZ, map, 5.0f);
+                            
+                            // Validate ground position before movement
+                            if (!ValidateGroundPosition(nextX, nextY, nextZ, map))
+                            {
+                                if (g_DebugMode)
+                                {
+                                    LOG_INFO("server.loading", "[City Siege] Defender {} next waypoint position invalid, skipping",
+                                             creature->GetGUID().ToString());
+                                }
+                                continue;
+                            }
+                            
                             creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                             
                             Movement::MoveSplineInit init(creature);
@@ -2353,10 +2446,11 @@ public:
     {
         static ChatCommandTable citySiegeCommandTable =
         {
-            { "start",   HandleCitySiegeStartCommand,   SEC_GAMEMASTER, Console::No },
-            { "stop",    HandleCitySiegeStopCommand,    SEC_GAMEMASTER, Console::No },
-            { "cleanup", HandleCitySiegeCleanupCommand, SEC_GAMEMASTER, Console::No },
-            { "status",  HandleCitySiegeStatusCommand,  SEC_GAMEMASTER, Console::No }
+            { "start",     HandleCitySiegeStartCommand,     SEC_GAMEMASTER, Console::No },
+            { "stop",      HandleCitySiegeStopCommand,      SEC_GAMEMASTER, Console::No },
+            { "cleanup",   HandleCitySiegeCleanupCommand,   SEC_GAMEMASTER, Console::No },
+            { "status",    HandleCitySiegeStatusCommand,    SEC_GAMEMASTER, Console::No },
+            { "waypoints", HandleCitySiegeWaypointsCommand, SEC_GAMEMASTER, Console::No }
         };
 
         static ChatCommandTable commandTable =
@@ -2629,6 +2723,121 @@ public:
             }
         }
 
+        return true;
+    }
+
+    static bool HandleCitySiegeWaypointsCommand(ChatHandler* handler, Optional<std::string> cityNameArg)
+    {
+        if (!cityNameArg)
+        {
+            handler->PSendSysMessage("Usage: .citysiege waypoints <cityname>");
+            handler->PSendSysMessage("Shows or hides waypoint visualization for a city.");
+            handler->PSendSysMessage("Available cities: Stormwind, Ironforge, Darnassus, Exodar, Orgrimmar, Undercity, ThunderBluff, Silvermoon");
+            return true;
+        }
+
+        // Parse city name
+        std::string cityName = *cityNameArg;
+        std::transform(cityName.begin(), cityName.end(), cityName.begin(), ::tolower);
+
+        int cityId = -1;
+        for (size_t i = 0; i < g_Cities.size(); ++i)
+        {
+            std::string checkName = g_Cities[i].name;
+            std::transform(checkName.begin(), checkName.end(), checkName.begin(), ::tolower);
+            if (checkName == cityName)
+            {
+                cityId = static_cast<int>(i);
+                break;
+            }
+        }
+
+        if (cityId == -1)
+        {
+            handler->PSendSysMessage("Unknown city. Use: Stormwind, Ironforge, Darnassus, Exodar, Orgrimmar, Undercity, ThunderBluff, or Silvermoon");
+            return true;
+        }
+
+        const CityData& city = g_Cities[cityId];
+        Map* map = sMapMgr->FindMap(city.mapId, 0);
+        if (!map)
+        {
+            handler->PSendSysMessage("Could not find map for this city.");
+            return true;
+        }
+
+        // Check if waypoints are already shown for this city
+        if (g_WaypointVisualizations.find(cityId) != g_WaypointVisualizations.end())
+        {
+            // Hide waypoints
+            std::vector<ObjectGuid>& visualizations = g_WaypointVisualizations[cityId];
+            for (const ObjectGuid& guid : visualizations)
+            {
+                if (Creature* creature = map->GetCreature(guid))
+                {
+                    creature->DespawnOrUnsummon(0);
+                }
+            }
+            g_WaypointVisualizations.erase(cityId);
+            handler->PSendSysMessage(("Waypoint visualization hidden for " + city.name).c_str());
+            return true;
+        }
+
+        // Show waypoints - spawn visualization creatures
+        std::vector<ObjectGuid> visualizations;
+
+        // Visualize spawn point
+        float spawnZ = city.spawnZ;
+        float groundZ = map->GetHeight(city.spawnX, city.spawnY, spawnZ + 50.0f, true, 50.0f);
+        if (groundZ > INVALID_HEIGHT)
+            spawnZ = groundZ;
+
+        // Use entry 15631 (spotlight effect) - a tall visual beam
+        if (Creature* marker = map->SummonCreature(15631, Position(city.spawnX, city.spawnY, spawnZ, 0)))
+        {
+            marker->SetObjectScale(3.0f); // Large scale for visibility
+            marker->SetReactState(REACT_PASSIVE);
+            marker->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            marker->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+            visualizations.push_back(marker->GetGUID());
+        }
+
+        // Visualize each waypoint
+        for (size_t i = 0; i < city.waypoints.size(); ++i)
+        {
+            float wpZ = city.waypoints[i].z;
+            groundZ = map->GetHeight(city.waypoints[i].x, city.waypoints[i].y, wpZ + 50.0f, true, 50.0f);
+            if (groundZ > INVALID_HEIGHT)
+                wpZ = groundZ;
+
+            if (Creature* marker = map->SummonCreature(15631, Position(city.waypoints[i].x, city.waypoints[i].y, wpZ, 0)))
+            {
+                marker->SetObjectScale(2.5f); // Slightly smaller than spawn marker
+                marker->SetReactState(REACT_PASSIVE);
+                marker->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+                marker->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+                visualizations.push_back(marker->GetGUID());
+            }
+        }
+
+        // Visualize leader position
+        float leaderZ = city.leaderZ;
+        groundZ = map->GetHeight(city.leaderX, city.leaderY, leaderZ + 50.0f, true, 50.0f);
+        if (groundZ > INVALID_HEIGHT)
+            leaderZ = groundZ;
+
+        if (Creature* marker = map->SummonCreature(15631, Position(city.leaderX, city.leaderY, leaderZ, 0)))
+        {
+            marker->SetObjectScale(3.5f); // Largest for leader position
+            marker->SetReactState(REACT_PASSIVE);
+            marker->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+            marker->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
+            visualizations.push_back(marker->GetGUID());
+        }
+
+        g_WaypointVisualizations[cityId] = visualizations;
+        handler->PSendSysMessage(("Waypoint visualization shown for " + city.name + " (Spawn: Green, Waypoints: White, Leader: Large)").c_str());
+        handler->PSendSysMessage(("Total markers: " + std::to_string(visualizations.size())).c_str());
         return true;
     }
 };
