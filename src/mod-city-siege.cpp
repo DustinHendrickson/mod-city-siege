@@ -2763,7 +2763,7 @@ public:
             marker->DespawnOrUnsummon(20000); // Despawn after 20 seconds
 
             handler->PSendSysMessage("Test waypoint marker spawned at your location for 20 seconds.");
-            handler->PSendSysMessage(("Coordinates: X=%.2f, Y=%.2f, Z=%.2f", x, y, z));
+            handler->PSendSysMessage("Coordinates: X=%.2f, Y=%.2f, Z=%.2f", x, y, z);
             handler->PSendSysMessage("Copy these coordinates to your mod_city_siege.conf file.");
         }
         else
