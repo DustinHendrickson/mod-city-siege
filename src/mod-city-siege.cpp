@@ -95,9 +95,9 @@ static uint32 g_RewardGoldBase = 5000; // 50 silver in copper at level 1
 static uint32 g_RewardGoldPerLevel = 5000; // 0.5 gold per level in copper
 
 // Announcement messages
-static std::string g_MessageSiegeStart = "|cffff0000[City Siege]|r The city of %s is under attack! Defenders are needed!";
-static std::string g_MessageSiegeEnd = "|cff00ff00[City Siege]|r The siege of %s has ended!";
-static std::string g_MessageReward = "|cff00ff00[City Siege]|r You have been rewarded for defending %s!";
+static std::string g_MessageSiegeStart = "|cffff0000[City Siege]|r The city of {CITYNAME} is under attack! Defenders are needed!";
+static std::string g_MessageSiegeEnd = "|cff00ff00[City Siege]|r The siege of {CITYNAME} has ended!";
+static std::string g_MessageReward = "|cff00ff00[City Siege]|r You have been rewarded for defending {CITYNAME}!";
 
 // Leader spawn yell
 static std::string g_YellLeaderSpawn = "This city will fall before our might!";
@@ -233,11 +233,11 @@ void LoadCitySiegeConfiguration()
 
     // Messages
     g_MessageSiegeStart = sConfigMgr->GetOption<std::string>("CitySiege.Message.SiegeStart", 
-        "|cffff0000[City Siege]|r The city of %s is under attack! Defenders are needed!");
+        "|cffff0000[City Siege]|r The city of {CITYNAME} is under attack! Defenders are needed!");
     g_MessageSiegeEnd = sConfigMgr->GetOption<std::string>("CitySiege.Message.SiegeEnd", 
-        "|cff00ff00[City Siege]|r The siege of %s has ended!");
+        "|cff00ff00[City Siege]|r The siege of {CITYNAME} has ended!");
     g_MessageReward = sConfigMgr->GetOption<std::string>("CitySiege.Message.Reward", 
-        "|cff00ff00[City Siege]|r You have been rewarded for defending %s!");
+        "|cff00ff00[City Siege]|r You have been rewarded for defending {CITYNAME}!");
     
     // Yells
     g_YellLeaderSpawn = sConfigMgr->GetOption<std::string>("CitySiege.Yell.LeaderSpawn", 
@@ -375,15 +375,21 @@ void AnnounceSiege(const CityData& city, bool isStart)
     std::string message;
     if (isStart)
     {
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer), g_MessageSiegeStart.c_str(), city.name.c_str());
-        message = buffer;
+        message = g_MessageSiegeStart;
+        size_t pos = message.find("{CITYNAME}");
+        if (pos != std::string::npos)
+        {
+            message.replace(pos, 10, city.name);
+        }
     }
     else
     {
-        char buffer[256];
-        snprintf(buffer, sizeof(buffer), g_MessageSiegeEnd.c_str(), city.name.c_str());
-        message = buffer;
+        message = g_MessageSiegeEnd;
+        size_t pos = message.find("{CITYNAME}");
+        if (pos != std::string::npos)
+        {
+            message.replace(pos, 10, city.name);
+        }
     }
 
     if (g_AnnounceRadius == 0)
@@ -790,9 +796,13 @@ void DistributeRewards(const SiegeEvent& /*event*/, const CityData& city, int wi
                 }
                 
                 // Send confirmation message
-                char buffer[256];
-                snprintf(buffer, sizeof(buffer), g_MessageReward.c_str(), city.name.c_str());
-                ChatHandler(player->GetSession()).PSendSysMessage(buffer);
+                std::string rewardMsg = g_MessageReward;
+                size_t pos = rewardMsg.find("{CITYNAME}");
+                if (pos != std::string::npos)
+                {
+                    rewardMsg.replace(pos, 10, city.name);
+                }
+                ChatHandler(player->GetSession()).PSendSysMessage(rewardMsg.c_str());
                 
                 rewardedPlayers++;
             }
@@ -860,26 +870,37 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             creature->SetReactState(REACT_DEFENSIVE);
                         }
                         
-                        // Clear any existing movement
-                        creature->GetMotionMaster()->Clear(false);
-                        creature->GetMotionMaster()->MoveIdle();
-                        
-                        // Ensure creature walks on the ground
+                        // Ensure creature is grounded BEFORE any movement
                         creature->SetDisableGravity(false);
                         creature->SetCanFly(false);
                         creature->SetHover(false);
                         creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING);
-                        creature->SetWalk(false); // Run to the leader
+                        
+                        // Get proper ground height at current position
+                        float currentX = creature->GetPositionX();
+                        float currentY = creature->GetPositionY();
+                        float currentZ = creature->GetPositionZ();
+                        creature->UpdateAllowedPositionZ(currentX, currentY, currentZ);
                         
                         // Update ground height at destination
+                        float destX = city.leaderX;
+                        float destY = city.leaderY;
                         float destZ = city.leaderZ;
-                        creature->UpdateAllowedPositionZ(city.leaderX, city.leaderY, destZ);
                         
-                        // Use MoveSplineInit for proper pathfinding - this is how the core handles ground movement
-                        Movement::MoveSplineInit init(creature);
-                        init.MoveTo(city.leaderX, city.leaderY, destZ, true, true);
-                        init.SetWalk(false);
-                        init.Launch();
+                        // Use map->GetHeight to get proper ground Z
+                        float groundZ = map->GetHeight(destX, destY, destZ + 50.0f, true, 50.0f);
+                        if (groundZ > INVALID_HEIGHT)
+                        {
+                            destZ = groundZ + 0.5f;
+                        }
+                        
+                        // Clear any existing movement and wait a moment
+                        creature->GetMotionMaster()->Clear(false);
+                        creature->GetMotionMaster()->MoveIdle();
+                        
+                        // Use MotionMaster->MovePoint for proper pathfinding on ground
+                        creature->SetWalk(false); // Run to the leader
+                        creature->GetMotionMaster()->MovePoint(1, destX, destY, destZ, true);
                         
                         if (g_DebugMode)
                         {
@@ -1093,7 +1114,7 @@ public:
             // Check if city is enabled
             if (!g_CityEnabled[g_Cities[cityId].name])
             {
-                handler->PSendSysMessage("City '%s' is disabled in configuration.", g_Cities[cityId].name.c_str());
+                handler->PSendSysMessage(("City '" + g_Cities[cityId].name + "' is disabled in configuration.").c_str());
                 return true;
             }
         }
@@ -1105,7 +1126,7 @@ public:
             {
                 if (event.isActive && event.cityId == cityId)
                 {
-                    handler->PSendSysMessage("City '%s' is already under siege!", g_Cities[cityId].name.c_str());
+                    handler->PSendSysMessage(("City '" + g_Cities[cityId].name + "' is already under siege!").c_str());
                     return true;
                 }
             }
@@ -1120,7 +1141,7 @@ public:
         else
         {
             StartSiegeEvent(cityId);
-            handler->PSendSysMessage("Started siege event in %s!", g_Cities[cityId].name.c_str());
+            handler->PSendSysMessage(("Started siege event in " + g_Cities[cityId].name + "!").c_str());
         }
 
         return true;
@@ -1205,9 +1226,8 @@ public:
                 // Distribute rewards to winning faction's players
                 DistributeRewards(event, g_Cities[cityId], winningTeam);
                 
-                handler->PSendSysMessage("Siege stopped. %s wins! %s players have been rewarded.", 
-                    allianceWins ? "Alliance" : "Horde",
-                    allianceWins ? "Alliance" : "Horde");
+                std::string winningFaction = allianceWins ? "Alliance" : "Horde";
+                handler->PSendSysMessage(("Siege stopped. " + winningFaction + " wins! " + winningFaction + " players have been rewarded.").c_str());
                 
                 // Clean up
                 DespawnSiegeCreatures(event);
@@ -1219,7 +1239,7 @@ public:
 
         if (!found)
         {
-            handler->PSendSysMessage("No active siege in %s", g_Cities[cityId].name.c_str());
+            handler->PSendSysMessage(("No active siege in " + g_Cities[cityId].name).c_str());
         }
         else
         {
@@ -1267,7 +1287,7 @@ public:
             {
                 DespawnSiegeCreatures(event);
                 event.isActive = false;
-                handler->PSendSysMessage("Cleaned up siege creatures in %s", g_Cities[event.cityId].name.c_str());
+                handler->PSendSysMessage(("Cleaned up siege creatures in " + g_Cities[event.cityId].name).c_str());
                 cleanedCount++;
 
                 if (cityId != -1)
@@ -1294,8 +1314,8 @@ public:
     static bool HandleCitySiegeStatusCommand(ChatHandler* handler)
     {
         handler->PSendSysMessage("=== City Siege Status ===");
-        handler->PSendSysMessage("Module Enabled: %s", g_CitySiegeEnabled ? "Yes" : "No");
-        handler->PSendSysMessage("Active Sieges: %u", static_cast<uint32>(g_ActiveSieges.size()));
+        handler->PSendSysMessage(("Module Enabled: " + std::string(g_CitySiegeEnabled ? "Yes" : "No")).c_str());
+        handler->PSendSysMessage(("Active Sieges: " + std::to_string(g_ActiveSieges.size())).c_str());
 
         if (!g_ActiveSieges.empty())
         {
@@ -1306,10 +1326,9 @@ public:
                 {
                     uint32 currentTime = time(nullptr);
                     uint32 remaining = event.endTime > currentTime ? (event.endTime - currentTime) : 0;
-                    handler->PSendSysMessage("  %s - %u creatures, %u minutes remaining",
-                        g_Cities[event.cityId].name.c_str(),
-                        static_cast<uint32>(event.spawnedCreatures.size()),
-                        remaining / 60);
+                    handler->PSendSysMessage(("  " + g_Cities[event.cityId].name + " - " + 
+                        std::to_string(event.spawnedCreatures.size()) + " creatures, " + 
+                        std::to_string(remaining / 60) + " minutes remaining").c_str());
                 }
             }
         }
@@ -1320,7 +1339,7 @@ public:
             if (g_NextSiegeTime > currentTime)
             {
                 uint32 timeUntilNext = g_NextSiegeTime - currentTime;
-                handler->PSendSysMessage("Next auto-siege in: %u minutes", timeUntilNext / 60);
+                handler->PSendSysMessage(("Next auto-siege in: " + std::to_string(timeUntilNext / 60) + " minutes").c_str());
             }
         }
 

@@ -406,21 +406,21 @@ CitySiege.RewardGoldPerLevel = 5000
 
 #
 #    CitySiege.Message.SiegeStart
-#        Description: Message announced when a siege begins. Use %s for city name.
-#        Default:     "|cffff0000[City Siege]|r The city of %s is under attack! Defenders are needed!"
-CitySiege.Message.SiegeStart = "|cffff0000[City Siege]|r The city of %s is under attack! Defenders are needed!"
+#        Description: Message announced when a siege begins. Use {CITYNAME} for city name.
+#        Default:     "|cffff0000[City Siege]|r The city of {CITYNAME} is under attack! Defenders are needed!"
+CitySiege.Message.SiegeStart = "|cffff0000[City Siege]|r The city of {CITYNAME} is under attack! Defenders are needed!"
 
 #
 #    CitySiege.Message.SiegeEnd
-#        Description: Message announced when a siege ends. Use %s for city name.
-#        Default:     "|cff00ff00[City Siege]|r The siege of %s has ended!"
-CitySiege.Message.SiegeEnd = "|cff00ff00[City Siege]|r The siege of %s has ended!"
+#        Description: Message announced when a siege ends. Use {CITYNAME} for city name.
+#        Default:     "|cff00ff00[City Siege]|r The siege of {CITYNAME} has ended!"
+CitySiege.Message.SiegeEnd = "|cff00ff00[City Siege]|r The siege of {CITYNAME} has ended!"
 
 #
 #    CitySiege.Message.Reward
-#        Description: Message sent to players when they receive rewards. Use %s for city name.
-#        Default:     "|cff00ff00[City Siege]|r You have been rewarded for defending %s!"
-CitySiege.Message.Reward = "|cff00ff00[City Siege]|r You have been rewarded for defending %s!"
+#        Description: Message sent to players when they receive rewards. Use {CITYNAME} for city name.
+#        Default:     "|cff00ff00[City Siege]|r You have been rewarded for defending {CITYNAME}!"
+CitySiege.Message.Reward = "|cff00ff00[City Siege]|r You have been rewarded for defending {CITYNAME}!"
 
 ###############################################
 # Creature Yells
