@@ -1321,12 +1321,6 @@ void DistributeRewards(const SiegeEvent& /*event*/, const CityData& city, int wi
     {
         if (Player* player = itr->GetSource())
         {
-            // Skip GM accounts if they're in GM mode
-            if (player->IsGameMaster())
-            {
-                continue;
-            }
-            
             // If winningTeam is specified, only reward players of that faction
             if (winningTeam != -1 && player->GetTeamId() != winningTeam)
             {
@@ -2659,6 +2653,7 @@ public:
             { "status",       HandleCitySiegeStatusCommand,       SEC_GAMEMASTER, Console::No },
             { "testwaypoint", HandleCitySiegeTestWaypointCommand, SEC_GAMEMASTER, Console::No },
             { "waypoints",    HandleCitySiegeWaypointsCommand,    SEC_GAMEMASTER, Console::No },
+            { "distance",     HandleCitySiegeDistanceCommand,     SEC_GAMEMASTER, Console::No },
             { "reload",       HandleCitySiegeReloadCommand,       SEC_ADMINISTRATOR, Console::No }
         };
 
@@ -3331,6 +3326,63 @@ public:
             LOG_INFO("module", "[City Siege] Configuration reloaded by {}", handler->GetSession()->GetPlayerName());
         }
         
+        return true;
+    }
+
+    static bool HandleCitySiegeDistanceCommand(ChatHandler* handler, Optional<std::string> cityNameArg)
+    {
+        Player* player = handler->GetSession()->GetPlayer();
+        if (!player)
+        {
+            return false;
+        }
+
+        // If no city specified, show distance to all cities
+        if (!cityNameArg)
+        {
+            handler->PSendSysMessage("|cff00ff00[City Siege]|r Distance to city centers:");
+            for (const auto& city : g_Cities)
+            {
+                float distance = player->GetDistance(city.centerX, city.centerY, city.centerZ);
+                char msg[256];
+                snprintf(msg, sizeof(msg), "  %s: %.1f yards (center: %.1f, %.1f, %.1f)",
+                    city.name.c_str(), distance, city.centerX, city.centerY, city.centerZ);
+                handler->PSendSysMessage(msg);
+            }
+            return true;
+        }
+
+        // Find specific city
+        CityId cityId = CITY_STORMWIND;
+        std::string cityName = *cityNameArg;
+        
+        // Convert to lowercase for comparison
+        std::transform(cityName.begin(), cityName.end(), cityName.begin(), ::tolower);
+        
+        if (cityName == "stormwind") cityId = CITY_STORMWIND;
+        else if (cityName == "ironforge") cityId = CITY_IRONFORGE;
+        else if (cityName == "darnassus") cityId = CITY_DARNASSUS;
+        else if (cityName == "exodar") cityId = CITY_EXODAR;
+        else if (cityName == "orgrimmar") cityId = CITY_ORGRIMMAR;
+        else if (cityName == "undercity") cityId = CITY_UNDERCITY;
+        else if (cityName == "thunderbluff") cityId = CITY_THUNDERBLUFF;
+        else if (cityName == "silvermoon") cityId = CITY_SILVERMOON;
+        else
+        {
+            handler->PSendSysMessage("Invalid city name. Available: Stormwind, Ironforge, Darnassus, Exodar, Orgrimmar, Undercity, ThunderBluff, Silvermoon");
+            return true;
+        }
+
+        const CityData& city = g_Cities[cityId];
+        float distance = player->GetDistance(city.centerX, city.centerY, city.centerZ);
+        
+        char msg[512];
+        snprintf(msg, sizeof(msg), 
+            "|cff00ff00[City Siege]|r Distance to %s center: %.1f yards\nCenter coords: (%.1f, %.1f, %.1f)\nAnnounce radius: %u yards\n%s",
+            city.name.c_str(), distance, city.centerX, city.centerY, city.centerZ, g_AnnounceRadius,
+            distance <= g_AnnounceRadius ? "|cff00ff00You ARE in range|r" : "|cffff0000You are OUT OF RANGE|r");
+        handler->PSendSysMessage(msg);
+
         return true;
     }
 };
