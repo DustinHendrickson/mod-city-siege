@@ -2743,18 +2743,27 @@ public:
             return true;
         }
 
-        // Get player position
+        // Get player position (use actual position, not ground adjusted)
         float x = player->GetPositionX();
         float y = player->GetPositionY();
         float z = player->GetPositionZ();
+        
+        // Store original for display
+        float displayZ = z;
 
-        // Validate ground position
-        float groundZ = map->GetHeight(x, y, z + 50.0f, true, 50.0f);
-        if (groundZ > INVALID_HEIGHT)
-            z = groundZ;
+        // Try to find ground near player position for spawning the marker
+        float groundZ = map->GetHeight(x, y, z + 10.0f, true, 50.0f);
+        if (groundZ <= INVALID_HEIGHT)
+        {
+            // Try searching from below
+            groundZ = map->GetHeight(x, y, z - 10.0f, true, 50.0f);
+        }
+        
+        // Use ground height if found, otherwise use player height
+        float spawnZ = (groundZ > INVALID_HEIGHT) ? groundZ : z;
 
         // Spawn temporary waypoint marker (white spotlight - entry 15631)
-        if (Creature* marker = map->SummonCreature(15631, Position(x, y, z, 0)))
+        if (Creature* marker = map->SummonCreature(15631, Position(x, y, spawnZ, 0)))
         {
             marker->SetObjectScale(2.5f); // Standard waypoint size
             marker->SetReactState(REACT_PASSIVE);
@@ -2763,12 +2772,24 @@ public:
             marker->DespawnOrUnsummon(20000); // Despawn after 20 seconds
 
             handler->PSendSysMessage("Test waypoint marker spawned at your location for 20 seconds.");
-            handler->PSendSysMessage("Coordinates: X=%.2f, Y=%.2f, Z=%.2f", x, y, z);
+            
+            // Format coordinates properly
+            char coordMsg[256];
+            snprintf(coordMsg, sizeof(coordMsg), "Coordinates: X=%.2f, Y=%.2f, Z=%.2f", x, y, displayZ);
+            handler->PSendSysMessage(coordMsg);
+            
             handler->PSendSysMessage("Copy these coordinates to your mod_city_siege.conf file.");
         }
         else
         {
-            handler->PSendSysMessage("Failed to spawn test waypoint marker.");
+            handler->PSendSysMessage("Failed to spawn test waypoint marker at this location.");
+            
+            // Show coordinates anyway
+            char coordMsg[256];
+            snprintf(coordMsg, sizeof(coordMsg), "Your position: X=%.2f, Y=%.2f, Z=%.2f", x, y, displayZ);
+            handler->PSendSysMessage(coordMsg);
+            
+            handler->PSendSysMessage("This location may not be valid for spawning creatures.");
         }
 
         return true;
@@ -2836,7 +2857,11 @@ public:
 
         // Visualize spawn point
         float spawnZ = city.spawnZ;
-        float groundZ = map->GetHeight(city.spawnX, city.spawnY, spawnZ + 50.0f, true, 50.0f);
+        float groundZ = map->GetHeight(city.spawnX, city.spawnY, spawnZ + 10.0f, true, 50.0f);
+        if (groundZ <= INVALID_HEIGHT)
+        {
+            groundZ = map->GetHeight(city.spawnX, city.spawnY, spawnZ - 10.0f, true, 50.0f);
+        }
         if (groundZ > INVALID_HEIGHT)
             spawnZ = groundZ;
 
@@ -2849,6 +2874,11 @@ public:
             marker->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
             visualizations.push_back(marker->GetGUID());
             
+            char spawnMsg[256];
+            snprintf(spawnMsg, sizeof(spawnMsg), "Spawn Point: X=%.2f, Y=%.2f, Z=%.2f - OK", 
+                city.spawnX, city.spawnY, city.spawnZ);
+            handler->PSendSysMessage(spawnMsg);
+            
             if (g_DebugMode)
             {
                 LOG_INFO("module", "[City Siege] Spawned spawn point marker at {}, {}, {}", city.spawnX, city.spawnY, spawnZ);
@@ -2856,50 +2886,96 @@ public:
         }
         else
         {
-            handler->PSendSysMessage("Warning: Failed to spawn marker at spawn point.");
+            char spawnMsg[256];
+            snprintf(spawnMsg, sizeof(spawnMsg), "Spawn Point: X=%.2f, Y=%.2f, Z=%.2f - FAILED", 
+                city.spawnX, city.spawnY, city.spawnZ);
+            handler->PSendSysMessage(spawnMsg);
         }
 
         // Visualize each waypoint
         handler->PSendSysMessage(("City has " + std::to_string(city.waypoints.size()) + " waypoints configured.").c_str());
+        
+        int spawnedWaypoints = 0;
+        int failedWaypoints = 0;
+        
         for (size_t i = 0; i < city.waypoints.size(); ++i)
         {
+            float wpX = city.waypoints[i].x;
+            float wpY = city.waypoints[i].y;
             float wpZ = city.waypoints[i].z;
-            groundZ = map->GetHeight(city.waypoints[i].x, city.waypoints[i].y, wpZ + 50.0f, true, 50.0f);
-            if (groundZ > INVALID_HEIGHT)
-                wpZ = groundZ;
-
-            if (Creature* marker = map->SummonCreature(15631, Position(city.waypoints[i].x, city.waypoints[i].y, wpZ, 0)))
+            
+            // Try to find ground near the waypoint position
+            float groundZ = map->GetHeight(wpX, wpY, wpZ + 10.0f, true, 50.0f);
+            if (groundZ <= INVALID_HEIGHT)
             {
-                marker->SetObjectScale(2.5f); // Slightly smaller than spawn marker
+                // Try searching from below
+                groundZ = map->GetHeight(wpX, wpY, wpZ - 10.0f, true, 50.0f);
+            }
+            
+            // Use ground height if found, otherwise use config Z
+            float spawnZ = (groundZ > INVALID_HEIGHT) ? groundZ : wpZ;
+
+            if (Creature* marker = map->SummonCreature(15631, Position(wpX, wpY, spawnZ, 0)))
+            {
+                marker->SetObjectScale(2.5f); // Medium size for waypoints
                 marker->SetReactState(REACT_PASSIVE);
                 marker->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                 marker->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                 visualizations.push_back(marker->GetGUID());
+                spawnedWaypoints++;
+                
+                // Format coordinates properly
+                char waypointMsg[256];
+                snprintf(waypointMsg, sizeof(waypointMsg), "  WP %zu: X=%.2f, Y=%.2f, Z=%.2f - OK", 
+                    i + 1, wpX, wpY, wpZ);
+                handler->PSendSysMessage(waypointMsg);
                 
                 if (g_DebugMode)
                 {
-                    LOG_INFO("module", "[City Siege] Spawned waypoint {} marker at {}, {}, {}", i + 1, city.waypoints[i].x, city.waypoints[i].y, wpZ);
+                    LOG_INFO("module", "[City Siege] Spawned waypoint {} marker at {}, {}, {}", i + 1, wpX, wpY, spawnZ);
                 }
             }
             else
             {
-                handler->PSendSysMessage(("Warning: Failed to spawn marker at waypoint " + std::to_string(i + 1)).c_str());
+                failedWaypoints++;
+                
+                // Format coordinates properly
+                char waypointMsg[256];
+                snprintf(waypointMsg, sizeof(waypointMsg), "  WP %zu: X=%.2f, Y=%.2f, Z=%.2f - FAILED", 
+                    i + 1, wpX, wpY, wpZ);
+                handler->PSendSysMessage(waypointMsg);
             }
         }
+        
+        if (failedWaypoints > 0)
+        {
+            char warningMsg[128];
+            snprintf(warningMsg, sizeof(warningMsg), "WARNING: %d waypoint markers failed to spawn!", failedWaypoints);
+            handler->PSendSysMessage(warningMsg);
+        }
 
-        // Visualize leader position (using red spotlight - entry 15638 for red color)
+        // Visualize leader position (using same green spotlight as spawn - entry 15631)
         float leaderZ = city.leaderZ;
-        groundZ = map->GetHeight(city.leaderX, city.leaderY, leaderZ + 50.0f, true, 50.0f);
+        groundZ = map->GetHeight(city.leaderX, city.leaderY, leaderZ + 10.0f, true, 50.0f);
+        if (groundZ <= INVALID_HEIGHT)
+        {
+            groundZ = map->GetHeight(city.leaderX, city.leaderY, leaderZ - 10.0f, true, 50.0f);
+        }
         if (groundZ > INVALID_HEIGHT)
             leaderZ = groundZ;
 
-        if (Creature* marker = map->SummonCreature(15638, Position(city.leaderX, city.leaderY, leaderZ, 0)))
+        if (Creature* marker = map->SummonCreature(15631, Position(city.leaderX, city.leaderY, leaderZ, 0)))
         {
-            marker->SetObjectScale(2.5f); // Same size as waypoints
+            marker->SetObjectScale(3.0f); // Same size as spawn marker
             marker->SetReactState(REACT_PASSIVE);
             marker->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             marker->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
             visualizations.push_back(marker->GetGUID());
+            
+            char leaderMsg[256];
+            snprintf(leaderMsg, sizeof(leaderMsg), "Leader Position: X=%.2f, Y=%.2f, Z=%.2f - OK", 
+                city.leaderX, city.leaderY, city.leaderZ);
+            handler->PSendSysMessage(leaderMsg);
             
             if (g_DebugMode)
             {
@@ -2908,14 +2984,26 @@ public:
         }
         else
         {
-            handler->PSendSysMessage("Warning: Failed to spawn marker at leader position.");
+            char leaderMsg[256];
+            snprintf(leaderMsg, sizeof(leaderMsg), "Leader Position: X=%.2f, Y=%.2f, Z=%.2f - FAILED", 
+                city.leaderX, city.leaderY, city.leaderZ);
+            handler->PSendSysMessage(leaderMsg);
         }
 
         g_WaypointVisualizations[cityId] = visualizations;
-        handler->PSendSysMessage(("Waypoint visualization shown for " + city.name).c_str());
-        handler->PSendSysMessage(("Markers spawned: " + std::to_string(visualizations.size()) + 
-            " (1 Spawn Point + " + std::to_string(city.waypoints.size()) + " Waypoints + 1 Leader Position)").c_str());
-        handler->PSendSysMessage("Colors: Green=Spawn, White=Waypoints, Red=Leader");
+        
+        char summaryMsg[256];
+        snprintf(summaryMsg, sizeof(summaryMsg), "Total markers: %zu (1 Spawn + %zu Waypoints + 1 Leader)", 
+            visualizations.size(), city.waypoints.size());
+        handler->PSendSysMessage(summaryMsg);
+        
+        handler->PSendSysMessage("Green/Large = Spawn & Leader | White/Medium = Waypoints");
+        
+        if (g_DebugMode)
+        {
+            LOG_INFO("module", "[City Siege] Total visualization markers spawned: {}", visualizations.size());
+        }
+        
         return true;
     }
 };

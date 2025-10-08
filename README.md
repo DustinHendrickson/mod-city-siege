@@ -197,23 +197,26 @@ Toggles visualization of the siege waypoint path for a specific city. Shows tall
 ```
 
 **Visual Markers:**
-- **Spawn Position** (scale 3.0): Green spotlight beam marking attacker spawn point
-- **Waypoint Path** (scale 2.5): White spotlight beams marking each waypoint along the route
-- **Leader Position** (scale 2.5): Red spotlight beam marking where the leader stops
+- **Spawn Position** (scale 3.0): Large green spotlight beam marking attacker spawn point
+- **Waypoint Path** (scale 2.5): Medium white spotlight beams marking each waypoint along the route
+- **Leader Position** (scale 3.0): Large green spotlight beam marking where the leader stops (same as spawn)
 
 **Output:**
 - Shows how many waypoints are configured for the city
 - Reports successful marker spawns and any failures
 - Displays total marker count breakdown (spawn + waypoints + leader)
-- Color legend: Green=Spawn, White=Waypoints, Red=Leader
+- Path guide: Spawn (Green/Large) -> Waypoints (White/Medium) -> Leader (Green/Large)
 
 **Notes:**
 - Run the command again to hide the waypoints
 - Markers are visible from afar for easy diagnosis
+- Large green beams mark start (spawn) and end (leader) positions
+- Medium white beams mark the path waypoints in between
 - Useful for identifying problematic waypoint positions
 - Helps visualize the complete attack path
 - Each city's waypoints can be toggled independently
 - If markers are missing, check the output messages for spawn failures
+- Enable debug mode to see detailed spawn logs in server console
 
 ### Command Examples
 
