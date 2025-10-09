@@ -51,6 +51,20 @@ Features
 - **Debug Mode:**  
   Comprehensive logging for server administrators.
 
+Playerbot Support
+-----------------
+This module can optionally recruit Playerbots (random bots) to participate in sieges when the `MOD_PLAYERBOTS` build option is enabled and the Playerbots module is active.
+
+- Recruitment source: `RandomPlayerbotMgr` (rndbots). The module prefers randomly-managed bots and will not recruit alternate-character/explicitly-managed accounts.
+- Exclusions: Bots that are dead, in combat, inside instances/battlegrounds, or currently in a party/raid will be skipped.
+- Level and count: Recruited bots respect `Playerbots.MinLevel`, `Playerbots.MaxAttackers` and `Playerbots.MaxDefenders` configuration values.
+- Behavior: Recruited bots are teleported to spawn points or near the city leader and will be returned to their original location and strategies after the siege ends.
+
+Notes
+-----
+- Ensure the Playerbots module is enabled and configured before enabling playerbot recruitment for sieges.
+- For testing use a small max-attacker/max-defender value to avoid large-scale teleportation of many bots.
+
 Installation
 ------------
 1. **Clone the Module**  

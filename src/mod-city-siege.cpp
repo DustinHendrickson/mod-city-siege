@@ -1125,6 +1125,14 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
             inInstance++;
             continue;
         }
+
+        // Skip bots that are in a party or raid (we want free random bots, not alts)
+        if (Group* group = bot->GetGroup())
+        {
+            // If the bot is in any group (party or raid), skip it
+            inInstance++; // reuse counter for grouped
+            continue;
+        }
             
         eligibleBots.push_back(bot);
     }
@@ -1287,6 +1295,13 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
         if (bot->GetMap()->IsDungeon() || bot->GetMap()->IsBattleground())
         {
             inInstance++;
+            continue;
+        }
+            
+        // Skip bots that are in a party or raid (avoid recruiting alts)
+        if (Group* group = bot->GetGroup())
+        {
+            inInstance++; // reuse counter for grouped
             continue;
         }
             
