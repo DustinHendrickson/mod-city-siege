@@ -48,6 +48,8 @@
 #include "PlayerbotMgr.h"
 #include "RandomPlayerbotMgr.h"
 #include "PlayerbotAI.h"
+#include "AiObjectContext.h"
+#include "TravelMgr.h"
 #endif
 
 using namespace Acore::ChatCommands;
