@@ -1437,8 +1437,15 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
                 TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
                 if (travelTarget)
                 {
-                    WorldPosition dest(city->mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                    travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                    // Create destination position
+                    WorldPosition* destPos = new WorldPosition(city->mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                    
+                    // Create a simple travel destination with 5 yard radius
+                    TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                    siegeDest->addPoint(destPos);
+                    
+                    // Set target with both destination and position
+                    travelTarget->setTarget(siegeDest, destPos);
                     travelTarget->setForced(true);
                 }
                 
@@ -1484,8 +1491,12 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
             if (travelTarget)
             {
-                WorldPosition dest(city->mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                WorldPosition* destPos = new WorldPosition(city->mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                
+                TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                siegeDest->addPoint(destPos);
+                
+                travelTarget->setTarget(siegeDest, destPos);
                 travelTarget->setForced(true);
             }
             
@@ -2292,8 +2303,12 @@ void ProcessBotRespawns(SiegeEvent& event)
                                 TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
                                 if (travelTarget)
                                 {
-                                    WorldPosition dest(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                                    travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                                    WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                                    
+                                    TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                                    siegeDest->addPoint(destPos);
+                                    
+                                    travelTarget->setTarget(siegeDest, destPos);
                                     travelTarget->setForced(true);
                                 }
                                 
@@ -2331,8 +2346,12 @@ void ProcessBotRespawns(SiegeEvent& event)
                             TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
                             if (travelTarget)
                             {
-                                WorldPosition dest(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                                travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                                WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                                
+                                TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                                siegeDest->addPoint(destPos);
+                                
+                                travelTarget->setTarget(siegeDest, destPos);
                                 travelTarget->setForced(true);
                             }
                             
@@ -2414,8 +2433,12 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                 const Waypoint& targetWP = city.waypoints[currentWP];
                 
                 // Set new travel destination
-                WorldPosition dest(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                
+                TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                siegeDest->addPoint(destPos);
+                
+                travelTarget->setTarget(siegeDest, destPos);
                 travelTarget->setForced(true);
             }
         }
@@ -2456,8 +2479,12 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                 const Waypoint& targetWP = city.waypoints[currentWP];
                 
                 // Set new travel destination
-                WorldPosition dest(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                
+                TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                siegeDest->addPoint(destPos);
+                
+                travelTarget->setTarget(siegeDest, destPos);
                 travelTarget->setForced(true);
             }
         }
