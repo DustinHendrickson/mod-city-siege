@@ -1440,6 +1440,9 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             // Enable PvP mode for siege combat
             bot->SetPvP(true);
             
+            // Remove away status to ensure bot is active
+            bot->RemovePlayerFlag(PLAYER_FLAGS_AFK);
+            
             // Enable PvP strategy so bots attack enemy players while traveling
             if (!botAI->HasStrategy("pvp", BOT_STATE_NON_COMBAT))
             {
@@ -1501,6 +1504,9 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             
             // Enable PvP mode for siege combat
             bot->SetPvP(true);
+            
+            // Remove away status to ensure bot is active
+            bot->RemovePlayerFlag(PLAYER_FLAGS_AFK);
             
             // Enable PvP strategy so bots attack enemy players while traveling
             if (!botAI->HasStrategy("pvp", BOT_STATE_NON_COMBAT))
@@ -2298,6 +2304,9 @@ void ProcessBotRespawns(SiegeEvent& event)
                 bot->ResurrectPlayer(1.0f); // Full health and mana
                 bot->SpawnCorpseBones();
                 bot->SaveToDB(false, false);
+                
+                // Remove away status to ensure bot is active
+                bot->RemovePlayerFlag(PLAYER_FLAGS_AFK);
                 
                 // Re-enable PvP flag for continued siege participation
                 bot->SetPvP(true);
