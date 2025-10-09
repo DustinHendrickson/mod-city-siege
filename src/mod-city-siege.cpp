@@ -2424,35 +2424,52 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         
         uint32 currentWP = wpIter->second;
         
-        // Check if bot reached previous waypoint by distance (move toward spawn)
-        if (currentWP > 0)
+        // Always ensure bot has an active travel target if not at final destination
+        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        if (botAI)
         {
-            const Waypoint& targetWP = city.waypoints[currentWP - 1];
-            float dist = bot->GetDistance2d(targetWP.x, targetWP.y);
-            
-            // If bot is within 15 yards of previous waypoint, advance to it
-            if (dist < 15.0f)
+            TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+            if (travelTarget)
             {
-                currentWP--;
-                event.creatureWaypointProgress[botGuid] = currentWP;
-                
-                if (g_DebugMode)
-                {
-                    LOG_INFO("server.loading", "[City Siege] Defender bot {} reached waypoint {}, moving to waypoint {}",
-                             bot->GetName(), currentWP + 1, currentWP);
-                }
-                
-                // Set next waypoint if not at spawn yet
-                if (currentWP > 0)
+                // For defenders: if not at spawn (waypoint 0) and not currently traveling, set next waypoint
+                if (currentWP > 0 && !travelTarget->isTraveling())
                 {
                     const Waypoint& nextWP = city.waypoints[currentWP - 1];
+                    WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
+                    TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                    siegeDest->addPoint(destPos);
+                    travelTarget->setTarget(siegeDest, destPos);
+                    travelTarget->setForced(true);
                     
-                    PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
-                    if (botAI)
+                    if (g_DebugMode)
                     {
-                        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-                        if (travelTarget)
+                        LOG_INFO("server.loading", "[City Siege] Defender bot {} resuming travel to waypoint {}",
+                                 bot->GetName(), currentWP - 1);
+                    }
+                }
+                
+                // Check if bot reached current target waypoint by distance
+                if (currentWP > 0)
+                {
+                    const Waypoint& targetWP = city.waypoints[currentWP - 1];
+                    float dist = bot->GetDistance2d(targetWP.x, targetWP.y);
+                    
+                    // If bot is within 10 yards of target waypoint, advance immediately
+                    if (dist < 10.0f)
+                    {
+                        currentWP--;
+                        event.creatureWaypointProgress[botGuid] = currentWP;
+                        
+                        if (g_DebugMode)
                         {
+                            LOG_INFO("server.loading", "[City Siege] Defender bot {} reached waypoint {}, advancing to waypoint {}",
+                                     bot->GetName(), currentWP + 1, currentWP);
+                        }
+                        
+                        // Immediately set next waypoint if not at spawn
+                        if (currentWP > 0)
+                        {
+                            const Waypoint& nextWP = city.waypoints[currentWP - 1];
                             WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
                             TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
                             siegeDest->addPoint(destPos);
@@ -2479,35 +2496,52 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         
         uint32 currentWP = wpIter->second;
         
-        // Check if bot reached next waypoint by distance (move toward leader)
-        if (currentWP + 1 < city.waypoints.size())
+        // Always ensure bot has an active travel target if not at final destination
+        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        if (botAI)
         {
-            const Waypoint& targetWP = city.waypoints[currentWP + 1];
-            float dist = bot->GetDistance2d(targetWP.x, targetWP.y);
-            
-            // If bot is within 15 yards of next waypoint, advance to it
-            if (dist < 15.0f)
+            TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+            if (travelTarget)
             {
-                currentWP++;
-                event.creatureWaypointProgress[botGuid] = currentWP;
-                
-                if (g_DebugMode)
-                {
-                    LOG_INFO("server.loading", "[City Siege] Attacker bot {} reached waypoint {}, moving to waypoint {}",
-                             bot->GetName(), currentWP - 1, currentWP);
-                }
-                
-                // Set next waypoint if not at leader yet
-                if (currentWP + 1 < city.waypoints.size())
+                // For attackers: if not at final waypoint and not currently traveling, set next waypoint
+                if (currentWP + 1 < city.waypoints.size() && !travelTarget->isTraveling())
                 {
                     const Waypoint& nextWP = city.waypoints[currentWP + 1];
+                    WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
+                    TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                    siegeDest->addPoint(destPos);
+                    travelTarget->setTarget(siegeDest, destPos);
+                    travelTarget->setForced(true);
                     
-                    PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
-                    if (botAI)
+                    if (g_DebugMode)
                     {
-                        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-                        if (travelTarget)
+                        LOG_INFO("server.loading", "[City Siege] Attacker bot {} resuming travel to waypoint {}",
+                                 bot->GetName(), currentWP + 1);
+                    }
+                }
+                
+                // Check if bot reached current target waypoint by distance
+                if (currentWP + 1 < city.waypoints.size())
+                {
+                    const Waypoint& targetWP = city.waypoints[currentWP + 1];
+                    float dist = bot->GetDistance2d(targetWP.x, targetWP.y);
+                    
+                    // If bot is within 10 yards of target waypoint, advance immediately
+                    if (dist < 10.0f)
+                    {
+                        currentWP++;
+                        event.creatureWaypointProgress[botGuid] = currentWP;
+                        
+                        if (g_DebugMode)
                         {
+                            LOG_INFO("server.loading", "[City Siege] Attacker bot {} reached waypoint {}, advancing to waypoint {}",
+                                     bot->GetName(), currentWP - 1, currentWP);
+                        }
+                        
+                        // Immediately set next waypoint if not at leader yet
+                        if (currentWP + 1 < city.waypoints.size())
+                        {
+                            const Waypoint& nextWP = city.waypoints[currentWP + 1];
                             WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
                             TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
                             siegeDest->addPoint(destPos);
