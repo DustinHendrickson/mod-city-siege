@@ -1415,6 +1415,10 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             Player* bot = ObjectAccessor::FindPlayer(botGuid);
             if (!bot || !bot->IsInWorld())
                 continue;
+                
+            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            if (!botAI)
+                continue;
             
             // Enable PvP mode for siege combat
             bot->SetPvP(true);
@@ -1422,15 +1426,29 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             // Initialize waypoint tracking for defenders
             event.creatureWaypointProgress[botGuid] = defenderWaypoint;
             
-            // Move bot toward a waypoint closer to spawn (backward movement)
+            // Move bot toward a waypoint closer to spawn (backward movement) using playerbots travel system
             if (defenderWaypoint > 0)
             {
                 const Waypoint& targetWP = city->waypoints[defenderWaypoint - 1];
-                bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+                
+                // Set travel destination using playerbots travel manager
+                TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+                if (travelTarget)
+                {
+                    WorldPosition dest(city->mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                    travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                    travelTarget->setForced(true);
+                }
+                
+                // Enable travel strategy for proper pathfinding
+                if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
+                {
+                    botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                }
                 
                 if (g_DebugMode)
                 {
-                    LOG_INFO("server.loading", "[City Siege] Defender bot {} flagged for PvP and moving to waypoint {} [{:.2f}, {:.2f}, {:.2f}]",
+                    LOG_INFO("server.loading", "[City Siege] Defender bot {} flagged for PvP and traveling to waypoint {} [{:.2f}, {:.2f}, {:.2f}]",
                              bot->GetName(), defenderWaypoint - 1, targetWP.x, targetWP.y, targetWP.z);
                 }
             }
@@ -1446,6 +1464,10 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             Player* bot = ObjectAccessor::FindPlayer(botGuid);
             if (!bot || !bot->IsInWorld())
                 continue;
+                
+            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            if (!botAI)
+                continue;
             
             // Enable PvP mode for siege combat
             bot->SetPvP(true);
@@ -1453,13 +1475,27 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             // Initialize waypoint tracking for attackers (start at first waypoint)
             event.creatureWaypointProgress[botGuid] = 0;
             
-            // Move bot toward first waypoint
+            // Move bot toward first waypoint using playerbots travel system
             const Waypoint& targetWP = city->waypoints[0];
-            bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+            
+            // Set travel destination using playerbots travel manager
+            TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+            if (travelTarget)
+            {
+                WorldPosition dest(city->mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                travelTarget->setForced(true);
+            }
+            
+            // Enable travel strategy for proper pathfinding
+            if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
+            {
+                botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+            }
             
             if (g_DebugMode)
             {
-                LOG_INFO("server.loading", "[City Siege] Attacker bot {} flagged for PvP and moving to waypoint 0 [{:.2f}, {:.2f}, {:.2f}]",
+                LOG_INFO("server.loading", "[City Siege] Attacker bot {} flagged for PvP and traveling to waypoint 0 [{:.2f}, {:.2f}, {:.2f}]",
                          bot->GetName(), targetWP.x, targetWP.y, targetWP.z);
             }
         }
@@ -2246,7 +2282,24 @@ void ProcessBotRespawns(SiegeEvent& event)
                         if (defenderWaypoint > 0)
                         {
                             const Waypoint& targetWP = city.waypoints[defenderWaypoint - 1];
-                            bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+                            
+                            // Use playerbots travel system for proper pathfinding
+                            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+                            if (botAI)
+                            {
+                                TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+                                if (travelTarget)
+                                {
+                                    WorldPosition dest(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                                    travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                                    travelTarget->setForced(true);
+                                }
+                                
+                                if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
+                                {
+                                    botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                                }
+                            }
                         }
                     }
                     
@@ -2268,7 +2321,24 @@ void ProcessBotRespawns(SiegeEvent& event)
                     {
                         event.creatureWaypointProgress[it->botGuid] = 0;
                         const Waypoint& targetWP = city.waypoints[0];
-                        bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+                        
+                        // Use playerbots travel system for proper pathfinding
+                        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+                        if (botAI)
+                        {
+                            TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+                            if (travelTarget)
+                            {
+                                WorldPosition dest(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                                travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                                travelTarget->setForced(true);
+                            }
+                            
+                            if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
+                            {
+                                botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                            }
+                        }
                     }
                     
                     if (g_DebugMode)
@@ -2325,8 +2395,13 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         
         uint32 currentWP = wpIter->second;
         
-        // Check if bot is idle (reached waypoint)
-        if (!bot->isMoving() && !bot->GetMotionMaster()->empty())
+        // Check if bot is idle (reached waypoint) - check if travel target is null or expired
+        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        if (!botAI)
+            continue;
+            
+        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+        if (travelTarget && !travelTarget->isTraveling())
         {
             // Move to previous waypoint (toward spawn)
             if (currentWP > 0)
@@ -2335,7 +2410,11 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                 event.creatureWaypointProgress[botGuid] = currentWP;
                 
                 const Waypoint& targetWP = city.waypoints[currentWP];
-                bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+                
+                // Set new travel destination
+                WorldPosition dest(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                travelTarget->setForced(true);
             }
         }
     }
@@ -2358,8 +2437,13 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         
         uint32 currentWP = wpIter->second;
         
-        // Check if bot is idle (reached waypoint)
-        if (!bot->isMoving() && !bot->GetMotionMaster()->empty())
+        // Check if bot is idle (reached waypoint) - check if travel target is null or expired
+        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        if (!botAI)
+            continue;
+            
+        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+        if (travelTarget && !travelTarget->isTraveling())
         {
             // Move to next waypoint (toward leader)
             if (currentWP + 1 < city.waypoints.size())
@@ -2368,7 +2452,11 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                 event.creatureWaypointProgress[botGuid] = currentWP;
                 
                 const Waypoint& targetWP = city.waypoints[currentWP];
-                bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+                
+                // Set new travel destination
+                WorldPosition dest(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                travelTarget->setTarget(sTravelMgr->addDestination(dest, "Siege Waypoint", false), &dest);
+                travelTarget->setForced(true);
             }
         }
     }
