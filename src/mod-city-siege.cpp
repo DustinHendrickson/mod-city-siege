@@ -1163,7 +1163,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
             if (botAI->HasStrategy("new rpg", BOT_STATE_NON_COMBAT))
             {
                 returnPos.rpgStrategy = "new rpg";
-                botAI->ResetStrategy("new rpg"); // Remove RPG strategy during siege
+                botAI->ChangeStrategy("-new rpg", BOT_STATE_NON_COMBAT); // Remove RPG strategy during siege
                 if (g_DebugMode)
                 {
                     LOG_INFO("server.loading", "[City Siege] Removed 'new rpg' strategy from defender bot {}", bot->GetName());
@@ -1172,7 +1172,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
             else if (botAI->HasStrategy("rpg", BOT_STATE_NON_COMBAT))
             {
                 returnPos.rpgStrategy = "rpg";
-                botAI->ResetStrategy("rpg"); // Remove RPG strategy during siege
+                botAI->ChangeStrategy("-rpg", BOT_STATE_NON_COMBAT); // Remove RPG strategy during siege
                 if (g_DebugMode)
                 {
                     LOG_INFO("server.loading", "[City Siege] Removed 'rpg' strategy from defender bot {}", bot->GetName());
@@ -1327,7 +1327,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
             if (botAI->HasStrategy("new rpg", BOT_STATE_NON_COMBAT))
             {
                 returnPos.rpgStrategy = "new rpg";
-                botAI->ResetStrategy("new rpg"); // Remove RPG strategy during siege
+                botAI->ChangeStrategy("-new rpg", BOT_STATE_NON_COMBAT); // Remove RPG strategy during siege
                 if (g_DebugMode)
                 {
                     LOG_INFO("server.loading", "[City Siege] Removed 'new rpg' strategy from attacker bot {}", bot->GetName());
@@ -1336,7 +1336,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
             else if (botAI->HasStrategy("rpg", BOT_STATE_NON_COMBAT))
             {
                 returnPos.rpgStrategy = "rpg";
-                botAI->ResetStrategy("rpg"); // Remove RPG strategy during siege
+                botAI->ChangeStrategy("-rpg", BOT_STATE_NON_COMBAT); // Remove RPG strategy during siege
                 if (g_DebugMode)
                 {
                     LOG_INFO("server.loading", "[City Siege] Removed 'rpg' strategy from attacker bot {}", bot->GetName());
@@ -1538,7 +1538,7 @@ void DeactivatePlayerbotsFromSiege(SiegeEvent& event)
             PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
             if (botAI)
             {
-                botAI->ChangeStrategy(returnPos.rpgStrategy, BOT_STATE_NON_COMBAT);
+                botAI->ChangeStrategy("+" + returnPos.rpgStrategy, BOT_STATE_NON_COMBAT);
                 if (g_DebugMode)
                 {
                     LOG_INFO("server.loading", "[City Siege] Restored '{}' strategy to bot {}", 
