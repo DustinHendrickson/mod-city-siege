@@ -44,7 +44,7 @@
 #include <algorithm>
 
 // Conditional include for playerbots module
-#ifdef PLAYERBOT
+#ifdef MOD_PLAYERBOTS
 #include "PlayerbotMgr.h"
 #include "RandomPlayerbotMgr.h"
 #include "PlayerbotAI.h"
@@ -187,7 +187,7 @@ static std::string g_YellsCombat = "Your defenses crumble!;This city will burn!;
 static std::string g_RPScriptsAlliance = "Citizens of {CITY}, your time has come! We march under the banner of the Alliance!;{LEADER}, your people cry out for mercy, but you have shown none to ours!;We have crossed mountains and seas to bring justice to {CITY}. Surrender now, or face annihilation!;The Light guides our blades, and the might of Stormwind stands behind us. Your defenses will crumble!;This ends today! {LEADER}, come forth and face the Alliance, or watch {CITY} burn!|The Alliance has gathered its greatest heroes for this assault on {CITY}. You cannot stand against us!;{LEADER}, your leadership has made the Horde enemies it cannot defeat! We will tear down these walls!;Too long have you raided our villages and slaughtered our people. Today, we bring the war to {CITY}!;Your shamans' magic cannot protect you. Our priests and paladins have blessed this army!;Prepare to face the wrath of the Alliance! {LEADER}, your reign over {CITY} ends here and now!|By order of King Varian Wrynn, {CITY} is to be taken! Resistance is futile!;{LEADER}! Come forth and face us, or hide like a coward while your people suffer!;The Horde's reign of terror ends here at {CITY}. We will show no mercy to those who threaten peace!;Our siege engines are ready. The walls of {CITY} mean nothing to the might of the Alliance!;For every innocent killed by Horde aggression, {LEADER}, you will pay with your life!";
 static std::string g_RPScriptsHorde = "The Horde has come to claim {CITY}! Your precious Alliance ends today!;{LEADER}, you have oppressed our people for the last time! Come out and face your fate!;We are not savages - we are warriors! And today, we show {CITY} what true strength means!;Your guards are weak. Your walls are weak. {LEADER} hides in the throne room while we stand at the gates!;Blood and honor! Today we prove that the Horde is the superior force in Azeroth!|Citizens of {CITY}, flee while you can! We have come for your leaders, not for you!;{LEADER}! Your reign of tyranny over {CITY} ends today! The throne will belong to the Horde!;You call us monsters, but it is YOU who started this war! We finish it today at {CITY}!;The spirits of our ancestors guide us. No amount of Light magic will save {CITY} from our wrath!;Lok'tar Ogar! {LEADER}, today you fall, and the Horde claims {CITY}!|The Warchief has sent his finest warriors to end Alliance tyranny at {CITY} once and for all!;Your pitiful city guard cannot stop the Horde war machine! {LEADER}, your time has come!;We march for honor! We march for glory! We march to prove that the Horde will take {CITY}!;Every siege tower, every warrior, every drop of blood spilled today at {CITY} - it all leads to YOUR defeat!;{LEADER}, the Alliance has grown soft under your leadership. Today at {CITY}, the Horde reminds you why you should fear us!";
 
-#ifdef PLAYERBOT
+#ifdef MOD_PLAYERBOTS
 // Playerbot Integration
 static bool g_PlayerbotsEnabled = false;
 static uint32 g_PlayerbotsMinLevel = 70;
@@ -402,7 +402,7 @@ void LoadCitySiegeConfiguration()
     g_RPScriptsHorde = sConfigMgr->GetOption<std::string>("CitySiege.RP.Horde", 
         "The Horde has come to claim {CITY}! Your precious Alliance ends today!;{LEADER}, you have oppressed our people for the last time! Come out and face your fate!;We are not savages - we are warriors! And today, we show {CITY} what true strength means!;Your guards are weak. Your walls are weak. {LEADER} hides in the throne room while we stand at the gates!;Blood and honor! Today we prove that the Horde is the superior force in Azeroth!|Citizens of {CITY}, flee while you can! We have come for your leaders, not for you!;{LEADER}! Your reign of tyranny over {CITY} ends today! The throne will belong to the Horde!;You call us monsters, but it is YOU who started this war! We finish it today at {CITY}!;The spirits of our ancestors guide us. No amount of Light magic will save {CITY} from our wrath!;Lok'tar Ogar! {LEADER}, today you fall, and the Horde claims {CITY}!|The Warchief has sent his finest warriors to end Alliance tyranny at {CITY} once and for all!;Your pitiful city guard cannot stop the Horde war machine! {LEADER}, your time has come!;We march for honor! We march for glory! We march to prove that the Horde will take {CITY}!;Every siege tower, every warrior, every drop of blood spilled today at {CITY} - it all leads to YOUR defeat!;{LEADER}, the Alliance has grown soft under your leadership. Today at {CITY}, the Horde reminds you why you should fear us!");
 
-#ifdef PLAYERBOT
+#ifdef MOD_PLAYERBOTS
     // Playerbot Integration
     g_PlayerbotsEnabled = sConfigMgr->GetOption<bool>("CitySiege.Playerbots.Enabled", false);
     g_PlayerbotsMinLevel = sConfigMgr->GetOption<uint32>("CitySiege.Playerbots.MinLevel", 70);
@@ -1037,7 +1037,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city)
 {
     std::vector<ObjectGuid> recruitedBots;
     
-#ifdef PLAYERBOT
+#ifdef MOD_PLAYERBOTS
     if (!g_PlayerbotsEnabled)
     {
         return recruitedBots;
@@ -1120,7 +1120,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city)
 {
     std::vector<ObjectGuid> recruitedBots;
     
-#ifdef PLAYERBOT
+#ifdef MOD_PLAYERBOTS
     if (!g_PlayerbotsEnabled)
     {
         return recruitedBots;
@@ -1207,11 +1207,11 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city)
 /**
  * @brief Activates siege combat mode for playerbots
  * @param event The siege event
- * Makes defender bots attack siege NPCs and attacker bots help siege NPCs
+ * Puts bots into combat mode for siege engagement
  */
 void ActivatePlayerbotsForSiege(SiegeEvent& event)
 {
-#ifdef PLAYERBOT
+#ifdef MOD_PLAYERBOTS
     if (!g_PlayerbotsEnabled)
     {
         return;
@@ -1230,7 +1230,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
     if (!city)
         return;
     
-    // Make defender bots aggressive towards attacker NPCs
+    // Activate defender bots
     for (const auto& botGuid : event.defenderBots)
     {
         Player* bot = ObjectAccessor::FindPlayer(botGuid);
@@ -1240,24 +1240,17 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
         PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
         if (!botAI)
             continue;
-            
-        // Make bot help defend by attacking nearby siege NPCs
-        // The bot's existing combat AI will handle targeting
-        for (const auto& creatureGuid : event.spawnedCreatures)
+        
+        // Put bot in combat state so they'll engage nearby enemies
+        bot->SetInCombatState(true);
+        
+        if (g_DebugMode)
         {
-            Creature* creature = ObjectAccessor::GetCreature(*bot, creatureGuid);
-            if (creature && creature->IsAlive() && bot->IsWithinDist(creature, 40.0f))
-            {
-                if (creature->IsHostileTo(bot))
-                {
-                    // Bot will automatically engage hostile targets
-                    break;
-                }
-            }
+            LOG_INFO("server.loading", "[City Siege] Activated defender bot {}", bot->GetName());
         }
     }
     
-    // Make attacker bots aggressive towards defenders and city leader
+    // Activate attacker bots
     for (const auto& botGuid : event.attackerBots)
     {
         Player* bot = ObjectAccessor::FindPlayer(botGuid);
@@ -1267,34 +1260,13 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
         PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
         if (!botAI)
             continue;
-            
-        // Attacker bots will help siege NPCs attack defenders
-        // Check for city leader
-        if (!event.cityLeaderGuid.IsEmpty())
-        {
-            Creature* leader = ObjectAccessor::GetCreature(*bot, event.cityLeaderGuid);
-            if (leader && leader->IsAlive() && bot->IsWithinDist(leader, 40.0f))
-            {
-                if (!leader->IsHostileTo(bot))
-                {
-                    // Make leader hostile to attacker bot
-                    leader->SetInCombatWith(bot);
-                }
-            }
-        }
         
-        // Check for defender NPCs
-        for (const auto& defenderGuid : event.spawnedDefenders)
+        // Put bot in combat state so they'll engage nearby enemies
+        bot->SetInCombatState(true);
+        
+        if (g_DebugMode)
         {
-            Creature* defender = ObjectAccessor::GetCreature(*bot, defenderGuid);
-            if (defender && defender->IsAlive() && bot->IsWithinDist(defender, 40.0f))
-            {
-                if (!defender->IsHostileTo(bot))
-                {
-                    // Make defender hostile to attacker bot
-                    defender->SetInCombatWith(bot);
-                }
-            }
+            LOG_INFO("server.loading", "[City Siege] Activated attacker bot {}", bot->GetName());
         }
     }
     
@@ -1309,21 +1281,23 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
 /**
  * @brief Deactivates siege combat mode for playerbots and releases them
  * @param event The siege event
+ * Stops combat and releases all participating bots
  */
 void DeactivatePlayerbotsFromSiege(SiegeEvent& event)
 {
-#ifdef PLAYERBOT
+#ifdef MOD_PLAYERBOTS
     if (!g_PlayerbotsEnabled)
     {
         return;
     }
     
-    // Release all bots from combat and let them resume normal AI
+    // Release defender bots from combat
     for (const auto& botGuid : event.defenderBots)
     {
         Player* bot = ObjectAccessor::FindPlayer(botGuid);
         if (bot && bot->IsInWorld())
         {
+            // Stop combat
             bot->CombatStop(true);
             
             if (g_DebugMode)
@@ -1333,11 +1307,13 @@ void DeactivatePlayerbotsFromSiege(SiegeEvent& event)
         }
     }
     
+    // Release attacker bots from combat
     for (const auto& botGuid : event.attackerBots)
     {
         Player* bot = ObjectAccessor::FindPlayer(botGuid);
         if (bot && bot->IsInWorld())
         {
+            // Stop combat
             bot->CombatStop(true);
             
             if (g_DebugMode)
@@ -1552,7 +1528,7 @@ void StartSiegeEvent(int targetCityId = -1)
 
     g_ActiveSieges.push_back(newEvent);
 
-#ifdef PLAYERBOT
+#ifdef MOD_PLAYERBOTS
     // Recruit playerbots if enabled
     if (g_PlayerbotsEnabled)
     {
@@ -1977,7 +1953,7 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             // Pick a random creature to say the current line
                             uint32 randomCreatureIndex = urand(0, rpCreatures.size() - 1);
                             Creature* yellingCreature = rpCreatures[randomCreatureIndex];
-                            yellingCreature->MonsterYell(event.activeRPScript[event.rpScriptIndex], LANG_UNIVERSAL, yellingCreature);
+                            yellingCreature->Yell(event.activeRPScript[event.rpScriptIndex], LANG_UNIVERSAL);
                             
                             if (g_DebugMode)
                             {
