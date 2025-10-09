@@ -2484,11 +2484,6 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                         currentWP--;
                         event.creatureWaypointProgress[botGuid] = currentWP;
                         
-                        if (g_DebugMode)
-                        {
-                            LOG_INFO("server.loading", "[City Siege] Defender bot {} reached waypoint {}, advancing to waypoint {}",
-                                     bot->GetName(), currentWP + 1, currentWP);
-                        }
                         
                         // Immediately set next waypoint if not at spawn
                         if (currentWP > 0)
@@ -2550,12 +2545,6 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                     {
                         currentWP++;
                         event.creatureWaypointProgress[botGuid] = currentWP;
-                        
-                        if (g_DebugMode)
-                        {
-                            LOG_INFO("server.loading", "[City Siege] Attacker bot {} reached waypoint {}, advancing to waypoint {}",
-                                     bot->GetName(), currentWP - 1, currentWP);
-                        }
                         
                         // Immediately set next waypoint if not at leader yet
                         if (currentWP + 1 < city.waypoints.size())
