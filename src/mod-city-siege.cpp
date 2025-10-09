@@ -2292,7 +2292,7 @@ void ProcessBotRespawns(SiegeEvent& event)
         if (currentTime - it->deathTime >= g_PlayerbotsRespawnDelay)
         {
             Player* bot = ObjectAccessor::FindPlayer(it->botGuid);
-            if (bot && bot->IsInWorld())
+            if (bot && bot->IsInWorld() && !bot->IsAlive())
             {
                 // Resurrect the bot
                 bot->ResurrectPlayer(1.0f); // Full health and mana
@@ -2398,10 +2398,15 @@ void ProcessBotRespawns(SiegeEvent& event)
                 
                 // Put back into combat state
                 bot->SetInCombatState(true);
+                
+                // Remove from respawn queue
+                it = event.deadBots.erase(it);
             }
-            
-            // Remove from respawn queue
-            it = event.deadBots.erase(it);
+            else
+            {
+                // Bot exists and is alive, just remove from queue
+                it = event.deadBots.erase(it);
+            }
         }
         else
         {
