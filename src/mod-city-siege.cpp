@@ -1425,6 +1425,12 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             // Enable PvP mode for siege combat
             bot->SetPvP(true);
             
+            // Enable PvP strategy so bots attack enemy players while traveling
+            if (!botAI->HasStrategy("pvp", BOT_STATE_NON_COMBAT))
+            {
+                botAI->ChangeStrategy("+pvp", BOT_STATE_NON_COMBAT);
+            }
+            
             // Initialize waypoint tracking for defenders
             event.creatureWaypointProgress[botGuid] = defenderWaypoint;
             
@@ -1480,6 +1486,12 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             
             // Enable PvP mode for siege combat
             bot->SetPvP(true);
+            
+            // Enable PvP strategy so bots attack enemy players while traveling
+            if (!botAI->HasStrategy("pvp", BOT_STATE_NON_COMBAT))
+            {
+                botAI->ChangeStrategy("+pvp", BOT_STATE_NON_COMBAT);
+            }
             
             // Initialize waypoint tracking for attackers (start at first waypoint)
             event.creatureWaypointProgress[botGuid] = 0;
@@ -2405,10 +2417,6 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         if (!bot || !bot->IsInWorld() || !bot->IsAlive())
             continue;
         
-        // Skip if bot is in combat - let playerbots handle their own combat AI
-        if (bot->IsInCombat())
-            continue;
-        
         // Check if bot has reached their waypoint
         auto wpIter = event.creatureWaypointProgress.find(botGuid);
         if (wpIter == event.creatureWaypointProgress.end())
@@ -2416,30 +2424,43 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         
         uint32 currentWP = wpIter->second;
         
-        // Check if bot is idle (reached waypoint) - check if travel target is null or expired
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
-        if (!botAI)
-            continue;
-            
-        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-        if (travelTarget && !travelTarget->isTraveling())
+        // Check if bot reached previous waypoint by distance (move toward spawn)
+        if (currentWP > 0)
         {
-            // Move to previous waypoint (toward spawn)
-            if (currentWP > 0)
+            const Waypoint& targetWP = city.waypoints[currentWP - 1];
+            float dist = bot->GetDistance2d(targetWP.x, targetWP.y);
+            
+            // If bot is within 15 yards of previous waypoint, advance to it
+            if (dist < 15.0f)
             {
                 currentWP--;
                 event.creatureWaypointProgress[botGuid] = currentWP;
                 
-                const Waypoint& targetWP = city.waypoints[currentWP];
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Defender bot {} reached waypoint {}, moving to waypoint {}",
+                             bot->GetName(), currentWP + 1, currentWP);
+                }
                 
-                // Set new travel destination
-                WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                
-                TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                siegeDest->addPoint(destPos);
-                
-                travelTarget->setTarget(siegeDest, destPos);
-                travelTarget->setForced(true);
+                // Set next waypoint if not at spawn yet
+                if (currentWP > 0)
+                {
+                    const Waypoint& nextWP = city.waypoints[currentWP - 1];
+                    
+                    PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+                    if (botAI)
+                    {
+                        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+                        if (travelTarget)
+                        {
+                            WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
+                            TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                            siegeDest->addPoint(destPos);
+                            travelTarget->setTarget(siegeDest, destPos);
+                            travelTarget->setForced(true);
+                        }
+                    }
+                }
             }
         }
     }
@@ -2451,10 +2472,6 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         if (!bot || !bot->IsInWorld() || !bot->IsAlive())
             continue;
         
-        // Skip if bot is in combat - let playerbots handle their own combat AI
-        if (bot->IsInCombat())
-            continue;
-        
         // Check if bot has reached their waypoint
         auto wpIter = event.creatureWaypointProgress.find(botGuid);
         if (wpIter == event.creatureWaypointProgress.end())
@@ -2462,30 +2479,43 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         
         uint32 currentWP = wpIter->second;
         
-        // Check if bot is idle (reached waypoint) - check if travel target is null or expired
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
-        if (!botAI)
-            continue;
-            
-        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-        if (travelTarget && !travelTarget->isTraveling())
+        // Check if bot reached next waypoint by distance (move toward leader)
+        if (currentWP + 1 < city.waypoints.size())
         {
-            // Move to next waypoint (toward leader)
-            if (currentWP + 1 < city.waypoints.size())
+            const Waypoint& targetWP = city.waypoints[currentWP + 1];
+            float dist = bot->GetDistance2d(targetWP.x, targetWP.y);
+            
+            // If bot is within 15 yards of next waypoint, advance to it
+            if (dist < 15.0f)
             {
                 currentWP++;
                 event.creatureWaypointProgress[botGuid] = currentWP;
                 
-                const Waypoint& targetWP = city.waypoints[currentWP];
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Attacker bot {} reached waypoint {}, moving to waypoint {}",
+                             bot->GetName(), currentWP - 1, currentWP);
+                }
                 
-                // Set new travel destination
-                WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                
-                TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                siegeDest->addPoint(destPos);
-                
-                travelTarget->setTarget(siegeDest, destPos);
-                travelTarget->setForced(true);
+                // Set next waypoint if not at leader yet
+                if (currentWP + 1 < city.waypoints.size())
+                {
+                    const Waypoint& nextWP = city.waypoints[currentWP + 1];
+                    
+                    PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+                    if (botAI)
+                    {
+                        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+                        if (travelTarget)
+                        {
+                            WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
+                            TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                            siegeDest->addPoint(destPos);
+                            travelTarget->setTarget(siegeDest, destPos);
+                            travelTarget->setForced(true);
+                        }
+                    }
+                }
             }
         }
     }
