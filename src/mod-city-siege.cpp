@@ -281,6 +281,7 @@ struct SiegeEvent
         ObjectGuid botGuid;
         uint32 mapId;
         float x, y, z, o;
+        bool wasPvPFlagged; // Store original PvP status
     };
     std::vector<BotReturnPosition> botReturnPositions; // Original positions to return bots to
     
@@ -1067,37 +1068,68 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
     // Get the defending faction for this city
     TeamId defendingFaction = (city.id <= CITY_EXODAR) ? TEAM_ALLIANCE : TEAM_HORDE;
     
+    if (g_DebugMode)
+    {
+        LOG_INFO("server.loading", "[City Siege] Recruiting defenders for {} - Need faction: {} ({})", 
+                 city.name, defendingFaction == TEAM_HORDE ? "HORDE" : "ALLIANCE", static_cast<int>(defendingFaction));
+    }
+    
     // Get all playerbots from RandomPlayerbotMgr
     auto allBots = sRandomPlayerbotMgr->GetAllBots();
     std::vector<Player*> eligibleBots;
     
+    uint32 totalBots = 0, wrongFaction = 0, tooLowLevel = 0, notAlive = 0, inCombat = 0, inInstance = 0;
+    
     for (auto& pair : allBots)
     {
         Player* bot = pair.second;
+        totalBots++;
+        
         if (!bot || !bot->IsInWorld())
             continue;
             
         // Check if bot is correct faction
         if (bot->GetTeamId() != defendingFaction)
+        {
+            wrongFaction++;
             continue;
+        }
             
         // Check level requirement
         if (bot->GetLevel() < g_PlayerbotsMinLevel)
+        {
+            tooLowLevel++;
             continue;
+        }
             
         // Check if alive
         if (!bot->IsAlive())
+        {
+            notAlive++;
             continue;
+        }
             
         // Check if not in combat
         if (bot->IsInCombat())
+        {
+            inCombat++;
             continue;
+        }
             
         // Check if not in instance/battleground
         if (bot->GetMap()->IsDungeon() || bot->GetMap()->IsBattleground())
+        {
+            inInstance++;
             continue;
+        }
             
         eligibleBots.push_back(bot);
+    }
+    
+    if (g_DebugMode)
+    {
+        LOG_INFO("server.loading", "[City Siege] Defender recruitment stats - Total bots: {}, Wrong faction: {}, Too low level: {}, Dead: {}, In combat: {}, In instance: {}, Eligible: {}", 
+                 totalBots, wrongFaction, tooLowLevel, notAlive, inCombat, inInstance, eligibleBots.size());
     }
     
     // Shuffle and take up to max defenders
@@ -1112,7 +1144,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
     // Store original positions and teleport bots to city center
     for (Player* bot : eligibleBots)
     {
-        // Store original position for return later
+        // Store original position and PvP status for return later
         SiegeEvent::BotReturnPosition returnPos;
         returnPos.botGuid = bot->GetGUID();
         returnPos.mapId = bot->GetMapId();
@@ -1120,6 +1152,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
         returnPos.y = bot->GetPositionY();
         returnPos.z = bot->GetPositionZ();
         returnPos.o = bot->GetOrientation();
+        returnPos.wasPvPFlagged = bot->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP); // Store original PvP status
         event.botReturnPositions.push_back(returnPos);
         
         // Randomize position within ~10 yards of the leader
@@ -1169,37 +1202,68 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
     // Get the attacking faction (opposite of defending)
     TeamId attackingFaction = (city.id <= CITY_EXODAR) ? TEAM_HORDE : TEAM_ALLIANCE;
     
+    if (g_DebugMode)
+    {
+        LOG_INFO("server.loading", "[City Siege] Recruiting attackers for {} - Need faction: {} ({})", 
+                 city.name, attackingFaction == TEAM_HORDE ? "HORDE" : "ALLIANCE", static_cast<int>(attackingFaction));
+    }
+    
     // Get all playerbots from RandomPlayerbotMgr
     auto allBots = sRandomPlayerbotMgr->GetAllBots();
     std::vector<Player*> eligibleBots;
     
+    uint32 totalBots = 0, wrongFaction = 0, tooLowLevel = 0, notAlive = 0, inCombat = 0, inInstance = 0;
+    
     for (auto& pair : allBots)
     {
         Player* bot = pair.second;
+        totalBots++;
+        
         if (!bot || !bot->IsInWorld())
             continue;
             
         // Check if bot is correct faction
         if (bot->GetTeamId() != attackingFaction)
+        {
+            wrongFaction++;
             continue;
+        }
             
         // Check level requirement
         if (bot->GetLevel() < g_PlayerbotsMinLevel)
+        {
+            tooLowLevel++;
             continue;
+        }
             
         // Check if alive
         if (!bot->IsAlive())
+        {
+            notAlive++;
             continue;
+        }
             
         // Check if not in combat
         if (bot->IsInCombat())
+        {
+            inCombat++;
             continue;
+        }
             
         // Check if not in instance/battleground
         if (bot->GetMap()->IsDungeon() || bot->GetMap()->IsBattleground())
+        {
+            inInstance++;
             continue;
+        }
             
         eligibleBots.push_back(bot);
+    }
+    
+    if (g_DebugMode)
+    {
+        LOG_INFO("server.loading", "[City Siege] Attacker recruitment stats - Total bots: {}, Wrong faction: {}, Too low level: {}, Dead: {}, In combat: {}, In instance: {}, Eligible: {}", 
+                 totalBots, wrongFaction, tooLowLevel, notAlive, inCombat, inInstance, eligibleBots.size());
     }
     
     // Shuffle and take up to max attackers
@@ -1214,7 +1278,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
     // Store original positions and teleport bots to spawn point (randomized within radius)
     for (Player* bot : eligibleBots)
     {
-        // Store original position for return later
+        // Store original position and PvP status for return later
         SiegeEvent::BotReturnPosition returnPos;
         returnPos.botGuid = bot->GetGUID();
         returnPos.mapId = bot->GetMapId();
@@ -1222,6 +1286,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
         returnPos.y = bot->GetPositionY();
         returnPos.z = bot->GetPositionZ();
         returnPos.o = bot->GetOrientation();
+        returnPos.wasPvPFlagged = bot->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP); // Store original PvP status
         event.botReturnPositions.push_back(returnPos);
         
         // Randomize position within ~10 yards of the spawn point
@@ -1255,7 +1320,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
 /**
  * @brief Activates siege combat mode for playerbots
  * @param event The siege event
- * Puts bots into combat mode for siege engagement
+ * Puts bots into combat mode and gives them initial movement orders
  */
 void ActivatePlayerbotsForSiege(SiegeEvent& event)
 {
@@ -1278,43 +1343,64 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
     if (!city)
         return;
     
-    // Activate defender bots
-    for (const auto& botGuid : event.defenderBots)
+    // Activate defender bots - move them toward spawn to intercept attackers
+    if (!city->waypoints.empty())
     {
-        Player* bot = ObjectAccessor::FindPlayer(botGuid);
-        if (!bot || !bot->IsInWorld())
-            continue;
-            
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
-        if (!botAI)
-            continue;
+        // Defenders start at leader and move backward along waypoints toward spawn
+        size_t defenderWaypoint = city->waypoints.size() - 1; // Start at last waypoint (near leader)
         
-        // Put bot in combat state so they'll engage nearby enemies
-        bot->SetInCombatState(true);
-        
-        if (g_DebugMode)
+        for (const auto& botGuid : event.defenderBots)
         {
-            LOG_INFO("server.loading", "[City Siege] Activated defender bot {}", bot->GetName());
+            Player* bot = ObjectAccessor::FindPlayer(botGuid);
+            if (!bot || !bot->IsInWorld())
+                continue;
+            
+            // Enable PvP mode for siege combat
+            bot->SetPvP(true);
+            
+            // Initialize waypoint tracking for defenders
+            event.creatureWaypointProgress[botGuid] = defenderWaypoint;
+            
+            // Move bot toward a waypoint closer to spawn (backward movement)
+            if (defenderWaypoint > 0)
+            {
+                const Waypoint& targetWP = city->waypoints[defenderWaypoint - 1];
+                bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Defender bot {} flagged for PvP and moving to waypoint {} [{:.2f}, {:.2f}, {:.2f}]",
+                             bot->GetName(), defenderWaypoint - 1, targetWP.x, targetWP.y, targetWP.z);
+                }
+            }
         }
     }
     
-    // Activate attacker bots
-    for (const auto& botGuid : event.attackerBots)
+    // Activate attacker bots - move them toward leader along waypoints
+    if (!city->waypoints.empty())
     {
-        Player* bot = ObjectAccessor::FindPlayer(botGuid);
-        if (!bot || !bot->IsInWorld())
-            continue;
-            
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
-        if (!botAI)
-            continue;
-        
-        // Put bot in combat state so they'll engage nearby enemies
-        bot->SetInCombatState(true);
-        
-        if (g_DebugMode)
+        // Attackers start at spawn and move forward along waypoints toward leader
+        for (const auto& botGuid : event.attackerBots)
         {
-            LOG_INFO("server.loading", "[City Siege] Activated attacker bot {}", bot->GetName());
+            Player* bot = ObjectAccessor::FindPlayer(botGuid);
+            if (!bot || !bot->IsInWorld())
+                continue;
+            
+            // Enable PvP mode for siege combat
+            bot->SetPvP(true);
+            
+            // Initialize waypoint tracking for attackers (start at first waypoint)
+            event.creatureWaypointProgress[botGuid] = 0;
+            
+            // Move bot toward first waypoint
+            const Waypoint& targetWP = city->waypoints[0];
+            bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+            
+            if (g_DebugMode)
+            {
+                LOG_INFO("server.loading", "[City Siege] Attacker bot {} flagged for PvP and moving to waypoint 0 [{:.2f}, {:.2f}, {:.2f}]",
+                         bot->GetName(), targetWP.x, targetWP.y, targetWP.z);
+            }
         }
     }
     
@@ -1382,13 +1468,16 @@ void DeactivatePlayerbotsFromSiege(SiegeEvent& event)
         // Stop combat first
         bot->CombatStop(true);
         
+        // Restore original PvP flag status
+        bot->SetPvP(returnPos.wasPvPFlagged);
+        
         // Teleport back to original position
         bot->TeleportTo(returnPos.mapId, returnPos.x, returnPos.y, returnPos.z, returnPos.o);
         
         if (g_DebugMode)
         {
-            LOG_INFO("server.loading", "[City Siege] Returned bot {} to original location (map {} at [{:.2f}, {:.2f}, {:.2f}])", 
-                     bot->GetName(), returnPos.mapId, returnPos.x, returnPos.y, returnPos.z);
+            LOG_INFO("server.loading", "[City Siege] Returned bot {} to original location (map {} at [{:.2f}, {:.2f}, {:.2f}]) and restored PvP flag to {}", 
+                     bot->GetName(), returnPos.mapId, returnPos.x, returnPos.y, returnPos.z, returnPos.wasPvPFlagged ? "ON" : "OFF");
         }
     }
     
@@ -2058,6 +2147,9 @@ void ProcessBotRespawns(SiegeEvent& event)
                 bot->SpawnCorpseBones();
                 bot->SaveToDB(false, false);
                 
+                // Re-enable PvP flag for continued siege participation
+                bot->SetPvP(true);
+                
                 // Teleport to appropriate spawn location with randomization
                 float angle = frand(0.0f, 2.0f * M_PI);
                 float distance = frand(0.0f, 10.0f);
@@ -2068,6 +2160,19 @@ void ProcessBotRespawns(SiegeEvent& event)
                     float respawnX = city.leaderX + distance * std::cos(angle);
                     float respawnY = city.leaderY + distance * std::sin(angle);
                     bot->TeleportTo(city.mapId, respawnX, respawnY, city.leaderZ, 0.0f);
+                    
+                    // Restart waypoint movement for defenders (move toward spawn)
+                    if (!city.waypoints.empty())
+                    {
+                        size_t defenderWaypoint = city.waypoints.size() - 1;
+                        event.creatureWaypointProgress[it->botGuid] = defenderWaypoint;
+                        
+                        if (defenderWaypoint > 0)
+                        {
+                            const Waypoint& targetWP = city.waypoints[defenderWaypoint - 1];
+                            bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+                        }
+                    }
                     
                     if (g_DebugMode)
                     {
@@ -2081,6 +2186,14 @@ void ProcessBotRespawns(SiegeEvent& event)
                     float respawnX = city.spawnX + distance * std::cos(angle);
                     float respawnY = city.spawnY + distance * std::sin(angle);
                     bot->TeleportTo(city.mapId, respawnX, respawnY, city.spawnZ, 0.0f);
+                    
+                    // Restart waypoint movement for attackers (move toward leader)
+                    if (!city.waypoints.empty())
+                    {
+                        event.creatureWaypointProgress[it->botGuid] = 0;
+                        const Waypoint& targetWP = city.waypoints[0];
+                        bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+                    }
                     
                     if (g_DebugMode)
                     {
@@ -2099,6 +2212,88 @@ void ProcessBotRespawns(SiegeEvent& event)
         else
         {
             ++it;
+        }
+    }
+}
+
+/**
+ * @brief Updates bot waypoint movement during siege
+ * @param event The siege event
+ * Moves bots along waypoints when they reach their destination
+ */
+void UpdateBotWaypointMovement(SiegeEvent& event)
+{
+    if (!g_PlayerbotsEnabled)
+        return;
+        
+    const CityData& city = g_Cities[event.cityId];
+    
+    if (city.waypoints.empty())
+        return;
+    
+    // Update defender bot movement (move backward along waypoints toward spawn)
+    for (const auto& botGuid : event.defenderBots)
+    {
+        Player* bot = ObjectAccessor::FindPlayer(botGuid);
+        if (!bot || !bot->IsInWorld() || !bot->IsAlive())
+            continue;
+        
+        // Skip if bot is in combat - let playerbots handle their own combat AI
+        if (bot->IsInCombat())
+            continue;
+        
+        // Check if bot has reached their waypoint
+        auto wpIter = event.creatureWaypointProgress.find(botGuid);
+        if (wpIter == event.creatureWaypointProgress.end())
+            continue;
+        
+        uint32 currentWP = wpIter->second;
+        
+        // Check if bot is idle (reached waypoint)
+        if (!bot->IsMoving() && !bot->GetMotionMaster()->empty())
+        {
+            // Move to previous waypoint (toward spawn)
+            if (currentWP > 0)
+            {
+                currentWP--;
+                event.creatureWaypointProgress[botGuid] = currentWP;
+                
+                const Waypoint& targetWP = city.waypoints[currentWP];
+                bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+            }
+        }
+    }
+    
+    // Update attacker bot movement (move forward along waypoints toward leader)
+    for (const auto& botGuid : event.attackerBots)
+    {
+        Player* bot = ObjectAccessor::FindPlayer(botGuid);
+        if (!bot || !bot->IsInWorld() || !bot->IsAlive())
+            continue;
+        
+        // Skip if bot is in combat - let playerbots handle their own combat AI
+        if (bot->IsInCombat())
+            continue;
+        
+        // Check if bot has reached their waypoint
+        auto wpIter = event.creatureWaypointProgress.find(botGuid);
+        if (wpIter == event.creatureWaypointProgress.end())
+            continue;
+        
+        uint32 currentWP = wpIter->second;
+        
+        // Check if bot is idle (reached waypoint)
+        if (!bot->IsMoving() && !bot->GetMotionMaster()->empty())
+        {
+            // Move to next waypoint (toward leader)
+            if (currentWP + 1 < city.waypoints.size())
+            {
+                currentWP++;
+                event.creatureWaypointProgress[botGuid] = currentWP;
+                
+                const Waypoint& targetWP = city.waypoints[currentWP];
+                bot->GetMotionMaster()->MovePoint(0, targetWP.x, targetWP.y, targetWP.z);
+            }
         }
     }
 }
@@ -3127,6 +3322,7 @@ void UpdateSiegeEvents(uint32 /*diff*/)
         {
             CheckBotDeaths(event);
             ProcessBotRespawns(event);
+            UpdateBotWaypointMovement(event);
         }
 #endif
 
