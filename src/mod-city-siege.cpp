@@ -1152,7 +1152,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
         returnPos.y = bot->GetPositionY();
         returnPos.z = bot->GetPositionZ();
         returnPos.o = bot->GetOrientation();
-        returnPos.wasPvPFlagged = bot->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP); // Store original PvP status
+        returnPos.wasPvPFlagged = bot->IsPvP(); // Store original PvP status
         event.botReturnPositions.push_back(returnPos);
         
         // Randomize position within ~10 yards of the leader
@@ -1286,7 +1286,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
         returnPos.y = bot->GetPositionY();
         returnPos.z = bot->GetPositionZ();
         returnPos.o = bot->GetOrientation();
-        returnPos.wasPvPFlagged = bot->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP); // Store original PvP status
+        returnPos.wasPvPFlagged = bot->IsPvP(); // Store original PvP status
         event.botReturnPositions.push_back(returnPos);
         
         // Randomize position within ~10 yards of the spawn point
@@ -2250,7 +2250,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         uint32 currentWP = wpIter->second;
         
         // Check if bot is idle (reached waypoint)
-        if (!bot->IsMoving() && !bot->GetMotionMaster()->empty())
+        if (!bot->isMoving() && !bot->GetMotionMaster()->empty())
         {
             // Move to previous waypoint (toward spawn)
             if (currentWP > 0)
@@ -2283,7 +2283,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         uint32 currentWP = wpIter->second;
         
         // Check if bot is idle (reached waypoint)
-        if (!bot->IsMoving() && !bot->GetMotionMaster()->empty())
+        if (!bot->isMoving() && !bot->GetMotionMaster()->empty())
         {
             // Move to next waypoint (toward leader)
             if (currentWP + 1 < city.waypoints.size())
