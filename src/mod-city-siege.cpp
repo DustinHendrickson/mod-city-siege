@@ -2470,11 +2470,6 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                     travelTarget->setTarget(siegeDest, destPos);
                     travelTarget->setForced(true);
                     
-                    if (g_DebugMode)
-                    {
-                        LOG_INFO("server.loading", "[City Siege] Defender bot {} resuming travel to waypoint {}",
-                                 bot->GetName(), currentWP - 1);
-                    }
                 }
                 
                 // Check if bot reached current target waypoint by distance
@@ -2541,12 +2536,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                     siegeDest->addPoint(destPos);
                     travelTarget->setTarget(siegeDest, destPos);
                     travelTarget->setForced(true);
-                    
-                    if (g_DebugMode)
-                    {
-                        LOG_INFO("server.loading", "[City Siege] Attacker bot {} resuming travel to waypoint {}",
-                                 bot->GetName(), currentWP + 1);
-                    }
+
                 }
                 
                 // Check if bot reached current target waypoint by distance
