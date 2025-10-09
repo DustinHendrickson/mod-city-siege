@@ -274,6 +274,15 @@ struct SiegeEvent
     std::vector<ObjectGuid> defenderBots; // Playerbots defending the city
     std::vector<ObjectGuid> attackerBots; // Playerbots attacking the city
     
+    // Structure to store bot original positions for returning them after siege
+    struct BotReturnPosition
+    {
+        ObjectGuid botGuid;
+        uint32 mapId;
+        float x, y, z, o;
+    };
+    std::vector<BotReturnPosition> botReturnPositions; // Original positions to return bots to
+    
     // Respawn tracking: stores creature GUID, entry, and death time
     struct RespawnData
     {
@@ -1031,9 +1040,10 @@ bool ValidateGroundPosition(float x, float y, float& z, Map* map)
 /**
  * @brief Recruits defending playerbots to teleport to the city being sieged
  * @param city The city structure containing position and faction info
+ * @param event The siege event to store bot return positions
  * @return Vector of GUIDs of recruited defender bots
  */
-std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city)
+std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEvent& event)
 {
     std::vector<ObjectGuid> recruitedBots;
     
@@ -1088,16 +1098,27 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city)
         eligibleBots.resize(g_PlayerbotsMaxDefenders);
     }
     
-    // Teleport bots to city center
+    // Store original positions and teleport bots to city center
     for (Player* bot : eligibleBots)
     {
+        // Store original position for return later
+        SiegeEvent::BotReturnPosition returnPos;
+        returnPos.botGuid = bot->GetGUID();
+        returnPos.mapId = bot->GetMapId();
+        returnPos.x = bot->GetPositionX();
+        returnPos.y = bot->GetPositionY();
+        returnPos.z = bot->GetPositionZ();
+        returnPos.o = bot->GetOrientation();
+        event.botReturnPositions.push_back(returnPos);
+        
+        // Teleport to city center
         bot->TeleportTo(city.mapId, city.centerX, city.centerY, city.centerZ, 0.0f);
         recruitedBots.push_back(bot->GetGUID());
         
         if (g_DebugMode)
         {
-            LOG_INFO("server.loading", "[City Siege] Recruited defender bot {} (Level {}) to {}", 
-                     bot->GetName(), bot->GetLevel(), city.name);
+            LOG_INFO("server.loading", "[City Siege] Recruited defender bot {} (Level {}) to {} (will return to map {} at [{:.2f}, {:.2f}, {:.2f}])", 
+                     bot->GetName(), bot->GetLevel(), city.name, returnPos.mapId, returnPos.x, returnPos.y, returnPos.z);
         }
     }
     
@@ -1114,9 +1135,10 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city)
 /**
  * @brief Recruits attacking playerbots to teleport to the spawn point
  * @param city The city structure containing spawn position
+ * @param event The siege event to store bot return positions
  * @return Vector of GUIDs of recruited attacker bots
  */
-std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city)
+std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEvent& event)
 {
     std::vector<ObjectGuid> recruitedBots;
     
@@ -1171,17 +1193,29 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city)
         eligibleBots.resize(g_PlayerbotsMaxAttackers);
     }
     
-    // Teleport bots to spawn point (spread them out a bit)
+    // Store original positions and teleport bots to spawn point (spread them out a bit)
     float angleIncrement = (2.0f * M_PI) / std::max((size_t)1, eligibleBots.size());
     float currentAngle = 0.0f;
     float spreadRadius = 10.0f; // 10 yard radius spread
     
     for (Player* bot : eligibleBots)
     {
+        // Store original position for return later
+        SiegeEvent::BotReturnPosition returnPos;
+        returnPos.botGuid = bot->GetGUID();
+        returnPos.mapId = bot->GetMapId();
+        returnPos.x = bot->GetPositionX();
+        returnPos.y = bot->GetPositionY();
+        returnPos.z = bot->GetPositionZ();
+        returnPos.o = bot->GetOrientation();
+        event.botReturnPositions.push_back(returnPos);
+        
+        // Calculate spread position
         float spawnX = city.spawnX + spreadRadius * std::cos(currentAngle);
         float spawnY = city.spawnY + spreadRadius * std::sin(currentAngle);
         float spawnZ = city.spawnZ;
         
+        // Teleport to spawn point
         bot->TeleportTo(city.mapId, spawnX, spawnY, spawnZ, 0.0f);
         recruitedBots.push_back(bot->GetGUID());
         
@@ -1189,8 +1223,8 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city)
         
         if (g_DebugMode)
         {
-            LOG_INFO("server.loading", "[City Siege] Recruited attacker bot {} (Level {}) for siege on {}", 
-                     bot->GetName(), bot->GetLevel(), city.name);
+            LOG_INFO("server.loading", "[City Siege] Recruited attacker bot {} (Level {}) for siege on {} (will return to map {} at [{:.2f}, {:.2f}, {:.2f}])", 
+                     bot->GetName(), bot->GetLevel(), city.name, returnPos.mapId, returnPos.x, returnPos.y, returnPos.z);
         }
     }
     
@@ -1281,7 +1315,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
 /**
  * @brief Deactivates siege combat mode for playerbots and releases them
  * @param event The siege event
- * Stops combat and releases all participating bots
+ * Stops combat, teleports bots back to original locations, and releases all participating bots
  */
 void DeactivatePlayerbotsFromSiege(SiegeEvent& event)
 {
@@ -1291,45 +1325,67 @@ void DeactivatePlayerbotsFromSiege(SiegeEvent& event)
         return;
     }
     
-    // Release defender bots from combat
-    for (const auto& botGuid : event.defenderBots)
+    // Teleport all bots back to their original positions
+    for (const auto& returnPos : event.botReturnPositions)
     {
-        Player* bot = ObjectAccessor::FindPlayer(botGuid);
-        if (bot && bot->IsInWorld())
-        {
-            // Stop combat
-            bot->CombatStop(true);
+        Player* bot = ObjectAccessor::FindPlayer(returnPos.botGuid);
+        if (!bot || !bot->IsInWorld())
+            continue;
             
+        // Safety checks before teleporting
+        if (!bot->IsAlive())
+        {
             if (g_DebugMode)
             {
-                LOG_INFO("server.loading", "[City Siege] Released defender bot {} from siege duty", bot->GetName());
+                LOG_INFO("server.loading", "[City Siege] Skipping return for dead bot {}", bot->GetName());
             }
+            continue;
+        }
+        
+        // Don't teleport if bot is in a dungeon, raid, arena, or battleground
+        if (bot->GetMap()->IsDungeon() || bot->GetMap()->IsRaid() || 
+            bot->GetMap()->IsBattleground() || bot->GetMap()->IsBattleArena())
+        {
+            if (g_DebugMode)
+            {
+                LOG_INFO("server.loading", "[City Siege] Skipping return for bot {} - currently in instance/raid/arena/bg", 
+                         bot->GetName());
+            }
+            continue;
+        }
+        
+        // Don't teleport if bot is being teleported or loading
+        if (bot->IsBeingTeleported())
+        {
+            if (g_DebugMode)
+            {
+                LOG_INFO("server.loading", "[City Siege] Skipping return for bot {} - already being teleported", 
+                         bot->GetName());
+            }
+            continue;
+        }
+        
+        // Stop combat first
+        bot->CombatStop(true);
+        
+        // Teleport back to original position
+        bot->TeleportTo(returnPos.mapId, returnPos.x, returnPos.y, returnPos.z, returnPos.o);
+        
+        if (g_DebugMode)
+        {
+            LOG_INFO("server.loading", "[City Siege] Returned bot {} to original location (map {} at [{:.2f}, {:.2f}, {:.2f}])", 
+                     bot->GetName(), returnPos.mapId, returnPos.x, returnPos.y, returnPos.z);
         }
     }
     
-    // Release attacker bots from combat
-    for (const auto& botGuid : event.attackerBots)
-    {
-        Player* bot = ObjectAccessor::FindPlayer(botGuid);
-        if (bot && bot->IsInWorld())
-        {
-            // Stop combat
-            bot->CombatStop(true);
-            
-            if (g_DebugMode)
-            {
-                LOG_INFO("server.loading", "[City Siege] Released attacker bot {} from siege duty", bot->GetName());
-            }
-        }
-    }
-    
-    // Clear bot lists
+    // Clear all bot tracking data
     event.defenderBots.clear();
     event.attackerBots.clear();
+    event.botReturnPositions.clear();
     
     if (g_DebugMode)
     {
-        LOG_INFO("server.loading", "[City Siege] Deactivated all playerbots from siege");
+        LOG_INFO("server.loading", "[City Siege] Deactivated all playerbots from siege and returned them to original locations");
     }
 #endif
 }
@@ -1532,8 +1588,8 @@ void StartSiegeEvent(int targetCityId = -1)
     // Recruit playerbots if enabled
     if (g_PlayerbotsEnabled)
     {
-        g_ActiveSieges.back().defenderBots = RecruitDefendingPlayerbots(*city);
-        g_ActiveSieges.back().attackerBots = RecruitAttackingPlayerbots(*city);
+        g_ActiveSieges.back().defenderBots = RecruitDefendingPlayerbots(*city, g_ActiveSieges.back());
+        g_ActiveSieges.back().attackerBots = RecruitAttackingPlayerbots(*city, g_ActiveSieges.back());
     }
 #endif
 
