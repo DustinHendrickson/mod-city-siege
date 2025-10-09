@@ -193,6 +193,7 @@ static bool g_PlayerbotsEnabled = false;
 static uint32 g_PlayerbotsMinLevel = 70;
 static uint32 g_PlayerbotsMaxDefenders = 20;
 static uint32 g_PlayerbotsMaxAttackers = 20;
+static uint32 g_PlayerbotsRespawnDelay = 30; // Seconds before bot respawns after death
 #endif
 
 // -----------------------------------------------------------------------------
@@ -282,6 +283,15 @@ struct SiegeEvent
         float x, y, z, o;
     };
     std::vector<BotReturnPosition> botReturnPositions; // Original positions to return bots to
+    
+    // Bot respawn tracking: stores bot GUID, death time, and faction
+    struct BotRespawnData
+    {
+        ObjectGuid botGuid;
+        uint32 deathTime;
+        bool isDefender; // true = defender, false = attacker
+    };
+    std::vector<BotRespawnData> deadBots; // Bots waiting to respawn
     
     // Respawn tracking: stores creature GUID, entry, and death time
     struct RespawnData
@@ -417,6 +427,7 @@ void LoadCitySiegeConfiguration()
     g_PlayerbotsMinLevel = sConfigMgr->GetOption<uint32>("CitySiege.Playerbots.MinLevel", 70);
     g_PlayerbotsMaxDefenders = sConfigMgr->GetOption<uint32>("CitySiege.Playerbots.MaxDefenders", 20);
     g_PlayerbotsMaxAttackers = sConfigMgr->GetOption<uint32>("CitySiege.Playerbots.MaxAttackers", 20);
+    g_PlayerbotsRespawnDelay = sConfigMgr->GetOption<uint32>("CitySiege.Playerbots.RespawnDelay", 30);
 #endif
 
     // Load spawn locations for each city
@@ -1111,14 +1122,21 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
         returnPos.o = bot->GetOrientation();
         event.botReturnPositions.push_back(returnPos);
         
-        // Teleport to city center
-        bot->TeleportTo(city.mapId, city.centerX, city.centerY, city.centerZ, 0.0f);
+        // Randomize position within ~10 yards of the leader
+        float angle = frand(0.0f, 2.0f * M_PI);
+        float distance = frand(0.0f, 10.0f);
+        float defenderX = city.leaderX + distance * std::cos(angle);
+        float defenderY = city.leaderY + distance * std::sin(angle);
+        float defenderZ = city.leaderZ; // Keep same Z as leader (will be adjusted by server)
+        
+        // Teleport to randomized position near city leader (throne room)
+        bot->TeleportTo(city.mapId, defenderX, defenderY, defenderZ, 0.0f);
         recruitedBots.push_back(bot->GetGUID());
         
         if (g_DebugMode)
         {
-            LOG_INFO("server.loading", "[City Siege] Recruited defender bot {} (Level {}) to {} (will return to map {} at [{:.2f}, {:.2f}, {:.2f}])", 
-                     bot->GetName(), bot->GetLevel(), city.name, returnPos.mapId, returnPos.x, returnPos.y, returnPos.z);
+            LOG_INFO("server.loading", "[City Siege] Recruited defender bot {} (Level {}) to {} near leader at [{:.2f}, {:.2f}, {:.2f}] (will return to map {} at [{:.2f}, {:.2f}, {:.2f}])", 
+                     bot->GetName(), bot->GetLevel(), city.name, defenderX, defenderY, defenderZ, returnPos.mapId, returnPos.x, returnPos.y, returnPos.z);
         }
     }
     
@@ -1193,11 +1211,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
         eligibleBots.resize(g_PlayerbotsMaxAttackers);
     }
     
-    // Store original positions and teleport bots to spawn point (spread them out a bit)
-    float angleIncrement = (2.0f * M_PI) / std::max((size_t)1, eligibleBots.size());
-    float currentAngle = 0.0f;
-    float spreadRadius = 10.0f; // 10 yard radius spread
-    
+    // Store original positions and teleport bots to spawn point (randomized within radius)
     for (Player* bot : eligibleBots)
     {
         // Store original position for return later
@@ -1210,21 +1224,21 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
         returnPos.o = bot->GetOrientation();
         event.botReturnPositions.push_back(returnPos);
         
-        // Calculate spread position
-        float spawnX = city.spawnX + spreadRadius * std::cos(currentAngle);
-        float spawnY = city.spawnY + spreadRadius * std::sin(currentAngle);
-        float spawnZ = city.spawnZ;
+        // Randomize position within ~10 yards of the spawn point
+        float angle = frand(0.0f, 2.0f * M_PI);
+        float distance = frand(0.0f, 10.0f);
+        float spawnX = city.spawnX + distance * std::cos(angle);
+        float spawnY = city.spawnY + distance * std::sin(angle);
+        float spawnZ = city.spawnZ; // Keep same Z as spawn (will be adjusted by server)
         
-        // Teleport to spawn point
+        // Teleport to randomized spawn point
         bot->TeleportTo(city.mapId, spawnX, spawnY, spawnZ, 0.0f);
         recruitedBots.push_back(bot->GetGUID());
         
-        currentAngle += angleIncrement;
-        
         if (g_DebugMode)
         {
-            LOG_INFO("server.loading", "[City Siege] Recruited attacker bot {} (Level {}) for siege on {} (will return to map {} at [{:.2f}, {:.2f}, {:.2f}])", 
-                     bot->GetName(), bot->GetLevel(), city.name, returnPos.mapId, returnPos.x, returnPos.y, returnPos.z);
+            LOG_INFO("server.loading", "[City Siege] Recruited attacker bot {} (Level {}) for siege on {} at [{:.2f}, {:.2f}, {:.2f}] (will return to map {} at [{:.2f}, {:.2f}, {:.2f}])", 
+                     bot->GetName(), bot->GetLevel(), city.name, spawnX, spawnY, spawnZ, returnPos.mapId, returnPos.x, returnPos.y, returnPos.z);
         }
     }
     
@@ -1929,6 +1943,166 @@ void DistributeRewards(const SiegeEvent& /*event*/, const CityData& city, int wi
                  rewardedPlayers, city.name);
     }
 }
+
+#ifdef MOD_PLAYERBOTS
+/**
+ * @brief Checks for dead bots during siege and adds them to respawn queue
+ * @param event The siege event
+ */
+void CheckBotDeaths(SiegeEvent& event)
+{
+    if (!g_PlayerbotsEnabled)
+        return;
+        
+    uint32 currentTime = time(nullptr);
+    
+    // Check defender bots for deaths
+    for (const auto& botGuid : event.defenderBots)
+    {
+        Player* bot = ObjectAccessor::FindPlayer(botGuid);
+        if (!bot || !bot->IsInWorld())
+            continue;
+            
+        // If bot is dead and not already in respawn queue
+        if (!bot->IsAlive())
+        {
+            // Check if already in respawn queue
+            bool alreadyQueued = false;
+            for (const auto& deadBot : event.deadBots)
+            {
+                if (deadBot.botGuid == botGuid)
+                {
+                    alreadyQueued = true;
+                    break;
+                }
+            }
+            
+            if (!alreadyQueued)
+            {
+                SiegeEvent::BotRespawnData respawnData;
+                respawnData.botGuid = botGuid;
+                respawnData.deathTime = currentTime;
+                respawnData.isDefender = true;
+                event.deadBots.push_back(respawnData);
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Defender bot {} died, will respawn in {} seconds",
+                             bot->GetName(), g_PlayerbotsRespawnDelay);
+                }
+            }
+        }
+    }
+    
+    // Check attacker bots for deaths
+    for (const auto& botGuid : event.attackerBots)
+    {
+        Player* bot = ObjectAccessor::FindPlayer(botGuid);
+        if (!bot || !bot->IsInWorld())
+            continue;
+            
+        // If bot is dead and not already in respawn queue
+        if (!bot->IsAlive())
+        {
+            // Check if already in respawn queue
+            bool alreadyQueued = false;
+            for (const auto& deadBot : event.deadBots)
+            {
+                if (deadBot.botGuid == botGuid)
+                {
+                    alreadyQueued = true;
+                    break;
+                }
+            }
+            
+            if (!alreadyQueued)
+            {
+                SiegeEvent::BotRespawnData respawnData;
+                respawnData.botGuid = botGuid;
+                respawnData.deathTime = currentTime;
+                respawnData.isDefender = false;
+                event.deadBots.push_back(respawnData);
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Attacker bot {} died, will respawn in {} seconds",
+                             bot->GetName(), g_PlayerbotsRespawnDelay);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief Processes bot respawns after delay expires
+ * @param event The siege event
+ */
+void ProcessBotRespawns(SiegeEvent& event)
+{
+    if (!g_PlayerbotsEnabled || event.deadBots.empty())
+        return;
+        
+    uint32 currentTime = time(nullptr);
+    const CityData& city = g_Cities[event.cityId];
+    
+    // Process respawns (iterate backwards so we can safely erase)
+    for (auto it = event.deadBots.begin(); it != event.deadBots.end();)
+    {
+        if (currentTime - it->deathTime >= g_PlayerbotsRespawnDelay)
+        {
+            Player* bot = ObjectAccessor::FindPlayer(it->botGuid);
+            if (bot && bot->IsInWorld())
+            {
+                // Resurrect the bot
+                bot->ResurrectPlayer(1.0f); // Full health and mana
+                bot->SpawnCorpseBones();
+                bot->SaveToDB(false, false);
+                
+                // Teleport to appropriate spawn location with randomization
+                float angle = frand(0.0f, 2.0f * M_PI);
+                float distance = frand(0.0f, 10.0f);
+                
+                if (it->isDefender)
+                {
+                    // Defenders respawn near the city leader (throne room) with randomization
+                    float respawnX = city.leaderX + distance * std::cos(angle);
+                    float respawnY = city.leaderY + distance * std::sin(angle);
+                    bot->TeleportTo(city.mapId, respawnX, respawnY, city.leaderZ, 0.0f);
+                    
+                    if (g_DebugMode)
+                    {
+                        LOG_INFO("server.loading", "[City Siege] Respawned defender bot {} near city leader at [{:.2f}, {:.2f}, {:.2f}]",
+                                 bot->GetName(), respawnX, respawnY, city.leaderZ);
+                    }
+                }
+                else
+                {
+                    // Attackers respawn at spawn point with randomization
+                    float respawnX = city.spawnX + distance * std::cos(angle);
+                    float respawnY = city.spawnY + distance * std::sin(angle);
+                    bot->TeleportTo(city.mapId, respawnX, respawnY, city.spawnZ, 0.0f);
+                    
+                    if (g_DebugMode)
+                    {
+                        LOG_INFO("server.loading", "[City Siege] Respawned attacker bot {} at spawn point [{:.2f}, {:.2f}, {:.2f}]",
+                                 bot->GetName(), respawnX, respawnY, city.spawnZ);
+                    }
+                }
+                
+                // Put back into combat state
+                bot->SetInCombatState(true);
+            }
+            
+            // Remove from respawn queue
+            it = event.deadBots.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+}
+#endif
 
 /**
  * @brief Updates all active siege events.
@@ -2946,6 +3120,15 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 }
             }
         }
+
+#ifdef MOD_PLAYERBOTS
+        // Handle bot death tracking and respawning
+        if (!event.cinematicPhase)
+        {
+            CheckBotDeaths(event);
+            ProcessBotRespawns(event);
+        }
+#endif
 
         // Status announcements every 5 minutes (300 seconds) during active combat
         if (!event.cinematicPhase && (currentTime - event.lastStatusAnnouncement) >= 300)

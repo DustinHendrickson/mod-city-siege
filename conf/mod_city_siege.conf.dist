@@ -754,4 +754,13 @@ CitySiege.Playerbots.MaxDefenders = 20
 
 CitySiege.Playerbots.MaxAttackers = 20
 
+#
+#    CitySiege.Playerbots.RespawnDelay
+#        Description: Time in seconds before a dead bot is resurrected and returned to battle
+#                     Defenders respawn near the city leader (throne room), attackers respawn at spawn point
+#        Default:     30
+
+CitySiege.Playerbots.RespawnDelay = 30
+
+
 
