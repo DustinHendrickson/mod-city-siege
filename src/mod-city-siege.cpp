@@ -282,6 +282,7 @@ struct SiegeEvent
         uint32 mapId;
         float x, y, z, o;
         bool wasPvPFlagged; // Store original PvP status
+        std::string rpgStrategy; // Store RPG strategy if active ("rpg", "new rpg", or empty)
     };
     std::vector<BotReturnPosition> botReturnPositions; // Original positions to return bots to
     
@@ -1153,6 +1154,36 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
         returnPos.z = bot->GetPositionZ();
         returnPos.o = bot->GetOrientation();
         returnPos.wasPvPFlagged = bot->IsPvP(); // Store original PvP status
+        
+        // Check for and store RPG strategy
+        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        if (botAI)
+        {
+            // Check for "rpg" or "new rpg" strategy
+            if (botAI->HasStrategy("new rpg", BOT_STATE_NON_COMBAT))
+            {
+                returnPos.rpgStrategy = "new rpg";
+                botAI->ResetStrategy("new rpg"); // Remove RPG strategy during siege
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Removed 'new rpg' strategy from defender bot {}", bot->GetName());
+                }
+            }
+            else if (botAI->HasStrategy("rpg", BOT_STATE_NON_COMBAT))
+            {
+                returnPos.rpgStrategy = "rpg";
+                botAI->ResetStrategy("rpg"); // Remove RPG strategy during siege
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Removed 'rpg' strategy from defender bot {}", bot->GetName());
+                }
+            }
+            else
+            {
+                returnPos.rpgStrategy = ""; // No RPG strategy active
+            }
+        }
+        
         event.botReturnPositions.push_back(returnPos);
         
         // Randomize position within ~10 yards of the leader
@@ -1287,6 +1318,36 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
         returnPos.z = bot->GetPositionZ();
         returnPos.o = bot->GetOrientation();
         returnPos.wasPvPFlagged = bot->IsPvP(); // Store original PvP status
+        
+        // Check for and store RPG strategy
+        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        if (botAI)
+        {
+            // Check for "rpg" or "new rpg" strategy
+            if (botAI->HasStrategy("new rpg", BOT_STATE_NON_COMBAT))
+            {
+                returnPos.rpgStrategy = "new rpg";
+                botAI->ResetStrategy("new rpg"); // Remove RPG strategy during siege
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Removed 'new rpg' strategy from attacker bot {}", bot->GetName());
+                }
+            }
+            else if (botAI->HasStrategy("rpg", BOT_STATE_NON_COMBAT))
+            {
+                returnPos.rpgStrategy = "rpg";
+                botAI->ResetStrategy("rpg"); // Remove RPG strategy during siege
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Removed 'rpg' strategy from attacker bot {}", bot->GetName());
+                }
+            }
+            else
+            {
+                returnPos.rpgStrategy = ""; // No RPG strategy active
+            }
+        }
+        
         event.botReturnPositions.push_back(returnPos);
         
         // Randomize position within ~10 yards of the spawn point
@@ -1470,6 +1531,21 @@ void DeactivatePlayerbotsFromSiege(SiegeEvent& event)
         
         // Restore original PvP flag status
         bot->SetPvP(returnPos.wasPvPFlagged);
+        
+        // Restore RPG strategy if bot had one
+        if (!returnPos.rpgStrategy.empty())
+        {
+            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            if (botAI)
+            {
+                botAI->ChangeStrategy(returnPos.rpgStrategy, BOT_STATE_NON_COMBAT);
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Restored '{}' strategy to bot {}", 
+                             returnPos.rpgStrategy, bot->GetName());
+                }
+            }
+        }
         
         // Teleport back to original position
         bot->TeleportTo(returnPos.mapId, returnPos.x, returnPos.y, returnPos.z, returnPos.o);
