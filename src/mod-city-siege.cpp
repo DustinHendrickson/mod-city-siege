@@ -352,7 +352,7 @@ void SetSiegeWeather(const CityData& city, SiegeEvent& event)
     uint32 zoneId = map->GetZoneId(0, city.centerX, city.centerY, city.centerZ);
 
     // Store original weather state
-    Weather* weather = map->GetWeather();
+    Weather* weather = map->GetOrGenerateZoneDefaultWeather(zoneId);
     if (weather)
     {
         event.originalWeatherType = weather->GetWeatherState();
