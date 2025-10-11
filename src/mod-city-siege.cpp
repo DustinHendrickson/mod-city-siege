@@ -202,7 +202,7 @@ static uint32 g_PlayerbotsRespawnDelay = 30; // Seconds before bot respawns afte
 
 // Weather settings
 static bool g_WeatherEnabled = true;
-static WeatherState g_WeatherType = WEATHER_TYPE_RAIN;
+static WeatherState g_WeatherType = WEATHER_STATE_MEDIUM_RAIN;
 static float g_WeatherGrade = 0.8f;
 
 // -----------------------------------------------------------------------------
@@ -368,7 +368,7 @@ void SetSiegeWeather(const CityData& city, SiegeEvent& event)
     else
     {
         // No existing weather, set defaults
-        event.originalWeatherType = WEATHER_TYPE_FINE;
+        event.originalWeatherType = WEATHER_STATE_FINE;
         event.originalWeatherGrade = 0.0f;
         event.weatherOverridden = true;
     }
@@ -526,7 +526,7 @@ void LoadCitySiegeConfiguration()
 
     // Weather settings
     g_WeatherEnabled = sConfigMgr->GetOption<bool>("CitySiege.Weather.Enabled", true);
-    g_WeatherType = static_cast<WeatherState>(sConfigMgr->GetOption<uint32>("CitySiege.Weather.Type", WEATHER_TYPE_RAIN));
+    g_WeatherType = static_cast<WeatherState>(sConfigMgr->GetOption<uint32>("CitySiege.Weather.Type", WEATHER_STATE_MEDIUM_RAIN));
     g_WeatherGrade = sConfigMgr->GetOption<float>("CitySiege.Weather.Grade", 0.8f);
 
     // Load spawn locations for each city
