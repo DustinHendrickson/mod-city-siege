@@ -593,6 +593,37 @@ CitySiege.CinematicDelay = 150
 CitySiege.YellFrequency = 30
 
 ###############################################
+# Weather Override Settings
+###############################################
+
+#
+#    CitySiege.Weather.Enabled
+#        Description: Enable weather override during siege RP phase.
+#                     When enabled, weather will be temporarily changed during the cinematic phase
+#                     and restored to normal when the siege ends.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Weather.Enabled = 1
+
+#
+#    CitySiege.Weather.Type
+#        Description: Weather type to set during siege RP phase.
+#                     Valid values: 0 (WEATHER_TYPE_FINE) - Clear weather
+#                                   1 (WEATHER_TYPE_RAIN) - Rain
+#                                   2 (WEATHER_TYPE_SNOW) - Snow
+#                                   3 (WEATHER_TYPE_STORM) - Storm
+#        Default:     3 (WEATHER_TYPE_STORM)
+CitySiege.Weather.Type = 3
+
+#
+#    CitySiege.Weather.Grade
+#        Description: Weather intensity grade (0.0 to 1.0).
+#                     0.0 = No weather effect, 1.0 = Maximum weather intensity
+#                     Example: 0.5 = Moderate rain/snow/storm
+#        Default:     1.0 (maximum intensity)
+CitySiege.Weather.Grade = 1.0
+
+###############################################
 # Respawn Settings
 ###############################################
 

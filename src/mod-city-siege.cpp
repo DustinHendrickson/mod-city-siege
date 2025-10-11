@@ -37,6 +37,8 @@
 #include "CellImpl.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
+#include "Weather.h"
+#include "WeatherMgr.h"
 #include <vector>
 #include <unordered_map>
 #include <string>
@@ -198,6 +200,11 @@ static uint32 g_PlayerbotsMaxAttackers = 20;
 static uint32 g_PlayerbotsRespawnDelay = 30; // Seconds before bot respawns after death
 #endif
 
+// Weather settings
+static bool g_WeatherEnabled = true;
+static WeatherState g_WeatherType = WEATHER_TYPE_RAIN;
+static float g_WeatherGrade = 0.8f;
+
 // -----------------------------------------------------------------------------
 // CITY SIEGE DATA STRUCTURES
 // -----------------------------------------------------------------------------
@@ -306,6 +313,11 @@ struct SiegeEvent
         bool isDefender; // Track if this is a defender for correct respawn
     };
     std::vector<RespawnData> deadCreatures; // Creatures waiting to respawn
+
+    // Weather storage for siege weather override
+    WeatherState originalWeatherType; // Store original weather type
+    float originalWeatherGrade; // Store original weather grade
+    bool weatherOverridden; // Track if weather was overridden for this siege
 };
 
 // Active siege events
@@ -321,6 +333,84 @@ static std::unordered_map<uint32, std::vector<ObjectGuid>> g_WaypointVisualizati
 
 // Forward declarations
 void DistributeRewards(const SiegeEvent& event, const CityData& city, int winningTeam = -1);
+
+/**
+ * @brief Sets siege weather for a city during RP phase
+ * @param city The city to set weather for
+ * @param event The siege event to store original weather state
+ */
+void SetSiegeWeather(const CityData& city, SiegeEvent& event)
+{
+    if (!g_WeatherEnabled)
+        return;
+
+    Map* map = sMapMgr->FindMap(city.mapId, 0);
+    if (!map)
+        return;
+
+    // Get the zone ID from the city center coordinates
+    uint32 zoneId = map->GetZoneId(city.centerX, city.centerY, city.centerZ);
+
+    // Store original weather state
+    Weather* weather = map->GetWeather();
+    if (weather)
+    {
+        event.originalWeatherType = weather->GetWeatherState();
+        event.originalWeatherGrade = weather->GetGrade();
+        event.weatherOverridden = true;
+
+        if (g_DebugMode)
+        {
+            LOG_INFO("server.loading", "[City Siege] Stored original weather for {}: type={}, grade={:.2f}",
+                     city.name, static_cast<uint32>(event.originalWeatherType), event.originalWeatherGrade);
+        }
+    }
+    else
+    {
+        // No existing weather, set defaults
+        event.originalWeatherType = WEATHER_TYPE_FINE;
+        event.originalWeatherGrade = 0.0f;
+        event.weatherOverridden = true;
+    }
+
+    // Set siege weather
+    map->SetZoneWeather(zoneId, g_WeatherType, g_WeatherGrade);
+
+    if (g_DebugMode)
+    {
+        LOG_INFO("server.loading", "[City Siege] Set siege weather for {} (zone {}): type={}, grade={:.2f}",
+                 city.name, zoneId, static_cast<uint32>(g_WeatherType), g_WeatherGrade);
+    }
+}
+
+/**
+ * @brief Restores original weather for a city after siege ends
+ * @param city The city to restore weather for
+ * @param event The siege event containing original weather state
+ */
+void RestoreSiegeWeather(const CityData& city, SiegeEvent& event)
+{
+    if (!g_WeatherEnabled || !event.weatherOverridden)
+        return;
+
+    Map* map = sMapMgr->FindMap(city.mapId, 0);
+    if (!map)
+        return;
+
+    // Get the zone ID from the city center coordinates
+    uint32 zoneId = map->GetZoneId(city.centerX, city.centerY, city.centerZ);
+
+    // Restore original weather
+    map->SetZoneWeather(zoneId, event.originalWeatherType, event.originalWeatherGrade);
+
+    if (g_DebugMode)
+    {
+        LOG_INFO("server.loading", "[City Siege] Restored original weather for {} (zone {}): type={}, grade={:.2f}",
+                 city.name, zoneId, static_cast<uint32>(event.originalWeatherType), event.originalWeatherGrade);
+    }
+
+    event.weatherOverridden = false;
+}
 
 /**
  * @brief Loads the configuration for the City Siege module.
@@ -433,6 +523,11 @@ void LoadCitySiegeConfiguration()
     g_PlayerbotsMaxAttackers = sConfigMgr->GetOption<uint32>("CitySiege.Playerbots.MaxAttackers", 20);
     g_PlayerbotsRespawnDelay = sConfigMgr->GetOption<uint32>("CitySiege.Playerbots.RespawnDelay", 30);
 #endif
+
+    // Weather settings
+    g_WeatherEnabled = sConfigMgr->GetOption<bool>("CitySiege.Weather.Enabled", true);
+    g_WeatherType = static_cast<WeatherState>(sConfigMgr->GetOption<uint32>("CitySiege.Weather.Type", WEATHER_TYPE_RAIN));
+    g_WeatherGrade = sConfigMgr->GetOption<float>("CitySiege.Weather.Grade", 0.8f);
 
     // Load spawn locations for each city
     g_Cities[CITY_STORMWIND].spawnX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnX", -9161.16f);
@@ -1721,6 +1816,7 @@ void StartSiegeEvent(int targetCityId = -1)
     newEvent.countdown50Announced = false;
     newEvent.countdown25Announced = false;
     newEvent.rpScriptIndex = 0; // Start RP script at first line
+    newEvent.weatherOverridden = false; // Initialize weather override flag
     
     // First, find and store the city leader's GUID and name
     Map* map = sMapMgr->FindMap(city->mapId, 0);
@@ -1845,6 +1941,9 @@ void StartSiegeEvent(int targetCityId = -1)
 
     g_ActiveSieges.push_back(newEvent);
 
+    // Set siege weather during RP phase
+    SetSiegeWeather(*city, g_ActiveSieges.back());
+
 #ifdef MOD_PLAYERBOTS
     // Recruit playerbots if enabled
     if (g_PlayerbotsEnabled)
@@ -1941,6 +2040,9 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
 
     DespawnSiegeCreatures(event);
     AnnounceSiege(city, false);
+
+    // Restore original weather
+    RestoreSiegeWeather(city, event);
 
     // Determine which faction owns the city
     bool isAllianceCity = (event.cityId == CITY_STORMWIND || event.cityId == CITY_IRONFORGE || 

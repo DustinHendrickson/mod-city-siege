@@ -32,6 +32,8 @@ Features
   GM command to toggle tall beam-style markers showing spawn points, waypoint paths, and leader positions for easy diagnosis of pathfinding issues.
 - **Cinematic RP Phase:**  
   Configurable delay where siege forces stand passive and yell RP messages before combat begins to give players time to join in and get ready.
+- **Weather Override System:**  
+  Temporarily overrides zone weather during the RP phase to create dramatic atmospheric effects (storm, rain, snow, or clear weather). Weather is automatically restored when the siege ends.
 - **Periodic Yells:**  
   Leaders and mini-bosses yell threatening messages every 30 seconds during combat for immersion.
 - **Configurable Creature Entries:**  
@@ -59,6 +61,7 @@ This module can optionally recruit Playerbots (random bots) to participate in si
 - Exclusions: Bots that are dead, in combat, inside instances/battlegrounds, or currently in a party/raid will be skipped.
 - Level and count: Recruited bots respect `Playerbots.MinLevel`, `Playerbots.MaxAttackers` and `Playerbots.MaxDefenders` configuration values.
 - Behavior: Recruited bots are teleported to spawn points or near the city leader and will be returned to their original location and strategies after the siege ends.
+- Override Alone Scale: When `CitySiege.Playerbots.OverrideAloneScale = 1`, siege participant bots will remain active even when no players are nearby, overriding the `AiPlayerbot.botActiveAloneSmartScale` setting. This ensures bots continue participating in sieges regardless of player presence.
 
 Notes
 -----
@@ -395,6 +398,9 @@ Setting                                | Description                            
 ---------------------------------------|-------------------------------------------------------|--------
 CitySiege.CinematicDelay               | Initial RP phase duration (seconds).                  | 150
 CitySiege.YellFrequency                | How often leaders yell (seconds).                     | 30
+CitySiege.Weather.Enabled              | Enable weather override during RP phase.              | 1
+CitySiege.Weather.Type                 | Weather type (0=Fine, 1=Rain, 2=Snow, 3=Storm).       | 3
+CitySiege.Weather.Grade                | Weather intensity (0.0-1.0).                          | 1.0
 
 ### Respawn Settings
 
@@ -438,14 +444,11 @@ CitySiege.Stormwind.Waypoint3.Z = 103.72089
 - Setting WaypointCount to 0 makes units path directly to the leader
 - Use `.gps` command in-game to get coordinates for waypoints
 
-### Reward Settings
+### Playerbot Settings
 
 Setting                                | Description                                           | Default
 ---------------------------------------|-------------------------------------------------------|--------
-CitySiege.RewardOnDefense              | Enable rewards for defenders.                         | 1
-CitySiege.RewardHonor                  | Honor points for successful defense.                  | 100
-CitySiege.RewardGoldBase               | Base gold at level 1 in copper (50 silver = 5000).   | 5000
-CitySiege.RewardGoldPerLevel           | Additional gold per player level in copper.           | 5000
+CitySiege.Playerbots.OverrideAloneScale| Override AiPlayerbot.botActiveAloneSmartScale for siege bots, keeping them active even without nearby players.| 1
 
 ### Announcement Messages
 
