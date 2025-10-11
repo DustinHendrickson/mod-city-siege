@@ -349,7 +349,7 @@ void SetSiegeWeather(const CityData& city, SiegeEvent& event)
         return;
 
     // Get the zone ID from the city center coordinates
-    uint32 zoneId = map->GetZoneId(city.centerX, city.centerY, city.centerZ);
+    uint32 zoneId = map->GetZoneId(0, city.centerX, city.centerY, city.centerZ);
 
     // Store original weather state
     Weather* weather = map->GetWeather();
@@ -398,7 +398,7 @@ void RestoreSiegeWeather(const CityData& city, SiegeEvent& event)
         return;
 
     // Get the zone ID from the city center coordinates
-    uint32 zoneId = map->GetZoneId(city.centerX, city.centerY, city.centerZ);
+    uint32 zoneId = map->GetZoneId(0, city.centerX, city.centerY, city.centerZ);
 
     // Restore original weather
     map->SetZoneWeather(zoneId, event.originalWeatherType, event.originalWeatherGrade);
