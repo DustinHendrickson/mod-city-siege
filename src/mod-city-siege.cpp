@@ -352,26 +352,11 @@ void SetSiegeWeather(const CityData& city, SiegeEvent& event)
     uint32 zoneId = map->GetZoneId(0, city.centerX, city.centerY, city.centerZ);
 
     // Store original weather state
-    Weather* weather = map->GetOrGenerateZoneDefaultWeather(zoneId);
-    if (weather)
-    {
-        event.originalWeatherType = weather->GetWeatherState();
-        event.originalWeatherGrade = weather->GetGrade();
-        event.weatherOverridden = true;
-
-        if (g_DebugMode)
-        {
-            LOG_INFO("server.loading", "[City Siege] Stored original weather for {}: type={}, grade={:.2f}",
-                     city.name, static_cast<uint32>(event.originalWeatherType), event.originalWeatherGrade);
-        }
-    }
-    else
-    {
-        // No existing weather, set defaults
-        event.originalWeatherType = WEATHER_STATE_FINE;
-        event.originalWeatherGrade = 0.0f;
-        event.weatherOverridden = true;
-    }
+    // Note: Weather::GetWeatherState() and Weather::GetGrade() are private methods
+    // Since we can't access them from a module, we'll restore to fine weather
+    event.originalWeatherType = WEATHER_STATE_FINE;
+    event.originalWeatherGrade = 0.0f;
+    event.weatherOverridden = true;
 
     // Set siege weather
     map->SetZoneWeather(zoneId, g_WeatherType, g_WeatherGrade);
