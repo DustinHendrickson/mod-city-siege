@@ -537,26 +537,26 @@ CitySiege.Level.Leader = 80
 #
 #    CitySiege.Level.MiniBoss
 #        Description: Level for siege mini-bosses (attackers).
-#        Default:     80
-CitySiege.Level.MiniBoss = 80
+#        Default:     70
+CitySiege.Level.MiniBoss = 70
 
 #
 #    CitySiege.Level.Elite
 #        Description: Level for siege elite units (attackers).
-#        Default:     75
-CitySiege.Level.Elite = 75
+#        Default:     60
+CitySiege.Level.Elite = 60
 
 #
 #    CitySiege.Level.Minion
 #        Description: Level for siege minion units (attackers).
-#        Default:     70
-CitySiege.Level.Minion = 70
+#        Default:     50
+CitySiege.Level.Minion = 50
 
 #
 #    CitySiege.Level.Defender
 #        Description: Level for city defender units.
-#        Default:     70
-CitySiege.Level.Defender = 70
+#        Default:     60
+CitySiege.Level.Defender = 60
 
 ###############################################
 # Scale Settings
@@ -767,23 +767,23 @@ CitySiege.Playerbots.Enabled = 0
 #
 #    CitySiege.Playerbots.MinLevel
 #        Description: Minimum level for playerbots to participate in city sieges
-#        Default:     70
+#        Default:     50
 
-CitySiege.Playerbots.MinLevel = 70
+CitySiege.Playerbots.MinLevel = 50
 
 #
 #    CitySiege.Playerbots.MaxDefenders
 #        Description: Maximum number of defending playerbots to teleport to city
-#        Default:     20
+#        Default:     30
 
-CitySiege.Playerbots.MaxDefenders = 20
+CitySiege.Playerbots.MaxDefenders = 30
 
 #
 #    CitySiege.Playerbots.MaxAttackers
 #        Description: Maximum number of attacking playerbots to teleport to spawn point
-#        Default:     20
+#        Default:     30
 
-CitySiege.Playerbots.MaxAttackers = 20
+CitySiege.Playerbots.MaxAttackers = 30
 
 #
 #    CitySiege.Playerbots.RespawnDelay
