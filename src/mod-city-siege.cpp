@@ -2390,7 +2390,6 @@ void ProcessBotRespawns(SiegeEvent& event)
                 // Resurrect the bot
                 bot->ResurrectPlayer(1.0f); // Full health and mana
                 bot->SpawnCorpseBones();
-                bot->SaveToDB(false, false);
                 
                 // Remove away status to ensure bot is active
                 bot->RemovePlayerFlag(PLAYER_FLAGS_AFK);
