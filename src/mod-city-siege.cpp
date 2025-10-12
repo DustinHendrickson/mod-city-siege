@@ -1559,11 +1559,11 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
                     botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
                 }
                 
-                if (g_DebugMode)
-                {
-                    LOG_INFO("server.loading", "[City Siege] Defender bot {} flagged for PvP and traveling to waypoint {} [{:.2f}, {:.2f}, {:.2f}]",
-                             bot->GetName(), defenderWaypoint - 1, targetWP.x, targetWP.y, targetWP.z);
-                }
+                // if (g_DebugMode)
+                // {
+                //     LOG_INFO("server.loading", "[City Siege] Defender bot {} flagged for PvP and traveling to waypoint {} [{:.2f}, {:.2f}, {:.2f}]",
+                //              bot->GetName(), defenderWaypoint - 1, targetWP.x, targetWP.y, targetWP.z);
+                // }
             }
         }
     }
@@ -1619,11 +1619,11 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
                 botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
             }
             
-            if (g_DebugMode)
-            {
-                LOG_INFO("server.loading", "[City Siege] Attacker bot {} flagged for PvP and traveling to waypoint 0 [{:.2f}, {:.2f}, {:.2f}]",
-                         bot->GetName(), targetWP.x, targetWP.y, targetWP.z);
-            }
+            // if (g_DebugMode)
+            // {
+            //     LOG_INFO("server.loading", "[City Siege] Attacker bot {} flagged for PvP and traveling to waypoint 0 [{:.2f}, {:.2f}, {:.2f}]",
+            //              bot->GetName(), targetWP.x, targetWP.y, targetWP.z);
+            // }
         }
     }
     

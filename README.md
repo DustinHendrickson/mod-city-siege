@@ -33,11 +33,9 @@ Features
 - **Cinematic RP Phase:**  
   Configurable delay where siege forces stand passive and yell RP messages before combat begins to give players time to join in and get ready.
 - **Weather Override System:**  
-  Temporarily overrides zone weather during the RP phase to create dramatic atmospheric effects (storm, rain, snow, or clear weather). Weather is automatically restored when the siege ends.
+  Temporarily overrides zone weather during the RP phase to create dramatic atmospheric effects (storm, rain, snow, or clear weather).
 - **Periodic Yells:**  
   Leaders and mini-bosses yell threatening messages every 30 seconds during combat for immersion.
-- **Configurable Creature Entries:**  
-  All creature types (Alliance & Horde attackers + defenders) fully configurable in .conf file with customizable levels and scale sizes.
 - **Flexible Event Timing:**  
   Configurable minimum (120min default) and maximum (240min default) intervals between events.
 - **Event Duration Control:**  
@@ -48,10 +46,6 @@ Features
   Enable or disable events for individual cities.
 - **Reward System:**  
   Automatic honor (100 default) and level-scaled gold rewards for winning faction players (base 50 silver + 50 silver per level).
-- **Dual Victory Conditions:**  
-  Defenders win if the city leader survives, attackers win if they kill the city leader. Both outcomes reward the winning faction.
-- **Debug Mode:**  
-  Comprehensive logging for server administrators.
 
 Playerbot Support
 -----------------
@@ -61,12 +55,10 @@ This module can optionally recruit Playerbots (random bots) to participate in si
 - Exclusions: Bots that are dead, in combat, inside instances/battlegrounds, or currently in a party/raid will be skipped.
 - Level and count: Recruited bots respect `Playerbots.MinLevel`, `Playerbots.MaxAttackers` and `Playerbots.MaxDefenders` configuration values.
 - Behavior: Recruited bots are teleported to spawn points or near the city leader and will be returned to their original location and strategies after the siege ends.
-- Override Alone Scale: When `CitySiege.Playerbots.OverrideAloneScale = 1`, siege participant bots will remain active even when no players are nearby, overriding the `AiPlayerbot.botActiveAloneSmartScale` setting. This ensures bots continue participating in sieges regardless of player presence.
 
 Notes
 -----
 - Ensure the Playerbots module is enabled and configured before enabling playerbot recruitment for sieges.
-- For testing use a small max-attacker/max-defender value to avoid large-scale teleportation of many bots.
 
 Installation
 ------------
@@ -444,11 +436,14 @@ CitySiege.Stormwind.Waypoint3.Z = 103.72089
 - Setting WaypointCount to 0 makes units path directly to the leader
 - Use `.gps` command in-game to get coordinates for waypoints
 
-### Playerbot Settings
+### Reward Settings
 
 Setting                                | Description                                           | Default
 ---------------------------------------|-------------------------------------------------------|--------
-CitySiege.Playerbots.OverrideAloneScale| Override AiPlayerbot.botActiveAloneSmartScale for siege bots, keeping them active even without nearby players.| 1
+CitySiege.RewardOnDefense              | Enable rewards for defenders.                         | 1
+CitySiege.RewardHonor                  | Honor points for successful defense.                  | 100
+CitySiege.RewardGoldBase               | Base gold at level 1 in copper (50 silver = 5000).   | 5000
+CitySiege.RewardGoldPerLevel           | Additional gold per player level in copper.           | 5000
 
 ### Announcement Messages
 

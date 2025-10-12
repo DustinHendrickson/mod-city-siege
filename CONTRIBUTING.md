@@ -151,10 +151,10 @@ Improvements to documentation are always welcome:
 Current priorities for contributions:
 
 1. **High Priority**
-   - Creature spawning implementation
-   - AI configuration
-   - Creature text system
-   - Reward distribution
+   - Waypoint remaining cities
+   - More Content
+   - Better Playerbot control
+   - More spread out enemies (less deathballs)
 
 2. **Medium Priority**
    - Additional configuration options
@@ -166,7 +166,7 @@ Current priorities for contributions:
    - Achievement system
    - Quest integration
    - Statistics tracking
-   - Web interface for monitoring
+   - Custom Addon for client visuals
 
 ## Code of Conduct
 
@@ -187,7 +187,5 @@ If you have questions:
 By contributing, you agree that your contributions will be licensed under the GNU AGPL v3 license.
 
 ## Recognition
-
-Contributors will be added to the AUTHORS file and recognized in release notes.
 
 Thank you for contributing to the City Siege module!
