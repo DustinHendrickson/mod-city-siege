@@ -2385,123 +2385,115 @@ void ProcessBotRespawns(SiegeEvent& event)
         if (currentTime - it->deathTime >= g_PlayerbotsRespawnDelay)
         {
             Player* bot = ObjectAccessor::FindPlayer(it->botGuid);
-            if (bot && bot->IsInWorld() && !bot->IsAlive())
+
+            // If the Player object is not present or not in world anymore, keep the entry and try again later
+            if (!bot || !bot->IsInWorld())
             {
-                // Resurrect the bot
-                bot->ResurrectPlayer(1.0f); // Full health and mana
-                bot->SpawnCorpseBones();
-                
-                // Remove away status to ensure bot is active
-                bot->RemovePlayerFlag(PLAYER_FLAGS_AFK);
-                
-                // Re-enable PvP flag for continued siege participation
-                bot->SetPvP(true);
-                
-                // Teleport to appropriate spawn location with randomization
-                float angle = frand(0.0f, 2.0f * M_PI);
-                float distance = frand(0.0f, 10.0f);
-                
-                if (it->isDefender)
-                {
-                    // Defenders respawn near the city leader (throne room) with randomization
-                    float respawnX = city.leaderX + distance * std::cos(angle);
-                    float respawnY = city.leaderY + distance * std::sin(angle);
-                    bot->TeleportTo(city.mapId, respawnX, respawnY, city.leaderZ, 0.0f);
-                    
-                    // Restart waypoint movement for defenders (move toward spawn)
-                    if (!city.waypoints.empty())
-                    {
-                        size_t defenderWaypoint = city.waypoints.size() - 1;
-                        event.creatureWaypointProgress[it->botGuid] = defenderWaypoint;
-                        
-                        if (defenderWaypoint > 0)
-                        {
-                            const Waypoint& targetWP = city.waypoints[defenderWaypoint - 1];
-                            
-                            // Use playerbots travel system for proper pathfinding
-                            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
-                            if (botAI)
-                            {
-                                TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-                                if (travelTarget)
-                                {
-                                    WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                                    
-                                    TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                                    siegeDest->addPoint(destPos);
-                                    
-                                    travelTarget->setTarget(siegeDest, destPos);
-                                    travelTarget->setForced(true);
-                                }
-                                
-                                if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
-                                {
-                                    botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (g_DebugMode)
-                    {
-                        LOG_INFO("server.loading", "[City Siege] Respawned defender bot {} near city leader at [{:.2f}, {:.2f}, {:.2f}]",
-                                 bot->GetName(), respawnX, respawnY, city.leaderZ);
-                    }
-                }
-                else
-                {
-                    // Attackers respawn at spawn point with randomization
-                    float respawnX = city.spawnX + distance * std::cos(angle);
-                    float respawnY = city.spawnY + distance * std::sin(angle);
-                    bot->TeleportTo(city.mapId, respawnX, respawnY, city.spawnZ, 0.0f);
-                    
-                    // Restart waypoint movement for attackers (move toward leader)
-                    if (!city.waypoints.empty())
-                    {
-                        event.creatureWaypointProgress[it->botGuid] = 0;
-                        const Waypoint& targetWP = city.waypoints[0];
-                        
-                        // Use playerbots travel system for proper pathfinding
-                        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
-                        if (botAI)
-                        {
-                            TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-                            if (travelTarget)
-                            {
-                                WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                                
-                                TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                                siegeDest->addPoint(destPos);
-                                
-                                travelTarget->setTarget(siegeDest, destPos);
-                                travelTarget->setForced(true);
-                            }
-                            
-                            if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
-                            {
-                                botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
-                            }
-                        }
-                    }
-                    
-                    if (g_DebugMode)
-                    {
-                        LOG_INFO("server.loading", "[City Siege] Respawned attacker bot {} at spawn point [{:.2f}, {:.2f}, {:.2f}]",
-                                 bot->GetName(), respawnX, respawnY, city.spawnZ);
-                    }
-                }
-                
-                // Put back into combat state
-                bot->SetInCombatState(true);
-                
-                // Remove from respawn queue
-                it = event.deadBots.erase(it);
+                ++it;
+                continue;
+            }
+
+            // Determine desired respawn position depending on faction
+            float desiredX, desiredY, desiredZ;
+            if (it->isDefender)
+            {
+                desiredX = city.leaderX;
+                desiredY = city.leaderY;
+                desiredZ = city.leaderZ;
             }
             else
             {
-                // Bot exists and is alive, just remove from queue
-                it = event.deadBots.erase(it);
+                desiredX = city.spawnX;
+                desiredY = city.spawnY;
+                desiredZ = city.spawnZ;
             }
+
+            // If bot is alive already, check whether it's at the correct location (not a graveyard)
+            if (bot->IsAlive())
+            {
+                float distToDesired = bot->GetDistance2d(desiredX, desiredY);
+                // If bot is already close to desired respawn location, consider it handled
+                if (distToDesired <= 15.0f)
+                {
+                    it = event.deadBots.erase(it);
+                    continue;
+                }
+                // Otherwise fall through and force-teleport/reissue movement so the bot goes to the siege spawn/leader
+            }
+            else
+            {
+                // Bot is dead: resurrect now
+                bot->ResurrectPlayer(1.0f); // Full health and mana
+                bot->SpawnCorpseBones();
+            }
+
+            // Ensure bot is active and participating
+            bot->RemovePlayerFlag(PLAYER_FLAGS_AFK);
+            bot->SetPvP(true);
+
+            // Teleport to desired spawn/leader position with small randomization
+            float angle = frand(0.0f, 2.0f * M_PI);
+            float distance = frand(0.0f, 10.0f);
+            float respawnX = desiredX + distance * std::cos(angle);
+            float respawnY = desiredY + distance * std::sin(angle);
+            bot->TeleportTo(city.mapId, respawnX, respawnY, desiredZ, 0.0f);
+
+            // Reinitialize waypoint/travel progress depending on defender/attacker
+            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            if (it->isDefender)
+            {
+                if (!city.waypoints.empty())
+                {
+                    size_t defenderWaypoint = city.waypoints.size() - 1;
+                    event.creatureWaypointProgress[it->botGuid] = defenderWaypoint;
+
+                    if (defenderWaypoint > 0 && botAI)
+                    {
+                        const Waypoint& targetWP = city.waypoints[defenderWaypoint - 1];
+                        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+                        if (travelTarget)
+                        {
+                            WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                            TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                            siegeDest->addPoint(destPos);
+                            travelTarget->setTarget(siegeDest, destPos);
+                            travelTarget->setForced(true);
+                        }
+
+                        if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
+                            botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                    }
+                }
+            }
+            else
+            {
+                if (!city.waypoints.empty())
+                {
+                    event.creatureWaypointProgress[it->botGuid] = 0;
+                    if (botAI)
+                    {
+                        const Waypoint& targetWP = city.waypoints[0];
+                        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+                        if (travelTarget)
+                        {
+                            WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
+                            TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
+                            siegeDest->addPoint(destPos);
+                            travelTarget->setTarget(siegeDest, destPos);
+                            travelTarget->setForced(true);
+                        }
+
+                        if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
+                            botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                    }
+                }
+            }
+
+            // Put back into combat state
+            bot->SetInCombatState(true);
+
+            // Remove from respawn queue
+            it = event.deadBots.erase(it);
         }
         else
         {
