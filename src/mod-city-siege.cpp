@@ -2554,15 +2554,16 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                 if (currentWP > 0)
                 {
                     const Waypoint& targetWP = city.waypoints[currentWP - 1];
-                    float dist = bot->GetDistance2d(targetWP.x, targetWP.y);
-                    
+                    // Use full 3D distance to account for small Z differences between config and actual ground
+                    float dist = bot->GetDistance(targetWP.x, targetWP.y, targetWP.z);
+
                     // If bot is within 10 yards of target waypoint, advance immediately
-                    if (dist < 10.0f)
+                    if (dist <= 10.0f)
                     {
                         currentWP--;
                         event.creatureWaypointProgress[botGuid] = currentWP;
-                        
-                        
+
+
                         // Immediately set next waypoint if not at spawn
                         if (currentWP > 0)
                         {
@@ -2616,14 +2617,15 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                 if (currentWP + 1 < city.waypoints.size())
                 {
                     const Waypoint& targetWP = city.waypoints[currentWP + 1];
-                    float dist = bot->GetDistance2d(targetWP.x, targetWP.y);
-                    
+                    // Use full 3D distance to account for small Z differences between config and actual ground
+                    float dist = bot->GetDistance(targetWP.x, targetWP.y, targetWP.z);
+
                     // If bot is within 10 yards of target waypoint, advance immediately
-                    if (dist < 10.0f)
+                    if (dist <= 10.0f)
                     {
                         currentWP++;
                         event.creatureWaypointProgress[botGuid] = currentWP;
-                        
+
                         // Immediately set next waypoint if not at leader yet
                         if (currentWP + 1 < city.waypoints.size())
                         {
