@@ -3932,6 +3932,7 @@ public:
             { "testwaypoint", HandleCitySiegeTestWaypointCommand, SEC_GAMEMASTER, Console::No },
             { "waypoints",    HandleCitySiegeWaypointsCommand,    SEC_GAMEMASTER, Console::No },
             { "distance",     HandleCitySiegeDistanceCommand,     SEC_GAMEMASTER, Console::No },
+            { "info",         HandleCitySiegeInfoCommand,         SEC_GAMEMASTER, Console::No },
             { "reload",       HandleCitySiegeReloadCommand,       SEC_ADMINISTRATOR, Console::No }
         };
 
@@ -4561,7 +4562,170 @@ public:
         
         return true;
     }
-    
+
+    static bool HandleCitySiegeInfoCommand(ChatHandler* handler)
+    {
+        Player* player = handler->GetSession()->GetPlayer();
+        if (!player)
+        {
+            handler->PSendSysMessage("You must be logged in to use this command.");
+            return true;
+        }
+
+        // Get selected creature
+        Unit* selectedUnit = player->GetSelectedUnit();
+        if (!selectedUnit || !selectedUnit->IsCreature())
+        {
+            handler->PSendSysMessage("You must select a creature to use this command.");
+            return true;
+        }
+
+        Creature* selectedCreature = selectedUnit->ToCreature();
+        ObjectGuid creatureGuid = selectedCreature->GetGUID();
+
+        // Find which siege this creature belongs to
+        SiegeEvent* activeSiege = nullptr;
+        for (auto& event : g_ActiveSieges)
+        {
+            if (!event.isActive)
+                continue;
+
+            // Check if creature is an attacker
+            bool isAttacker = false;
+            for (const auto& guid : event.spawnedCreatures)
+            {
+                if (guid == creatureGuid)
+                {
+                    isAttacker = true;
+                    break;
+                }
+            }
+
+            // Check if creature is a defender
+            bool isDefender = false;
+            if (!isAttacker)
+            {
+                for (const auto& guid : event.spawnedDefenders)
+                {
+                    if (guid == creatureGuid)
+                    {
+                        isDefender = true;
+                        break;
+                    }
+                }
+            }
+
+            if (isAttacker || isDefender)
+            {
+                activeSiege = &event;
+                break;
+            }
+        }
+
+        if (!activeSiege)
+        {
+            handler->PSendSysMessage("Selected creature is not part of any active siege.");
+            return true;
+        }
+
+        const CityData& city = g_Cities[activeSiege->cityId];
+
+        // Get waypoint progress
+        auto it = activeSiege->creatureWaypointProgress.find(creatureGuid);
+        if (it == activeSiege->creatureWaypointProgress.end())
+        {
+            handler->PSendSysMessage("Selected creature has no waypoint progress data.");
+            return true;
+        }
+
+        uint32 currentWP = it->second;
+
+        // Check if this is a defender (marked with +10000)
+        bool isDefender = (currentWP >= 10000);
+        if (isDefender)
+            currentWP -= 10000; // Remove marker to get actual waypoint
+
+        // Determine current target location
+        float targetX, targetY, targetZ;
+        std::string targetDescription;
+
+        if (isDefender)
+        {
+            // DEFENDERS: Move backwards through waypoints (high to low), then to spawn
+            if (currentWP > 0 && currentWP <= city.waypoints.size())
+            {
+                // Moving towards a waypoint (backwards)
+                targetX = city.waypoints[currentWP - 1].x;
+                targetY = city.waypoints[currentWP - 1].y;
+                targetZ = city.waypoints[currentWP - 1].z;
+                targetDescription = "Waypoint " + std::to_string(currentWP);
+            }
+            else if (currentWP == 0)
+            {
+                // At first waypoint, now go to spawn point
+                targetX = city.spawnX;
+                targetY = city.spawnY;
+                targetZ = city.spawnZ;
+                targetDescription = "Spawn Point";
+            }
+            else
+            {
+                handler->PSendSysMessage("Selected creature has invalid waypoint progress (defender).");
+                return true;
+            }
+        }
+        else
+        {
+            // ATTACKERS: Move forwards through waypoints (low to high), then to leader
+            if (currentWP < city.waypoints.size())
+            {
+                targetX = city.waypoints[currentWP].x;
+                targetY = city.waypoints[currentWP].y;
+                targetZ = city.waypoints[currentWP].z;
+                targetDescription = "Waypoint " + std::to_string(currentWP + 1);
+            }
+            else if (currentWP == city.waypoints.size())
+            {
+                targetX = city.leaderX;
+                targetY = city.leaderY;
+                targetZ = city.leaderZ;
+                targetDescription = "Leader Position";
+            }
+            else
+            {
+                handler->PSendSysMessage("Selected creature has invalid waypoint progress (attacker).");
+                return true;
+            }
+        }
+
+        // Calculate distance to target
+        float distance = selectedCreature->GetDistance(targetX, targetY, targetZ);
+
+        // Display information
+        char infoMsg[512];
+        snprintf(infoMsg, sizeof(infoMsg), "|cff00ff00[City Siege Info]|r %s in %s",
+            selectedCreature->GetName().c_str(), city.name.c_str());
+        handler->PSendSysMessage(infoMsg);
+
+        snprintf(infoMsg, sizeof(infoMsg), "Type: %s | Current Waypoint: %u | Target: %s",
+            isDefender ? "Defender" : "Attacker", currentWP, targetDescription.c_str());
+        handler->PSendSysMessage(infoMsg);
+
+        snprintf(infoMsg, sizeof(infoMsg), "Distance to target: %.1f yards | Target coords: (%.1f, %.1f, %.1f)",
+            distance, targetX, targetY, targetZ);
+        handler->PSendSysMessage(infoMsg);
+
+        // Show creature position
+        float creatureX = selectedCreature->GetPositionX();
+        float creatureY = selectedCreature->GetPositionY();
+        float creatureZ = selectedCreature->GetPositionZ();
+        snprintf(infoMsg, sizeof(infoMsg), "Creature position: (%.1f, %.1f, %.1f)",
+            creatureX, creatureY, creatureZ);
+        handler->PSendSysMessage(infoMsg);
+
+        return true;
+    }
+
     static bool HandleCitySiegeReloadCommand(ChatHandler* handler)
     {
         handler->PSendSysMessage("|cff00ff00[City Siege]|r Reloading configuration from mod_city_siege.conf...");

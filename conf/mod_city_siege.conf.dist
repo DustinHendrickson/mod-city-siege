@@ -158,9 +158,9 @@ CitySiege.Exodar.SpawnZ = 1.712
 #    CitySiege.Orgrimmar.SpawnX/Y/Z
 #        Description: Spawn location for siege forces outside Orgrimmar gates (Durotar entrance).
 #        Default:     1114.96, -4374.63, 25.813
-CitySiege.Orgrimmar.SpawnX = 1114.96
-CitySiege.Orgrimmar.SpawnY = -4374.63
-CitySiege.Orgrimmar.SpawnZ = 25.813
+CitySiege.Orgrimmar.SpawnX = 1250.33
+CitySiege.Orgrimmar.SpawnY = -4412.59
+CitySiege.Orgrimmar.SpawnZ = 25.48
 
 #
 #    CitySiege.Undercity.SpawnX/Y/Z
@@ -226,9 +226,9 @@ CitySiege.Exodar.LeaderZ = -137.644
 #    CitySiege.Orgrimmar.LeaderX/Y/Z
 #        Description: Location of the city leader (Thrall) for siege targeting.
 #        Default:     1633.75, -4439.39, 15.4396
-CitySiege.Orgrimmar.LeaderX = 1633.75
-CitySiege.Orgrimmar.LeaderY = -4439.39
-CitySiege.Orgrimmar.LeaderZ = 15.4396
+CitySiege.Orgrimmar.LeaderX = 1921.57
+CitySiege.Orgrimmar.LeaderY = -4148.41
+CitySiege.Orgrimmar.LeaderZ = 41.64
 
 #
 #    CitySiege.Undercity.LeaderX/Y/Z
@@ -371,7 +371,64 @@ CitySiege.Exodar.WaypointCount = 0
 #    CitySiege.Orgrimmar.WaypointCount
 #        Description: Number of waypoints for Orgrimmar siege path.
 #        Default:     0 (direct path - add waypoints if needed)
-CitySiege.Orgrimmar.WaypointCount = 0
+CitySiege.Orgrimmar.WaypointCount = 14
+
+# Orgrimmar waypoint path (spawn -> waypoints -> leader)
+CitySiege.Orgrimmar.Waypoint1.X = 1426.18
+CitySiege.Orgrimmar.Waypoint1.Y = -4364.05
+CitySiege.Orgrimmar.Waypoint1.Z = 26.46
+
+CitySiege.Orgrimmar.Waypoint2.X = 1539.32
+CitySiege.Orgrimmar.Waypoint2.Y = -4408.84
+CitySiege.Orgrimmar.Waypoint2.Z = 12.25
+
+CitySiege.Orgrimmar.Waypoint3.X = 1657.09
+CitySiege.Orgrimmar.Waypoint3.Y = -4415.28
+CitySiege.Orgrimmar.Waypoint3.Z = 17.77
+
+CitySiege.Orgrimmar.Waypoint4.X = 1713.08
+CitySiege.Orgrimmar.Waypoint4.Y = -4372.30
+CitySiege.Orgrimmar.Waypoint4.Z = 28.90
+
+CitySiege.Orgrimmar.Waypoint5.X = 1728.06
+CitySiege.Orgrimmar.Waypoint5.Y = -4477.64
+CitySiege.Orgrimmar.Waypoint5.Z = 33.76
+
+CitySiege.Orgrimmar.Waypoint6.X = 1774.96
+CitySiege.Orgrimmar.Waypoint6.Y = -4532.50
+CitySiege.Orgrimmar.Waypoint6.Z = 25.69
+
+CitySiege.Orgrimmar.Waypoint7.X = 1926.51
+CitySiege.Orgrimmar.Waypoint7.Y = -4486.32
+CitySiege.Orgrimmar.Waypoint7.Z = 24.88
+
+CitySiege.Orgrimmar.Waypoint8.X = 1844.84
+CitySiege.Orgrimmar.Waypoint8.Y = -4411.77
+CitySiege.Orgrimmar.Waypoint8.Z = 5.91
+
+CitySiege.Orgrimmar.Waypoint9.X = 1802.93
+CitySiege.Orgrimmar.Waypoint9.Y = -4304.78
+CitySiege.Orgrimmar.Waypoint9.Z = -9.96
+
+CitySiege.Orgrimmar.Waypoint10.X = 1758.48
+CitySiege.Orgrimmar.Waypoint10.Y = -4306.42
+CitySiege.Orgrimmar.Waypoint10.Z = 7.81
+
+CitySiege.Orgrimmar.Waypoint11.X = 1780.20
+CitySiege.Orgrimmar.Waypoint11.Y = -4234.99
+CitySiege.Orgrimmar.Waypoint11.Z = 40.61
+
+CitySiege.Orgrimmar.Waypoint12.X = 1890.68
+CitySiege.Orgrimmar.Waypoint12.Y = -4285.49
+CitySiege.Orgrimmar.Waypoint12.Z = 31.71
+
+CitySiege.Orgrimmar.Waypoint13.X = 1931.49
+CitySiege.Orgrimmar.Waypoint13.Y = -4285.40
+CitySiege.Orgrimmar.Waypoint13.Z = 29.28
+
+CitySiege.Orgrimmar.Waypoint14.X = 1926.68
+CitySiege.Orgrimmar.Waypoint14.Y = -4218.74
+CitySiege.Orgrimmar.Waypoint14.Z = 42.17
 
 #
 #    CitySiege.Undercity.WaypointCount
