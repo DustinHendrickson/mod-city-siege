@@ -4572,77 +4572,114 @@ public:
             return true;
         }
 
-        // Get selected creature
+        // Get selected unit (can be creature or playerbot)
         Unit* selectedUnit = player->GetSelectedUnit();
-        if (!selectedUnit || !selectedUnit->IsCreature())
+        if (!selectedUnit)
         {
-            handler->PSendSysMessage("You must select a creature to use this command.");
+            handler->PSendSysMessage("You must select a unit to use this command.");
             return true;
         }
 
-        Creature* selectedCreature = selectedUnit->ToCreature();
-        ObjectGuid creatureGuid = selectedCreature->GetGUID();
+        ObjectGuid unitGuid = selectedUnit->GetGUID();
+        bool isPlayerBot = selectedUnit->IsPlayer();
+        bool isCreature = selectedUnit->IsCreature();
 
-        // Find which siege this creature belongs to
+        if (!isPlayerBot && !isCreature)
+        {
+            handler->PSendSysMessage("Selected unit must be a creature or playerbot.");
+            return true;
+        }
+
+        // Find which siege this unit belongs to
         SiegeEvent* activeSiege = nullptr;
+        bool isAttacker = false;
+        bool isDefender = false;
+
         for (auto& event : g_ActiveSieges)
         {
             if (!event.isActive)
                 continue;
 
-            // Check if creature is an attacker
-            bool isAttacker = false;
-            for (const auto& guid : event.spawnedCreatures)
+            // Check if unit is an attacker
+            if (isCreature)
             {
-                if (guid == creatureGuid)
+                for (const auto& guid : event.spawnedCreatures)
                 {
-                    isAttacker = true;
-                    break;
+                    if (guid == unitGuid)
+                    {
+                        isAttacker = true;
+                        activeSiege = &event;
+                        break;
+                    }
                 }
             }
-
-            // Check if creature is a defender
-            bool isDefender = false;
-            if (!isAttacker)
+            else if (isPlayerBot)
             {
-                for (const auto& guid : event.spawnedDefenders)
+                for (const auto& guid : event.attackerBots)
                 {
-                    if (guid == creatureGuid)
+                    if (guid == unitGuid)
                     {
-                        isDefender = true;
+                        isAttacker = true;
+                        activeSiege = &event;
                         break;
                     }
                 }
             }
 
-            if (isAttacker || isDefender)
+            // Check if unit is a defender
+            if (!activeSiege)
             {
-                activeSiege = &event;
-                break;
+                if (isCreature)
+                {
+                    for (const auto& guid : event.spawnedDefenders)
+                    {
+                        if (guid == unitGuid)
+                        {
+                            isDefender = true;
+                            activeSiege = &event;
+                            break;
+                        }
+                    }
+                }
+                else if (isPlayerBot)
+                {
+                    for (const auto& guid : event.defenderBots)
+                    {
+                        if (guid == unitGuid)
+                        {
+                            isDefender = true;
+                            activeSiege = &event;
+                            break;
+                        }
+                    }
+                }
             }
+
+            if (activeSiege)
+                break;
         }
 
         if (!activeSiege)
         {
-            handler->PSendSysMessage("Selected creature is not part of any active siege.");
+            handler->PSendSysMessage("Selected unit is not part of any active siege.");
             return true;
         }
 
         const CityData& city = g_Cities[activeSiege->cityId];
 
         // Get waypoint progress
-        auto it = activeSiege->creatureWaypointProgress.find(creatureGuid);
+        auto it = activeSiege->creatureWaypointProgress.find(unitGuid);
         if (it == activeSiege->creatureWaypointProgress.end())
         {
-            handler->PSendSysMessage("Selected creature has no waypoint progress data.");
+            handler->PSendSysMessage("Selected unit has no waypoint progress data.");
             return true;
         }
 
         uint32 currentWP = it->second;
 
         // Check if this is a defender (marked with +10000)
-        bool isDefender = (currentWP >= 10000);
-        if (isDefender)
+        bool isDefenderMarker = (currentWP >= 10000);
+        if (isDefenderMarker)
             currentWP -= 10000; // Remove marker to get actual waypoint
 
         // Determine current target location
@@ -4670,7 +4707,7 @@ public:
             }
             else
             {
-                handler->PSendSysMessage("Selected creature has invalid waypoint progress (defender).");
+                handler->PSendSysMessage("Selected unit has invalid waypoint progress (defender).");
                 return true;
             }
         }
@@ -4693,34 +4730,35 @@ public:
             }
             else
             {
-                handler->PSendSysMessage("Selected creature has invalid waypoint progress (attacker).");
+                handler->PSendSysMessage("Selected unit has invalid waypoint progress (attacker).");
                 return true;
             }
         }
 
         // Calculate distance to target
-        float distance = selectedCreature->GetDistance(targetX, targetY, targetZ);
+        float distance = selectedUnit->GetDistance(targetX, targetY, targetZ);
 
         // Display information
+        std::string unitName = isPlayerBot ? selectedUnit->ToPlayer()->GetName() : selectedUnit->GetName();
         char infoMsg[512];
         snprintf(infoMsg, sizeof(infoMsg), "|cff00ff00[City Siege Info]|r %s in %s",
-            selectedCreature->GetName().c_str(), city.name.c_str());
+            unitName.c_str(), city.name.c_str());
         handler->PSendSysMessage(infoMsg);
 
-        snprintf(infoMsg, sizeof(infoMsg), "Type: %s | Current Waypoint: %u | Target: %s",
-            isDefender ? "Defender" : "Attacker", currentWP, targetDescription.c_str());
+        snprintf(infoMsg, sizeof(infoMsg), "Type: %s %s | Current Waypoint: %u | Target: %s",
+            isDefender ? "Defender" : "Attacker", isPlayerBot ? "Playerbot" : "NPC", currentWP, targetDescription.c_str());
         handler->PSendSysMessage(infoMsg);
 
         snprintf(infoMsg, sizeof(infoMsg), "Distance to target: %.1f yards | Target coords: (%.1f, %.1f, %.1f)",
             distance, targetX, targetY, targetZ);
         handler->PSendSysMessage(infoMsg);
 
-        // Show creature position
-        float creatureX = selectedCreature->GetPositionX();
-        float creatureY = selectedCreature->GetPositionY();
-        float creatureZ = selectedCreature->GetPositionZ();
-        snprintf(infoMsg, sizeof(infoMsg), "Creature position: (%.1f, %.1f, %.1f)",
-            creatureX, creatureY, creatureZ);
+        // Show unit position
+        float unitX = selectedUnit->GetPositionX();
+        float unitY = selectedUnit->GetPositionY();
+        float unitZ = selectedUnit->GetPositionZ();
+        snprintf(infoMsg, sizeof(infoMsg), "Unit position: (%.1f, %.1f, %.1f)",
+            unitX, unitY, unitZ);
         handler->PSendSysMessage(infoMsg);
 
         return true;
