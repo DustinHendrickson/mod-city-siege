@@ -2601,22 +2601,21 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
             TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
             if (travelTarget)
             {
-                // For attackers: if not at final waypoint and not currently traveling, set next waypoint
-                if (currentWP + 1 < city.waypoints.size() && !travelTarget->isTraveling())
+                // For attackers: if not at final waypoint and not currently traveling, set current waypoint
+                if (currentWP < city.waypoints.size() && !travelTarget->isTraveling())
                 {
-                    const Waypoint& nextWP = city.waypoints[currentWP + 1];
-                    WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
+                    const Waypoint& currentWPData = city.waypoints[currentWP];
+                    WorldPosition* destPos = new WorldPosition(city.mapId, currentWPData.x, currentWPData.y, currentWPData.z, 0.0f);
                     TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
                     siegeDest->addPoint(destPos);
                     travelTarget->setTarget(siegeDest, destPos);
                     travelTarget->setForced(true);
-
                 }
                 
                 // Check if bot reached current target waypoint by distance
-                if (currentWP + 1 < city.waypoints.size())
+                if (currentWP < city.waypoints.size())
                 {
-                    const Waypoint& targetWP = city.waypoints[currentWP + 1];
+                    const Waypoint& targetWP = city.waypoints[currentWP];
                     // Use full 3D distance to account for small Z differences between config and actual ground
                     float dist = bot->GetDistance(targetWP.x, targetWP.y, targetWP.z);
 
@@ -2627,9 +2626,9 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                         event.creatureWaypointProgress[botGuid] = currentWP;
 
                         // Immediately set next waypoint if not at leader yet
-                        if (currentWP + 1 < city.waypoints.size())
+                        if (currentWP < city.waypoints.size())
                         {
-                            const Waypoint& nextWP = city.waypoints[currentWP + 1];
+                            const Waypoint& nextWP = city.waypoints[currentWP];
                             WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
                             TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
                             siegeDest->addPoint(destPos);
