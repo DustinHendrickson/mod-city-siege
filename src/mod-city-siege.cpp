@@ -439,6 +439,47 @@ bool ParseXYZ(const std::string& coordString, float& outX, float& outY, float& o
 }
 
 /**
+ * @brief Parse comma-separated XYZ coordinates from a string
+ * @param coordString The string containing "X,Y,Z" format
+ * @param outX Output parameter for X coordinate
+ * @param outY Output parameter for Y coordinate
+ * @param outZ Output parameter for Z coordinate
+ * @return True if parsing was successful, false otherwise
+ */
+bool ParseXYZ(const std::string& coordString, float& outX, float& outY, float& outZ)
+{
+    if (coordString.empty())
+        return false;
+
+    std::vector<std::string> coords;
+    std::stringstream ss(coordString);
+    std::string token;
+
+    // Split by comma and trim whitespaces
+    while (std::getline(ss, token, ','))
+    {
+        token.erase(0, token.find_first_not_of(" \t"));
+        token.erase(token.find_last_not_of(" \t") + 1);
+        coords.push_back(token);
+    }
+
+    if (coords.size() != 3)
+        return false;
+
+    try
+    {
+        outX = std::stof(coords[0]);
+        outY = std::stof(coords[1]);
+        outZ = std::stof(coords[2]);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+/**
  * @brief Loads the configuration for the City Siege module.
  */
 void LoadCitySiegeConfiguration()
@@ -2693,10 +2734,11 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                 if (currentWP > 0)
                 {
                     const Waypoint& targetWP = city.waypoints[currentWP - 1];
-                    float dist = bot->GetDistance2d(targetWP.x, targetWP.y);
+                    // Use full 3D distance to account for small Z differences between config and actual ground
+                    float dist = bot->GetDistance(targetWP.x, targetWP.y, targetWP.z);
 
                     // If bot is within 10 yards of target waypoint, advance immediately
-                    if (dist < 10.0f)
+                    if (dist <= 10.0f)
                     {
                         currentWP--;
                         event.creatureWaypointProgress[botGuid] = currentWP;
@@ -2755,10 +2797,11 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                 if (currentWP + 1 < city.waypoints.size())
                 {
                     const Waypoint& targetWP = city.waypoints[currentWP + 1];
-                    float dist = bot->GetDistance2d(targetWP.x, targetWP.y);
+                    // Use full 3D distance to account for small Z differences between config and actual ground
+                    float dist = bot->GetDistance(targetWP.x, targetWP.y, targetWP.z);
 
                     // If bot is within 10 yards of target waypoint, advance immediately
-                    if (dist < 10.0f)
+                    if (dist <= 10.0f)
                     {
                         currentWP++;
                         event.creatureWaypointProgress[botGuid] = currentWP;
@@ -4071,6 +4114,7 @@ public:
             { "testwaypoint", HandleCitySiegeTestWaypointCommand, SEC_GAMEMASTER, Console::No },
             { "waypoints",    HandleCitySiegeWaypointsCommand,    SEC_GAMEMASTER, Console::No },
             { "distance",     HandleCitySiegeDistanceCommand,     SEC_GAMEMASTER, Console::No },
+            { "info",         HandleCitySiegeInfoCommand,         SEC_GAMEMASTER, Console::No },
             { "reload",       HandleCitySiegeReloadCommand,       SEC_ADMINISTRATOR, Console::No }
         };
 
@@ -4697,6 +4741,207 @@ public:
         {
             LOG_INFO("module", "[City Siege] Total visualization markers spawned: {}", visualizations.size());
         }
+
+        return true;
+    }
+
+    static bool HandleCitySiegeInfoCommand(ChatHandler* handler)
+    {
+        Player* player = handler->GetSession()->GetPlayer();
+        if (!player)
+        {
+            handler->PSendSysMessage("You must be logged in to use this command.");
+            return true;
+        }
+
+        // Get selected unit (can be creature or playerbot)
+        Unit* selectedUnit = player->GetSelectedUnit();
+        if (!selectedUnit)
+        {
+            handler->PSendSysMessage("You must select a unit to use this command.");
+            return true;
+        }
+
+        ObjectGuid unitGuid = selectedUnit->GetGUID();
+        bool isPlayerBot = selectedUnit->IsPlayer();
+        bool isCreature = selectedUnit->IsCreature();
+
+        if (!isPlayerBot && !isCreature)
+        {
+            handler->PSendSysMessage("Selected unit must be a creature or playerbot.");
+            return true;
+        }
+
+        // Find which siege this unit belongs to
+        SiegeEvent* activeSiege = nullptr;
+        bool isAttacker = false;
+        bool isDefender = false;
+
+        for (auto& event : g_ActiveSieges)
+        {
+            if (!event.isActive)
+                continue;
+
+            // Check if unit is an attacker
+            if (isCreature)
+            {
+                for (const auto& guid : event.spawnedCreatures)
+                {
+                    if (guid == unitGuid)
+                    {
+                        isAttacker = true;
+                        activeSiege = &event;
+                        break;
+                    }
+                }
+            }
+            else if (isPlayerBot)
+            {
+                for (const auto& guid : event.attackerBots)
+                {
+                    if (guid == unitGuid)
+                    {
+                        isAttacker = true;
+                        activeSiege = &event;
+                        break;
+                    }
+                }
+            }
+
+            // Check if unit is a defender
+            if (!activeSiege)
+            {
+                if (isCreature)
+                {
+                    for (const auto& guid : event.spawnedDefenders)
+                    {
+                        if (guid == unitGuid)
+                        {
+                            isDefender = true;
+                            activeSiege = &event;
+                            break;
+                        }
+                    }
+                }
+                else if (isPlayerBot)
+                {
+                    for (const auto& guid : event.defenderBots)
+                    {
+                        if (guid == unitGuid)
+                        {
+                            isDefender = true;
+                            activeSiege = &event;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (activeSiege)
+                break;
+        }
+
+        if (!activeSiege)
+        {
+            handler->PSendSysMessage("Selected unit is not part of any active siege.");
+            return true;
+        }
+
+        const CityData& city = g_Cities[activeSiege->cityId];
+
+        // Get waypoint progress
+        auto it = activeSiege->creatureWaypointProgress.find(unitGuid);
+        if (it == activeSiege->creatureWaypointProgress.end())
+        {
+            handler->PSendSysMessage("Selected unit has no waypoint progress data.");
+            return true;
+        }
+
+        uint32 currentWP = it->second;
+
+        // Check if this is a defender (marked with +10000)
+        bool isDefenderMarker = (currentWP >= 10000);
+        if (isDefenderMarker)
+            currentWP -= 10000; // Remove marker to get actual waypoint
+
+        // Determine current target location
+        float targetX, targetY, targetZ;
+        std::string targetDescription;
+
+        if (isDefender)
+        {
+            // DEFENDERS: Move backwards through waypoints (high to low), then to spawn
+            if (currentWP > 0 && currentWP <= city.waypoints.size())
+            {
+                // Moving towards a waypoint (backwards)
+                targetX = city.waypoints[currentWP - 1].x;
+                targetY = city.waypoints[currentWP - 1].y;
+                targetZ = city.waypoints[currentWP - 1].z;
+                targetDescription = "Waypoint " + std::to_string(currentWP);
+            }
+            else if (currentWP == 0)
+            {
+                // At first waypoint, now go to spawn point
+                targetX = city.spawnX;
+                targetY = city.spawnY;
+                targetZ = city.spawnZ;
+                targetDescription = "Spawn Point";
+            }
+            else
+            {
+                handler->PSendSysMessage("Selected unit has invalid waypoint progress (defender).");
+                return true;
+            }
+        }
+        else
+        {
+            // ATTACKERS: Move forwards through waypoints (low to high), then to leader
+            if (currentWP < city.waypoints.size())
+            {
+                targetX = city.waypoints[currentWP].x;
+                targetY = city.waypoints[currentWP].y;
+                targetZ = city.waypoints[currentWP].z;
+                targetDescription = "Waypoint " + std::to_string(currentWP + 1);
+            }
+            else if (currentWP == city.waypoints.size())
+            {
+                targetX = city.leaderX;
+                targetY = city.leaderY;
+                targetZ = city.leaderZ;
+                targetDescription = "Leader Position";
+            }
+            else
+            {
+                handler->PSendSysMessage("Selected unit has invalid waypoint progress (attacker).");
+                return true;
+            }
+        }
+
+        // Calculate distance to target
+        float distance = selectedUnit->GetDistance(targetX, targetY, targetZ);
+
+        // Display information
+        std::string unitName = isPlayerBot ? selectedUnit->ToPlayer()->GetName() : selectedUnit->GetName();
+        char infoMsg[512];
+        snprintf(infoMsg, sizeof(infoMsg), "|cff00ff00[City Siege Info]|r %s in %s",
+            unitName.c_str(), city.name.c_str());
+        handler->PSendSysMessage(infoMsg);
+
+        snprintf(infoMsg, sizeof(infoMsg), "Type: %s %s | Current Waypoint: %u | Target: %s",
+            isDefender ? "Defender" : "Attacker", isPlayerBot ? "Playerbot" : "NPC", currentWP, targetDescription.c_str());
+        handler->PSendSysMessage(infoMsg);
+
+        snprintf(infoMsg, sizeof(infoMsg), "Distance to target: %.1f yards | Target coords: (%.1f, %.1f, %.1f)",
+            distance, targetX, targetY, targetZ);
+        handler->PSendSysMessage(infoMsg);
+
+        // Show unit position
+        float unitX = selectedUnit->GetPositionX();
+        float unitY = selectedUnit->GetPositionY();
+        float unitZ = selectedUnit->GetPositionZ();
+        snprintf(infoMsg, sizeof(infoMsg), "Unit position: (%.1f, %.1f, %.1f)",
+            unitX, unitY, unitZ);
+        handler->PSendSysMessage(infoMsg);
 
         return true;
     }

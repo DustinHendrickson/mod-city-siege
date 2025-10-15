@@ -149,7 +149,7 @@ CitySiege.Exodar.SpawnXYZ = -4080.80, -12193.2, 1.712
 #    CitySiege.Orgrimmar.SpawnXYZ
 #        Description: Spawn location for siege forces outside Orgrimmar gates (Durotar entrance).
 #        Default:     1114.96, -4374.63, 25.813
-CitySiege.Orgrimmar.SpawnXYZ = 1114.96, -4374.63, 25.813
+CitySiege.Orgrimmar.SpawnXYZ = 1250.33, -4412.59, 25.48
 
 #
 #    CitySiege.Undercity.SpawnXYZ
@@ -201,7 +201,7 @@ CitySiege.Exodar.LeaderXYZ = -3864.92, -11643.7, -137.644
 #    CitySiege.Orgrimmar.LeaderXYZ
 #        Description: Location of the city leader (Thrall) for siege targeting.
 #        Default:     1633.75, -4439.39, 15.4396
-CitySiege.Orgrimmar.LeaderXYZ = 1633.75, -4439.39, 15.4396
+CitySiege.Orgrimmar.LeaderXYZ = 1921.57, -4148.41, 41.64
 
 #
 #    CitySiege.Undercity.LeaderXYZ
@@ -242,43 +242,18 @@ CitySiege.Silvermoon.LeaderXYZ = 9338.74, -7277.27, 13.7014
 
 # Waypoint 1 - Outside gates
 CitySiege.Stormwind.Waypoint1.XYZ = -9070.56, 429.37, 94.06
-
-# Waypoint 2
 CitySiege.Stormwind.Waypoint2.XYZ = -8883.58, 577.11, 93.98
-
-# Waypoint 3
 CitySiege.Stormwind.Waypoint3.XYZ = -8830.57, 624.65, 94.91
-
-# Waypoint 4
 CitySiege.Stormwind.Waypoint4.XYZ = -8846.97, 723.27, 98.11
-
-# Waypoint 5
 CitySiege.Stormwind.Waypoint5.XYZ = -8869.63, 760.62, 98.5
-
-# Waypoint 6
 CitySiege.Stormwind.Waypoint6.XYZ = -8824.29, 811.57, 99.70
-
-# Waypoint 7
 CitySiege.Stormwind.Waypoint7.XYZ = -8817.26, 956.38, 101.51
-
-# Waypoint 8
 CitySiege.Stormwind.Waypoint8.XYZ = -8760.37, 892.38, 102.60
-
-# Waypoint 9
 CitySiege.Stormwind.Waypoint9.XYZ = -8697.61, 865.26, 98.08
-
-# Waypoint 10
 CitySiege.Stormwind.Waypoint10.XYZ = -8620.92, 777.78, 97.65
-
-# Waypoint 11
 CitySiege.Stormwind.Waypoint11.XYZ = -8538.03, 688.95, 98.68
-
-# Waypoint 12
 CitySiege.Stormwind.Waypoint12.XYZ = -8400.78, 671.10, 95.90
-
-# Waypoint 13
 CitySiege.Stormwind.Waypoint13.XYZ = -8497.73, 542.96, 98.21
-
 # Waypoint 14 - Near throne room
 CitySiege.Stormwind.Waypoint14.XYZ = -8547.18, 466.92, 105.53
 
@@ -294,6 +269,22 @@ CitySiege.Stormwind.Waypoint14.XYZ = -8547.18, 466.92, 105.53
 
 #
 # Orgrimmar
+
+# Orgrimmar waypoint path (spawn -> waypoints -> leader)
+CitySiege.Orgrimmar.Waypoint1.XYZ = 1426.18, -4364.05, 26.46
+CitySiege.Orgrimmar.Waypoint2.XYZ = 1539.32, -4408.84, 12.25
+CitySiege.Orgrimmar.Waypoint3.XYZ = 1657.09, -4415.28, 17.77
+CitySiege.Orgrimmar.Waypoint4.XYZ = 1713.08, -4372.30, 28.90
+CitySiege.Orgrimmar.Waypoint5.XYZ = 1728.06, -4477.64, 33.76
+CitySiege.Orgrimmar.Waypoint6.XYZ = 1774.96, -4532.50, 25.69
+CitySiege.Orgrimmar.Waypoint7.XYZ = 1926.51, -4486.32, 24.88
+CitySiege.Orgrimmar.Waypoint8.XYZ = 1844.84, -4411.77, 5.91
+CitySiege.Orgrimmar.Waypoint9.XYZ = 1802.93, -4304.78, -9.96
+CitySiege.Orgrimmar.Waypoint10.XYZ = 1758.48, -4306.42, 7.81
+CitySiege.Orgrimmar.Waypoint11.XYZ = 1780.20, -4234.99, 40.61
+CitySiege.Orgrimmar.Waypoint12.XYZ = 1890.68, -4285.49, 31.71
+CitySiege.Orgrimmar.Waypoint13.XYZ = 1931.49, -4285.40, 29.28
+CitySiege.Orgrimmar.Waypoint14.XYZ = 1926.68, -4218.74, 42.17
 
 #
 # Undercity
