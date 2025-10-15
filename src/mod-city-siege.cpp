@@ -439,47 +439,6 @@ bool ParseXYZ(const std::string& coordString, float& outX, float& outY, float& o
 }
 
 /**
- * @brief Parse comma-separated XYZ coordinates from a string
- * @param coordString The string containing "X,Y,Z" format
- * @param outX Output parameter for X coordinate
- * @param outY Output parameter for Y coordinate
- * @param outZ Output parameter for Z coordinate
- * @return True if parsing was successful, false otherwise
- */
-bool ParseXYZ(const std::string& coordString, float& outX, float& outY, float& outZ)
-{
-    if (coordString.empty())
-        return false;
-
-    std::vector<std::string> coords;
-    std::stringstream ss(coordString);
-    std::string token;
-
-    // Split by comma and trim whitespaces
-    while (std::getline(ss, token, ','))
-    {
-        token.erase(0, token.find_first_not_of(" \t"));
-        token.erase(token.find_last_not_of(" \t") + 1);
-        coords.push_back(token);
-    }
-
-    if (coords.size() != 3)
-        return false;
-
-    try
-    {
-        outX = std::stof(coords[0]);
-        outY = std::stof(coords[1]);
-        outZ = std::stof(coords[2]);
-        return true;
-    }
-    catch (...)
-    {
-        return false;
-    }
-}
-
-/**
  * @brief Loads the configuration for the City Siege module.
  */
 void LoadCitySiegeConfiguration()
