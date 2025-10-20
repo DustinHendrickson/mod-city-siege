@@ -2486,6 +2486,59 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         if (!bot || !bot->IsInWorld() || !bot->IsAlive())
             continue;
         
+        // Check for nearby enemy players and interrupt waypoint movement to engage them
+        Unit* nearestEnemyPlayer = nullptr;
+        float nearestDistance = 60.0f; // Maximum detection range
+        
+        // Get all players in range
+        std::list<Player*> players;
+        Acore::AnyPlayerInObjectRangeCheck checker(bot, nearestDistance);
+        Acore::PlayerListSearcher<Acore::AnyPlayerInObjectRangeCheck> searcher(bot, players, checker);
+        Cell::VisitWorldObjects(bot, searcher, nearestDistance);
+        
+        // Find the closest enemy player
+        for (Player* player : players)
+        {
+            if (!player || !player->IsAlive() || !player->IsPvP())
+                continue;
+                
+            // Check if player is enemy faction
+            bool isAllianceCity = (event.cityId <= CITY_EXODAR);
+            bool playerIsAlliance = (player->GetTeamId() == TEAM_ALLIANCE);
+            bool isEnemy = (isAllianceCity && !playerIsAlliance) || (!isAllianceCity && playerIsAlliance);
+            
+            if (!isEnemy)
+                continue;
+                
+            // Check line of sight
+            if (!bot->IsWithinLOSInMap(player))
+                continue;
+                
+            float distance = bot->GetDistance(player);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearestEnemyPlayer = player;
+            }
+        }
+        
+        // If enemy player found, attack them immediately (interrupt waypoint movement)
+        if (nearestEnemyPlayer)
+        {
+            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            if (botAI)
+            {
+                botAI->Attack(nearestEnemyPlayer);
+            }
+            
+            if (g_DebugMode)
+            {
+                LOG_INFO("server.loading", "[City Siege] Defender bot {} interrupted waypoint movement to attack enemy player {} at distance {:.1f} yards",
+                         bot->GetName(), nearestEnemyPlayer->GetName(), nearestDistance);
+            }
+            continue; // Skip waypoint movement logic
+        }
+        
         // Check if bot has reached their waypoint
         auto wpIter = event.creatureWaypointProgress.find(botGuid);
         if (wpIter == event.creatureWaypointProgress.end())
@@ -2537,6 +2590,119 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         Player* bot = ObjectAccessor::FindPlayer(botGuid);
         if (!bot || !bot->IsInWorld() || !bot->IsAlive())
             continue;
+        
+        // Check for nearby enemy players and interrupt waypoint movement to engage them
+        Unit* nearestEnemyPlayer = nullptr;
+        Unit* nearestEnemyNPC = nullptr;
+        float nearestPlayerDistance = 30.0f; // Maximum detection range for players
+        float nearestNPCDistance = 20.0f; // Maximum detection range for NPCs
+        
+        // Get all players in range
+        std::list<Player*> players;
+        Acore::AnyPlayerInObjectRangeCheck playerChecker(bot, nearestPlayerDistance);
+        Acore::PlayerListSearcher<Acore::AnyPlayerInObjectRangeCheck> playerSearcher(bot, players, playerChecker);
+        Cell::VisitWorldObjects(bot, playerSearcher, nearestPlayerDistance);
+        
+        // Find the closest enemy player
+        for (Player* player : players)
+        {
+            if (!player || !player->IsAlive() || !player->IsPvP())
+                continue;
+                
+            // Check if player is enemy faction
+            bool isAllianceCity = (event.cityId <= CITY_EXODAR);
+            bool playerIsAlliance = (player->GetTeamId() == TEAM_ALLIANCE);
+            bool isEnemy = (isAllianceCity && !playerIsAlliance) || (!isAllianceCity && playerIsAlliance);
+            
+            if (!isEnemy)
+                continue;
+                
+            // Check line of sight
+            if (!bot->IsWithinLOSInMap(player))
+                continue;
+                
+            float distance = bot->GetDistance(player);
+            if (distance < nearestPlayerDistance)
+            {
+                // Check if pathable using PathGenerator
+                PathGenerator gen(bot);
+                gen.CalculatePath(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
+                if (gen.GetPathType() & (PATHFIND_NORMAL | PATHFIND_INCOMPLETE))
+                {
+                    nearestPlayerDistance = distance;
+                    nearestEnemyPlayer = player;
+                }
+            }
+        }
+        
+        // Get all creatures in range for enemy NPCs
+        std::list<Creature*> creatures;
+        Acore::AnyCreatureInObjectRangeCheck creatureChecker(bot, nearestNPCDistance);
+        Acore::CreatureListSearcher<Acore::AnyCreatureInObjectRangeCheck> creatureSearcher(bot, creatures, creatureChecker);
+        Cell::VisitWorldObjects(bot, creatureSearcher, nearestNPCDistance);
+        
+        // Find the closest enemy NPC
+        for (Creature* enemyCreature : creatures)
+        {
+            if (!enemyCreature || !enemyCreature->IsAlive() || enemyCreature == bot)
+                continue;
+                
+            // Check if creature is hostile to us
+            if (!bot->IsHostileTo(enemyCreature))
+                continue;
+                
+            // Check line of sight
+            if (!bot->IsWithinLOSInMap(enemyCreature))
+                continue;
+                
+            float distance = bot->GetDistance(enemyCreature);
+            if (distance < nearestNPCDistance)
+            {
+                // Check if pathable using PathGenerator
+                PathGenerator gen(bot);
+                gen.CalculatePath(enemyCreature->GetPositionX(), enemyCreature->GetPositionY(), enemyCreature->GetPositionZ());
+                if (gen.GetPathType() & (PATHFIND_NORMAL | PATHFIND_INCOMPLETE))
+                {
+                    nearestNPCDistance = distance;
+                    nearestEnemyNPC = enemyCreature;
+                }
+            }
+        }
+        
+        // Attack the closest enemy (prioritize players over NPCs if same distance, otherwise closest)
+        Unit* targetToAttack = nullptr;
+        if (nearestEnemyPlayer && nearestEnemyNPC)
+        {
+            // If both found, attack the closer one
+            targetToAttack = (nearestPlayerDistance <= nearestNPCDistance) ? nearestEnemyPlayer : nearestEnemyNPC;
+        }
+        else if (nearestEnemyPlayer)
+        {
+            targetToAttack = nearestEnemyPlayer;
+        }
+        else if (nearestEnemyNPC)
+        {
+            targetToAttack = nearestEnemyNPC;
+        }
+        
+        // If enemy found, attack them immediately (interrupt waypoint movement)
+        if (targetToAttack)
+        {
+            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            if (botAI)
+            {
+                botAI->Attack(targetToAttack);
+            }
+            
+            if (g_DebugMode)
+            {
+                float attackDistance = bot->GetDistance(targetToAttack);
+                std::string targetType = targetToAttack->IsPlayer() ? "player" : "NPC";
+                LOG_INFO("server.loading", "[City Siege] Attacker bot {} interrupted waypoint movement to attack enemy {} {} at distance {:.1f} yards",
+                         bot->GetName(), targetType, targetToAttack->GetName(), attackDistance);
+            }
+            continue; // Skip waypoint movement logic
+        }
         
         // Check if bot has reached their waypoint
         auto wpIter = event.creatureWaypointProgress.find(botGuid);
@@ -2969,6 +3135,115 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         // This must be done continuously - even during combat - because combat reset can restore original home
                         creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
                         
+                        // Check for nearby enemy players and interrupt waypoint movement to engage them
+                        Unit* nearestEnemyPlayer = nullptr;
+                        Unit* nearestEnemyNPC = nullptr;
+                        float nearestPlayerDistance = 30.0f; // Maximum detection range for players
+                        float nearestNPCDistance = 20.0f; // Maximum detection range for NPCs
+                        
+                        // Get all players in range
+                        std::list<Player*> players;
+                        Acore::AnyPlayerInObjectRangeCheck playerChecker(creature, nearestPlayerDistance);
+                        Acore::PlayerListSearcher<Acore::AnyPlayerInObjectRangeCheck> playerSearcher(creature, players, playerChecker);
+                        Cell::VisitWorldObjects(creature, playerSearcher, nearestPlayerDistance);
+                        
+                        // Find the closest enemy player
+                        for (Player* player : players)
+                        {
+                            if (!player || !player->IsAlive() || !player->IsPvP())
+                                continue;
+                                
+                            // Check if player is enemy faction
+                            bool isAllianceCity = (event.cityId <= CITY_EXODAR);
+                            bool playerIsAlliance = (player->GetTeamId() == TEAM_ALLIANCE);
+                            bool isEnemy = (isAllianceCity && !playerIsAlliance) || (!isAllianceCity && playerIsAlliance);
+                            
+                            if (!isEnemy)
+                                continue;
+                                
+                            // Check line of sight
+                            if (!creature->IsWithinLOSInMap(player))
+                                continue;
+                                
+                            float distance = creature->GetDistance(player);
+                            if (distance < nearestPlayerDistance)
+                            {
+                                // Check if pathable using PathGenerator
+                                PathGenerator gen(creature);
+                                gen.CalculatePath(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
+                                if (gen.GetPathType() & (PATHFIND_NORMAL | PATHFIND_INCOMPLETE))
+                                {
+                                    nearestPlayerDistance = distance;
+                                    nearestEnemyPlayer = player;
+                                }
+                            }
+                        }
+                        
+                        // Get all creatures in range for enemy NPCs
+                        std::list<Creature*> creatures;
+                        Acore::AnyCreatureInObjectRangeCheck creatureChecker(creature, nearestNPCDistance);
+                        Acore::CreatureListSearcher<Acore::AnyCreatureInObjectRangeCheck> creatureSearcher(creature, creatures, creatureChecker);
+                        Cell::VisitWorldObjects(creature, creatureSearcher, nearestNPCDistance);
+                        
+                        // Find the closest enemy NPC
+                        for (Creature* enemyCreature : creatures)
+                        {
+                            if (!enemyCreature || !enemyCreature->IsAlive() || enemyCreature == creature)
+                                continue;
+                                
+                            // Check if creature is hostile to us
+                            if (!creature->IsHostileTo(enemyCreature))
+                                continue;
+                                
+                            // Check line of sight
+                            if (!creature->IsWithinLOSInMap(enemyCreature))
+                                continue;
+                                
+                            float distance = creature->GetDistance(enemyCreature);
+                            if (distance < nearestNPCDistance)
+                            {
+                                // Check if pathable using PathGenerator
+                                PathGenerator gen(creature);
+                                gen.CalculatePath(enemyCreature->GetPositionX(), enemyCreature->GetPositionY(), enemyCreature->GetPositionZ());
+                                if (gen.GetPathType() & (PATHFIND_NORMAL | PATHFIND_INCOMPLETE))
+                                {
+                                    nearestNPCDistance = distance;
+                                    nearestEnemyNPC = enemyCreature;
+                                }
+                            }
+                        }
+                        
+                        // Attack the closest enemy (prioritize players over NPCs if same distance, otherwise closest)
+                        Unit* targetToAttack = nullptr;
+                        if (nearestEnemyPlayer && nearestEnemyNPC)
+                        {
+                            // If both found, attack the closer one
+                            targetToAttack = (nearestPlayerDistance <= nearestNPCDistance) ? nearestEnemyPlayer : nearestEnemyNPC;
+                        }
+                        else if (nearestEnemyPlayer)
+                        {
+                            targetToAttack = nearestEnemyPlayer;
+                        }
+                        else if (nearestEnemyNPC)
+                        {
+                            targetToAttack = nearestEnemyNPC;
+                        }
+                        
+                        // If enemy found, attack them immediately (interrupt waypoint movement)
+                        if (targetToAttack)
+                        {
+                            creature->AI()->AttackStart(targetToAttack);
+                            
+                            if (g_DebugMode)
+                            {
+                                float attackDistance = creature->GetDistance(targetToAttack);
+                                std::string targetType = targetToAttack->IsPlayer() ? "player" : "NPC";
+                                LOG_INFO("server.loading", "[City Siege] {} interrupted waypoint movement to attack enemy {} {} at distance {:.1f} yards",
+                                         creature->GetGUID().ToString(), targetType, targetToAttack->GetName(), attackDistance);
+                            }
+                            continue; // Skip waypoint movement logic
+                        }
+                        
                         // Skip movement updates if creature is currently in combat
                         if (creature->IsInCombat())
                             continue;
@@ -3211,6 +3486,115 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         
                         // IMPORTANT: ALWAYS set home position to current position to prevent evading/returning
                         creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation());
+                        
+                        // Check for nearby enemy players and interrupt waypoint movement to engage them
+                        Unit* nearestEnemyPlayer = nullptr;
+                        Unit* nearestEnemyNPC = nullptr;
+                        float nearestPlayerDistance = 30.0f; // Maximum detection range for players
+                        float nearestNPCDistance = 20.0f; // Maximum detection range for NPCs
+                        
+                        // Get all players in range
+                        std::list<Player*> players;
+                        Acore::AnyPlayerInObjectRangeCheck playerChecker(creature, nearestPlayerDistance);
+                        Acore::PlayerListSearcher<Acore::AnyPlayerInObjectRangeCheck> playerSearcher(creature, players, playerChecker);
+                        Cell::VisitWorldObjects(creature, playerSearcher, nearestPlayerDistance);
+                        
+                        // Find the closest enemy player
+                        for (Player* player : players)
+                        {
+                            if (!player || !player->IsAlive() || !player->IsPvP())
+                                continue;
+                                
+                            // Check if player is enemy faction
+                            bool isAllianceCity = (event.cityId <= CITY_EXODAR);
+                            bool playerIsAlliance = (player->GetTeamId() == TEAM_ALLIANCE);
+                            bool isEnemy = (isAllianceCity && !playerIsAlliance) || (!isAllianceCity && playerIsAlliance);
+                            
+                            if (!isEnemy)
+                                continue;
+                                
+                            // Check line of sight
+                            if (!creature->IsWithinLOSInMap(player))
+                                continue;
+                                
+                            float distance = creature->GetDistance(player);
+                            if (distance < nearestPlayerDistance)
+                            {
+                                // Check if pathable using PathGenerator
+                                PathGenerator gen(creature);
+                                gen.CalculatePath(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
+                                if (gen.GetPathType() & (PATHFIND_NORMAL | PATHFIND_INCOMPLETE))
+                                {
+                                    nearestPlayerDistance = distance;
+                                    nearestEnemyPlayer = player;
+                                }
+                            }
+                        }
+                        
+                        // Get all creatures in range for enemy NPCs
+                        std::list<Creature*> creatures;
+                        Acore::AnyCreatureInObjectRangeCheck creatureChecker(creature, nearestNPCDistance);
+                        Acore::CreatureListSearcher<Acore::AnyCreatureInObjectRangeCheck> creatureSearcher(creature, creatures, creatureChecker);
+                        Cell::VisitWorldObjects(creature, creatureSearcher, nearestNPCDistance);
+                        
+                        // Find the closest enemy NPC
+                        for (Creature* enemyCreature : creatures)
+                        {
+                            if (!enemyCreature || !enemyCreature->IsAlive() || enemyCreature == creature)
+                                continue;
+                                
+                            // Check if creature is hostile to us
+                            if (!creature->IsHostileTo(enemyCreature))
+                                continue;
+                                
+                            // Check line of sight
+                            if (!creature->IsWithinLOSInMap(enemyCreature))
+                                continue;
+                                
+                            float distance = creature->GetDistance(enemyCreature);
+                            if (distance < nearestNPCDistance)
+                            {
+                                // Check if pathable using PathGenerator
+                                PathGenerator gen(creature);
+                                gen.CalculatePath(enemyCreature->GetPositionX(), enemyCreature->GetPositionY(), enemyCreature->GetPositionZ());
+                                if (gen.GetPathType() & (PATHFIND_NORMAL | PATHFIND_INCOMPLETE))
+                                {
+                                    nearestNPCDistance = distance;
+                                    nearestEnemyNPC = enemyCreature;
+                                }
+                            }
+                        }
+                        
+                        // Attack the closest enemy (prioritize players over NPCs if same distance, otherwise closest)
+                        Unit* targetToAttack = nullptr;
+                        if (nearestEnemyPlayer && nearestEnemyNPC)
+                        {
+                            // If both found, attack the closer one
+                            targetToAttack = (nearestPlayerDistance <= nearestNPCDistance) ? nearestEnemyPlayer : nearestEnemyNPC;
+                        }
+                        else if (nearestEnemyPlayer)
+                        {
+                            targetToAttack = nearestEnemyPlayer;
+                        }
+                        else if (nearestEnemyNPC)
+                        {
+                            targetToAttack = nearestEnemyNPC;
+                        }
+                        
+                        // If enemy found, attack them immediately (interrupt waypoint movement)
+                        if (targetToAttack)
+                        {
+                            creature->AI()->AttackStart(targetToAttack);
+                            
+                            if (g_DebugMode)
+                            {
+                                float attackDistance = creature->GetDistance(targetToAttack);
+                                std::string targetType = targetToAttack->IsPlayer() ? "player" : "NPC";
+                                LOG_INFO("server.loading", "[City Siege] {} interrupted waypoint movement to attack enemy {} {} at distance {:.1f} yards",
+                                         creature->GetGUID().ToString(), targetType, targetToAttack->GetName(), attackDistance);
+                            }
+                            continue; // Skip waypoint movement logic
+                        }
                         
                         // Skip movement updates if creature is currently in combat
                         if (creature->IsInCombat())
