@@ -52,6 +52,7 @@
 #include "PlayerbotAI.h"
 #include "AiObjectContext.h"
 #include "TravelMgr.h"
+#include "MovementActions.h"
 #endif
 
 using namespace Acore::ChatCommands;
@@ -95,6 +96,20 @@ namespace CitySiege
         template<class NOT_INTERESTED> void Visit(GridRefMgr<NOT_INTERESTED>&) {}
     };
 }
+
+// SiegeMovementAction wrapper class to expose protected MoveTo method
+#ifdef MOD_PLAYERBOTS
+class SiegeMovementAction : public MovementAction
+{
+public:
+    SiegeMovementAction(PlayerbotAI* botAI) : MovementAction(botAI, "siege movement") {}
+
+    bool ExecuteMoveTo(uint32 mapId, float x, float y, float z, bool idle = false, bool react = true, bool normal_only = false, bool exact_waypoint = false, MovementPriority priority = MovementPriority::MOVEMENT_NORMAL, bool lessDelay = false, bool backwards = false)
+    {
+        return MoveTo(mapId, x, y, z, idle, react, normal_only, exact_waypoint, priority, lessDelay, backwards);
+    }
+};
+#endif
 
 // -----------------------------------------------------------------------------
 // CONFIGURATION VARIABLES
@@ -1532,38 +1547,20 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             // Initialize waypoint tracking for defenders
             event.creatureWaypointProgress[botGuid] = defenderWaypoint;
             
-            // Move bot toward a waypoint closer to spawn (backward movement) using playerbots travel system
+            // Move bot toward a waypoint closer to spawn (backward movement) using direct MoveTo
             if (defenderWaypoint > 0)
             {
                 const Waypoint& targetWP = city->waypoints[defenderWaypoint - 1];
                 
-                // Set travel destination using playerbots travel manager
-                TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-                if (travelTarget)
-                {
-                    // Create destination position
-                    WorldPosition* destPos = new WorldPosition(city->mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                    
-                    // Create a simple travel destination with 5 yard radius
-                    TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                    siegeDest->addPoint(destPos);
-                    
-                    // Set target with both destination and position
-                    travelTarget->setTarget(siegeDest, destPos);
-                    travelTarget->setForced(true);
-                }
+                // Use direct MoveTo with combat engagement
+                SiegeMovementAction moveAction(botAI);
+                moveAction.ExecuteMoveTo(city->mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
                 
-                // Enable travel strategy for proper pathfinding
-                if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
+                if (g_DebugMode)
                 {
-                    botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                    LOG_INFO("server.loading", "[City Siege] Defender bot {} flagged for PvP and moving to waypoint {} [{:.2f}, {:.2f}, {:.2f}]",
+                             bot->GetName(), defenderWaypoint - 1, targetWP.x, targetWP.y, targetWP.z);
                 }
-                
-                // if (g_DebugMode)
-                // {
-                //     LOG_INFO("server.loading", "[City Siege] Defender bot {} flagged for PvP and traveling to waypoint {} [{:.2f}, {:.2f}, {:.2f}]",
-                //              bot->GetName(), defenderWaypoint - 1, targetWP.x, targetWP.y, targetWP.z);
-                // }
             }
         }
     }
@@ -1597,33 +1594,18 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             // Initialize waypoint tracking for attackers (start at first waypoint)
             event.creatureWaypointProgress[botGuid] = 0;
             
-            // Move bot toward first waypoint using playerbots travel system
+            // Move bot toward first waypoint using direct MoveTo
             const Waypoint& targetWP = city->waypoints[0];
             
-            // Set travel destination using playerbots travel manager
-            TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-            if (travelTarget)
-            {
-                WorldPosition* destPos = new WorldPosition(city->mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                
-                TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                siegeDest->addPoint(destPos);
-                
-                travelTarget->setTarget(siegeDest, destPos);
-                travelTarget->setForced(true);
-            }
+            // Use direct MoveTo with combat engagement
+            SiegeMovementAction moveAction(botAI);
+            moveAction.ExecuteMoveTo(city->mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
             
-            // Enable travel strategy for proper pathfinding
-            if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
+            if (g_DebugMode)
             {
-                botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                LOG_INFO("server.loading", "[City Siege] Attacker bot {} flagged for PvP and moving to waypoint 0 [{:.2f}, {:.2f}, {:.2f}]",
+                         bot->GetName(), targetWP.x, targetWP.y, targetWP.z);
             }
-            
-            // if (g_DebugMode)
-            // {
-            //     LOG_INFO("server.loading", "[City Siege] Attacker bot {} flagged for PvP and traveling to waypoint 0 [{:.2f}, {:.2f}, {:.2f}]",
-            //              bot->GetName(), targetWP.x, targetWP.y, targetWP.z);
-            // }
         }
     }
     
@@ -2450,18 +2432,8 @@ void ProcessBotRespawns(SiegeEvent& event)
                     if (defenderWaypoint > 0 && botAI)
                     {
                         const Waypoint& targetWP = city.waypoints[defenderWaypoint - 1];
-                        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-                        if (travelTarget)
-                        {
-                            WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                            TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                            siegeDest->addPoint(destPos);
-                            travelTarget->setTarget(siegeDest, destPos);
-                            travelTarget->setForced(true);
-                        }
-
-                        if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
-                            botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                        SiegeMovementAction moveAction(botAI);
+                        moveAction.ExecuteMoveTo(city.mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
                     }
                 }
             }
@@ -2473,18 +2445,8 @@ void ProcessBotRespawns(SiegeEvent& event)
                     if (botAI)
                     {
                         const Waypoint& targetWP = city.waypoints[0];
-                        TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-                        if (travelTarget)
-                        {
-                            WorldPosition* destPos = new WorldPosition(city.mapId, targetWP.x, targetWP.y, targetWP.z, 0.0f);
-                            TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                            siegeDest->addPoint(destPos);
-                            travelTarget->setTarget(siegeDest, destPos);
-                            travelTarget->setForced(true);
-                        }
-
-                        if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
-                            botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                        SiegeMovementAction moveAction(botAI);
+                        moveAction.ExecuteMoveTo(city.mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
                     }
                 }
             }
@@ -2535,45 +2497,34 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
         if (botAI)
         {
-            TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-            if (travelTarget)
+            // For defenders: if not at spawn (waypoint 0) and not currently traveling, set next waypoint
+            if (currentWP > 0)
             {
-                // For defenders: if not at spawn (waypoint 0) and not currently traveling, set next waypoint
-                if (currentWP > 0 && !travelTarget->isTraveling())
-                {
-                    const Waypoint& nextWP = city.waypoints[currentWP - 1];
-                    WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
-                    TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                    siegeDest->addPoint(destPos);
-                    travelTarget->setTarget(siegeDest, destPos);
-                    travelTarget->setForced(true);
-                    
-                }
-                
-                // Check if bot reached current target waypoint by distance
-                if (currentWP > 0)
-                {
-                    const Waypoint& targetWP = city.waypoints[currentWP - 1];
-                    // Use full 3D distance to account for small Z differences between config and actual ground
-                    float dist = bot->GetDistance(targetWP.x, targetWP.y, targetWP.z);
+                const Waypoint& nextWP = city.waypoints[currentWP - 1];
+                SiegeMovementAction moveAction(botAI);
+                moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
+            }
+            
+            // Check if bot reached current target waypoint by distance
+            if (currentWP > 0)
+            {
+                const Waypoint& targetWP = city.waypoints[currentWP - 1];
+                // Use full 3D distance to account for small Z differences between config and actual ground
+                float dist = bot->GetDistance(targetWP.x, targetWP.y, targetWP.z);
 
-                    // If bot is within 10 yards of target waypoint, advance immediately
-                    if (dist <= 10.0f)
+                // If bot is within 10 yards of target waypoint, advance immediately
+                if (dist <= 10.0f)
+                {
+                    currentWP--;
+                    event.creatureWaypointProgress[botGuid] = currentWP;
+
+
+                    // Immediately set next waypoint if not at spawn
+                    if (currentWP > 0)
                     {
-                        currentWP--;
-                        event.creatureWaypointProgress[botGuid] = currentWP;
-
-
-                        // Immediately set next waypoint if not at spawn
-                        if (currentWP > 0)
-                        {
-                            const Waypoint& nextWP = city.waypoints[currentWP - 1];
-                            WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
-                            TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                            siegeDest->addPoint(destPos);
-                            travelTarget->setTarget(siegeDest, destPos);
-                            travelTarget->setForced(true);
-                        }
+                        const Waypoint& nextWP = city.waypoints[currentWP - 1];
+                        SiegeMovementAction moveAction(botAI);
+                        moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
                     }
                 }
             }
@@ -2598,43 +2549,33 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
         if (botAI)
         {
-            TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-            if (travelTarget)
+            // For attackers: if not at final waypoint and not currently traveling, set current waypoint
+            if (currentWP < city.waypoints.size())
             {
-                // For attackers: if not at final waypoint and not currently traveling, set current waypoint
-                if (currentWP < city.waypoints.size() && !travelTarget->isTraveling())
-                {
-                    const Waypoint& currentWPData = city.waypoints[currentWP];
-                    WorldPosition* destPos = new WorldPosition(city.mapId, currentWPData.x, currentWPData.y, currentWPData.z, 0.0f);
-                    TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                    siegeDest->addPoint(destPos);
-                    travelTarget->setTarget(siegeDest, destPos);
-                    travelTarget->setForced(true);
-                }
-                
-                // Check if bot reached current target waypoint by distance
-                if (currentWP < city.waypoints.size())
-                {
-                    const Waypoint& targetWP = city.waypoints[currentWP];
-                    // Use full 3D distance to account for small Z differences between config and actual ground
-                    float dist = bot->GetDistance(targetWP.x, targetWP.y, targetWP.z);
+                const Waypoint& currentWPData = city.waypoints[currentWP];
+                SiegeMovementAction moveAction(botAI);
+                moveAction.ExecuteMoveTo(city.mapId, currentWPData.x, currentWPData.y, currentWPData.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
+            }
+            
+            // Check if bot reached current target waypoint by distance
+            if (currentWP < city.waypoints.size())
+            {
+                const Waypoint& targetWP = city.waypoints[currentWP];
+                // Use full 3D distance to account for small Z differences between config and actual ground
+                float dist = bot->GetDistance(targetWP.x, targetWP.y, targetWP.z);
 
-                    // If bot is within 10 yards of target waypoint, advance immediately
-                    if (dist <= 10.0f)
+                // If bot is within 10 yards of target waypoint, advance immediately
+                if (dist <= 10.0f)
+                {
+                    currentWP++;
+                    event.creatureWaypointProgress[botGuid] = currentWP;
+
+                    // Immediately set next waypoint if not at leader yet
+                    if (currentWP < city.waypoints.size())
                     {
-                        currentWP++;
-                        event.creatureWaypointProgress[botGuid] = currentWP;
-
-                        // Immediately set next waypoint if not at leader yet
-                        if (currentWP < city.waypoints.size())
-                        {
-                            const Waypoint& nextWP = city.waypoints[currentWP];
-                            WorldPosition* destPos = new WorldPosition(city.mapId, nextWP.x, nextWP.y, nextWP.z, 0.0f);
-                            TravelDestination* siegeDest = new TravelDestination(0.0f, 5.0f);
-                            siegeDest->addPoint(destPos);
-                            travelTarget->setTarget(siegeDest, destPos);
-                            travelTarget->setForced(true);
-                        }
+                        const Waypoint& nextWP = city.waypoints[currentWP];
+                        SiegeMovementAction moveAction(botAI);
+                        moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
                     }
                 }
             }
