@@ -1554,7 +1554,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
                 
                 // Use direct MoveTo with combat engagement
                 SiegeMovementAction moveAction(botAI);
-                moveAction.ExecuteMoveTo(city->mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
+                moveAction.ExecuteMoveTo(city->mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
                 
                 if (g_DebugMode)
                 {
@@ -1599,7 +1599,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             
             // Use direct MoveTo with combat engagement
             SiegeMovementAction moveAction(botAI);
-            moveAction.ExecuteMoveTo(city->mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
+            moveAction.ExecuteMoveTo(city->mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
             
             if (g_DebugMode)
             {
@@ -2433,7 +2433,7 @@ void ProcessBotRespawns(SiegeEvent& event)
                     {
                         const Waypoint& targetWP = city.waypoints[defenderWaypoint - 1];
                         SiegeMovementAction moveAction(botAI);
-                        moveAction.ExecuteMoveTo(city.mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
+                        moveAction.ExecuteMoveTo(city.mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
                     }
                 }
             }
@@ -2446,7 +2446,7 @@ void ProcessBotRespawns(SiegeEvent& event)
                     {
                         const Waypoint& targetWP = city.waypoints[0];
                         SiegeMovementAction moveAction(botAI);
-                        moveAction.ExecuteMoveTo(city.mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
+                        moveAction.ExecuteMoveTo(city.mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
                     }
                 }
             }
@@ -2502,7 +2502,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
             {
                 const Waypoint& nextWP = city.waypoints[currentWP - 1];
                 SiegeMovementAction moveAction(botAI);
-                moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
+                moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
             }
             
             // Check if bot reached current target waypoint by distance
@@ -2524,7 +2524,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                     {
                         const Waypoint& nextWP = city.waypoints[currentWP - 1];
                         SiegeMovementAction moveAction(botAI);
-                        moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
+                        moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
                     }
                 }
             }
@@ -2554,7 +2554,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
             {
                 const Waypoint& currentWPData = city.waypoints[currentWP];
                 SiegeMovementAction moveAction(botAI);
-                moveAction.ExecuteMoveTo(city.mapId, currentWPData.x, currentWPData.y, currentWPData.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
+                moveAction.ExecuteMoveTo(city.mapId, currentWPData.x, currentWPData.y, currentWPData.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
             }
             
             // Check if bot reached current target waypoint by distance
@@ -2575,7 +2575,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                     {
                         const Waypoint& nextWP = city.waypoints[currentWP];
                         SiegeMovementAction moveAction(botAI);
-                        moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_COMBAT);
+                        moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
                     }
                 }
             }
@@ -4379,7 +4379,7 @@ public:
             
             if (g_DebugMode)
             {
-                LOG_INFO("module", "[City Siege] Spawned spawn point marker at {}, {}, {}", city.spawnX, city.spawnY, spawnZ);
+                LOG_INFO("server.loading", "[City Siege] Spawned spawn point marker at {}, {}, {}", city.spawnX, city.spawnY, spawnZ);
             }
         }
         else
@@ -4430,7 +4430,7 @@ public:
                 
                 if (g_DebugMode)
                 {
-                    LOG_INFO("module", "[City Siege] Spawned waypoint {} marker at {}, {}, {}", i + 1, wpX, wpY, spawnZ);
+                    LOG_INFO("server.loading", "[City Siege] Spawned waypoint {} marker at {}, {}, {}", i + 1, wpX, wpY, spawnZ);
                 }
             }
             else
@@ -4477,7 +4477,7 @@ public:
             
             if (g_DebugMode)
             {
-                LOG_INFO("module", "[City Siege] Spawned leader position marker at {}, {}, {}", city.leaderX, city.leaderY, leaderZ);
+                LOG_INFO("server.loading", "[City Siege] Spawned leader position marker at {}, {}, {}", city.leaderX, city.leaderY, leaderZ);
             }
         }
         else
@@ -4499,7 +4499,7 @@ public:
         
         if (g_DebugMode)
         {
-            LOG_INFO("module", "[City Siege] Total visualization markers spawned: {}", visualizations.size());
+            LOG_INFO("server.loading", "[City Siege] Total visualization markers spawned: {}", visualizations.size());
         }
         
         return true;
@@ -4743,7 +4743,7 @@ public:
         
         if (g_DebugMode)
         {
-            LOG_INFO("module", "[City Siege] Configuration reloaded by {}", handler->GetSession()->GetPlayerName());
+            LOG_INFO("server.loading", "[City Siege] Configuration reloaded by {}", handler->GetSession()->GetPlayerName());
         }
         
         return true;
