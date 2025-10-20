@@ -104,7 +104,7 @@ class SiegeMovementAction : public MovementAction
 public:
     SiegeMovementAction(PlayerbotAI* botAI) : MovementAction(botAI, "siege movement") {}
 
-    bool ExecuteMoveTo(uint32 mapId, float x, float y, float z, bool idle = false, bool react = true, bool normal_only = false, bool exact_waypoint = false, MovementPriority priority = MovementPriority::MOVEMENT_NORMAL, bool lessDelay = false, bool backwards = false)
+    bool ExecuteMoveTo(uint32 mapId, float x, float y, float z, bool idle = false, bool react = true, bool normal_only = false, bool exact_waypoint = false, MovementPriority priority = MovementPriority::MOVEMENT_NORMAL, bool lessDelay = true, bool backwards = false)
     {
         return MoveTo(mapId, x, y, z, idle, react, normal_only, exact_waypoint, priority, lessDelay, backwards);
     }
@@ -1554,7 +1554,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
                 
                 // Use direct MoveTo with combat engagement
                 SiegeMovementAction moveAction(botAI);
-                moveAction.ExecuteMoveTo(city->mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
+                moveAction.ExecuteMoveTo(city->mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL, true);
                 
                 if (g_DebugMode)
                 {
@@ -1599,7 +1599,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             
             // Use direct MoveTo with combat engagement
             SiegeMovementAction moveAction(botAI);
-            moveAction.ExecuteMoveTo(city->mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
+            moveAction.ExecuteMoveTo(city->mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL, true);
             
             if (g_DebugMode)
             {
@@ -2433,7 +2433,7 @@ void ProcessBotRespawns(SiegeEvent& event)
                     {
                         const Waypoint& targetWP = city.waypoints[defenderWaypoint - 1];
                         SiegeMovementAction moveAction(botAI);
-                        moveAction.ExecuteMoveTo(city.mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
+                        moveAction.ExecuteMoveTo(city.mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, true, MovementPriority::MOVEMENT_NORMAL);
                     }
                 }
             }
@@ -2446,7 +2446,7 @@ void ProcessBotRespawns(SiegeEvent& event)
                     {
                         const Waypoint& targetWP = city.waypoints[0];
                         SiegeMovementAction moveAction(botAI);
-                        moveAction.ExecuteMoveTo(city.mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
+                        moveAction.ExecuteMoveTo(city.mapId, targetWP.x, targetWP.y, targetWP.z, false, true, false, true, MovementPriority::MOVEMENT_NORMAL);
                     }
                 }
             }
@@ -2502,7 +2502,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
             {
                 const Waypoint& nextWP = city.waypoints[currentWP - 1];
                 SiegeMovementAction moveAction(botAI);
-                moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
+                moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, true, MovementPriority::MOVEMENT_NORMAL);
             }
             
             // Check if bot reached current target waypoint by distance
@@ -2524,7 +2524,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                     {
                         const Waypoint& nextWP = city.waypoints[currentWP - 1];
                         SiegeMovementAction moveAction(botAI);
-                        moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
+                        moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, true, MovementPriority::MOVEMENT_NORMAL);
                     }
                 }
             }
@@ -2554,7 +2554,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
             {
                 const Waypoint& currentWPData = city.waypoints[currentWP];
                 SiegeMovementAction moveAction(botAI);
-                moveAction.ExecuteMoveTo(city.mapId, currentWPData.x, currentWPData.y, currentWPData.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
+                moveAction.ExecuteMoveTo(city.mapId, currentWPData.x, currentWPData.y, currentWPData.z, false, true, false, true, MovementPriority::MOVEMENT_NORMAL);
             }
             
             // Check if bot reached current target waypoint by distance
@@ -2575,7 +2575,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                     {
                         const Waypoint& nextWP = city.waypoints[currentWP];
                         SiegeMovementAction moveAction(botAI);
-                        moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, false, MovementPriority::MOVEMENT_NORMAL);
+                        moveAction.ExecuteMoveTo(city.mapId, nextWP.x, nextWP.y, nextWP.z, false, true, false, true, MovementPriority::MOVEMENT_NORMAL);
                     }
                 }
             }
