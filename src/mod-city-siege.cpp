@@ -2639,8 +2639,8 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         
         // Get all creatures in range for enemy NPCs
         std::list<Creature*> creatures;
-        Acore::AnyCreatureInObjectRangeCheck creatureChecker(bot, nearestNPCDistance);
-        Acore::CreatureListSearcher<Acore::AnyCreatureInObjectRangeCheck> creatureSearcher(bot, creatures, creatureChecker);
+        Acore::AnyUnitInObjectRangeCheck creatureChecker(bot, nearestNPCDistance);
+        Acore::CreatureListSearcher<Acore::AnyUnitInObjectRangeCheck> creatureSearcher(bot, creatures, creatureChecker);
         Cell::VisitObjects(bot, creatureSearcher, nearestNPCDistance);
         
         // Find the closest enemy NPC
@@ -3193,8 +3193,8 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         
                         // Get all creatures in range for enemy NPCs
                         std::list<Creature*> creatures;
-                        Acore::AnyCreatureInObjectRangeCheck creatureChecker(creature, nearestNPCDistance);
-                        Acore::CreatureListSearcher<Acore::AnyCreatureInObjectRangeCheck> creatureSearcher(creature, creatures, creatureChecker);
+                        Acore::AnyUnitInObjectRangeCheck creatureChecker(creature, nearestNPCDistance);
+                        Acore::CreatureListSearcher<Acore::AnyUnitInObjectRangeCheck> creatureSearcher(creature, creatures, creatureChecker);
                         Cell::VisitObjects(creature, creatureSearcher, nearestNPCDistance);
                         
                         // Find the closest enemy NPC
@@ -3545,8 +3545,8 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                         
                         // Get all creatures in range for enemy NPCs
                         std::list<Creature*> creatures;
-                        Acore::AnyCreatureInObjectRangeCheck creatureChecker(creature, nearestNPCDistance);
-                        Acore::CreatureListSearcher<Acore::AnyCreatureInObjectRangeCheck> creatureSearcher(creature, creatures, creatureChecker);
+                        Acore::AnyUnitInObjectRangeCheck creatureChecker(creature, nearestNPCDistance);
+                        Acore::CreatureListSearcher<Acore::AnyUnitInObjectRangeCheck> creatureSearcher(creature, creatures, creatureChecker);
                         Cell::VisitObjects(creature, creatureSearcher, nearestNPCDistance);
                         
                         // Find the closest enemy NPC
