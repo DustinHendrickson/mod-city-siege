@@ -2528,7 +2528,9 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
             PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
             if (botAI)
             {
-                botAI->Attack(nearestEnemyPlayer);
+                // Set the enemy player target AI value and trigger attack action
+                botAI->GetAiObjectContext()->GetValue<Unit*>("enemy player target")->Set(nearestEnemyPlayer);
+                botAI->DoSpecificAction("attack enemy player");
             }
             
             if (g_DebugMode)
@@ -2691,7 +2693,17 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
             PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
             if (botAI)
             {
-                botAI->Attack(targetToAttack);
+                // Set the appropriate target AI value and trigger attack action
+                if (targetToAttack->IsPlayer())
+                {
+                    botAI->GetAiObjectContext()->GetValue<Unit*>("enemy player target")->Set(targetToAttack);
+                    botAI->DoSpecificAction("attack enemy player");
+                }
+                else
+                {
+                    botAI->GetAiObjectContext()->GetValue<Unit*>("current target")->Set(targetToAttack);
+                    botAI->DoSpecificAction("attack anything");
+                }
             }
             
             if (g_DebugMode)
