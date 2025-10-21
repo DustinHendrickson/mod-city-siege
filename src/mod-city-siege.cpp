@@ -4789,7 +4789,6 @@ public:
         // Visualize each waypoint
         handler->PSendSysMessage(("City has " + std::to_string(city.waypoints.size()) + " waypoints configured.").c_str());
         
-        int spawnedWaypoints = 0;
         int failedWaypoints = 0;
         
         for (size_t i = 0; i < city.waypoints.size(); ++i)
@@ -4816,7 +4815,6 @@ public:
                 marker->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                 marker->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                 visualizations.push_back(marker->GetGUID());
-                spawnedWaypoints++;
                 
                 // Format coordinates properly
                 char waypointMsg[256];
@@ -4930,7 +4928,6 @@ public:
 
         // Find which siege this unit belongs to
         SiegeEvent* activeSiege = nullptr;
-        bool isAttacker = false;
         bool isDefender = false;
 
         for (auto& event : g_ActiveSieges)
@@ -4945,7 +4942,6 @@ public:
                 {
                     if (guid == unitGuid)
                     {
-                        isAttacker = true;
                         activeSiege = &event;
                         break;
                     }
@@ -4957,14 +4953,13 @@ public:
                 {
                     if (guid == unitGuid)
                     {
-                        isAttacker = true;
                         activeSiege = &event;
                         break;
                     }
                 }
             }
 
-            // Check if unit is a defender
+            // Check if unit is a defender (only if not already found as attacker)
             if (!activeSiege)
             {
                 if (isCreature)
