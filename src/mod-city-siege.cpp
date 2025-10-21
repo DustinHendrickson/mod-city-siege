@@ -4469,8 +4469,8 @@ public:
             marker->SetReactState(REACT_PASSIVE);
             marker->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             marker->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
-            marker->DespawnOrUnsummon(20000); // Despawn after 20 seconds
-
+            marker->DespawnOrUnsummon(20s); // Despawn after 20 seconds
+            
             // Format coordinates properly - show the config Z (with buffer)
             char coordMsg[256];
             snprintf(coordMsg, sizeof(coordMsg), "Coordinates: X=%.2f, Y=%.2f, Z=%.2f", x, y, configZ);
@@ -4540,7 +4540,7 @@ public:
             {
                 if (Creature* creature = map->GetCreature(guid))
                 {
-                    creature->DespawnOrUnsummon(0);
+                    creature->DespawnOrUnsummon(0ms);
                 }
             }
             g_WaypointVisualizations.erase(cityId);
