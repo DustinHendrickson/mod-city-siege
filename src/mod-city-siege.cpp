@@ -2646,7 +2646,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         // Find the closest enemy NPC
         for (Creature* enemyCreature : creatures)
         {
-            if (!enemyCreature || !enemyCreature->IsAlive() || enemyCreature == bot)
+            if (!enemyCreature || !enemyCreature->IsAlive())
                 continue;
                 
             // Check if creature is hostile to us
