@@ -2485,14 +2485,15 @@ void ProcessBotRespawns(SiegeEvent& event)
 
                         if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
                             botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                        
+                        // Force immediate AI update so travel strategy issues MoveTo command right away
+                        botAI->UpdateAI(0);
                     }
                 }
             }
-
+            
             // Put back into combat state
-            bot->SetInCombatState(true);
-
-            // Remove from respawn queue
+            bot->SetInCombatState(true);            // Remove from respawn queue
             it = event.deadBots.erase(it);
         }
         else
@@ -2573,6 +2574,13 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                             siegeDest->addPoint(destPos);
                             travelTarget->setTarget(siegeDest, destPos);
                             travelTarget->setForced(true);
+                            
+                            bot->StopMoving();
+                            if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
+                                botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                            
+                            // Force immediate AI update so travel strategy issues MoveTo command right away
+                            botAI->UpdateAI(0);
                         }
                     }
                 }
@@ -2634,6 +2642,13 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
                             siegeDest->addPoint(destPos);
                             travelTarget->setTarget(siegeDest, destPos);
                             travelTarget->setForced(true);
+                            
+                            bot->StopMoving();
+                            if (!botAI->HasStrategy("travel", BOT_STATE_NON_COMBAT))
+                                botAI->ChangeStrategy("+travel", BOT_STATE_NON_COMBAT);
+                            
+                            // Force immediate AI update so travel strategy issues MoveTo command right away
+                            botAI->UpdateAI(0);
                         }
                     }
                 }
