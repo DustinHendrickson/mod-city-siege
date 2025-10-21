@@ -4401,7 +4401,7 @@ public:
             {
                 if (Creature* creature = map->GetCreature(guid))
                 {
-                    creature->DespawnOrUnsummon(0);
+                    creature->DespawnOrUnsummon(0ms);
                 }
             }
             g_WaypointVisualizations.erase(cityId);
