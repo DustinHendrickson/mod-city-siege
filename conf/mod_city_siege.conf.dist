@@ -74,21 +74,21 @@ CitySiege.Stormwind.Enabled = 1
 #        Description: Enable siege events in Ironforge.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Ironforge.Enabled = 1
+CitySiege.Ironforge.Enabled = 0
 
 #
 #    CitySiege.Darnassus.Enabled
 #        Description: Enable siege events in Darnassus.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Darnassus.Enabled = 1
+CitySiege.Darnassus.Enabled = 0
 
 #
 #    CitySiege.Exodar.Enabled
 #        Description: Enable siege events in the Exodar.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Exodar.Enabled = 1
+CitySiege.Exodar.Enabled = 0
 
 #
 #    CitySiege.Orgrimmar.Enabled
@@ -102,21 +102,21 @@ CitySiege.Orgrimmar.Enabled = 1
 #        Description: Enable siege events in Undercity.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Undercity.Enabled = 1
+CitySiege.Undercity.Enabled = 0
 
 #
 #    CitySiege.ThunderBluff.Enabled
 #        Description: Enable siege events in Thunder Bluff.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.ThunderBluff.Enabled = 1
+CitySiege.ThunderBluff.Enabled = 0
 
 #
 #    CitySiege.Silvermoon.Enabled
 #        Description: Enable siege events in Silvermoon City.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Silvermoon.Enabled = 1
+CitySiege.Silvermoon.Enabled = 0
 
 ###############################################
 # City Spawn Locations
@@ -480,9 +480,17 @@ CitySiege.SpawnCount.Leaders = 1
 # Creature Entry Configurations
 ###############################################
 # These define which creature entries to use for siege forces.
-# Using Mount Hyjal battle units for authentic faction warfare feel.
-# Alliance attackers spawn Footmen, Knights, Riflemen, and Priests.
-# Horde attackers spawn Grunts, Tauren Warriors, Headhunters, and Shamans.
+# Attacking faction leaders are now randomly selected from opposing faction city leader pools for variety.
+# Each siege will feature a different opposing faction leader leading the attack.
+#
+# Alliance attackers spawn Footmen, Knights, Riflemen, and a random Horde city leader.
+# Horde attackers spawn Grunts, Tauren Warriors, Headhunters, and a random Alliance city leader.
+#
+# Leader pools (randomly selected per siege):
+#   Alliance City Leaders: King Varian Wrynn (29611), King Magni Bronzebeard (2784),
+#                          Tyrande Whisperwind (7999), Prophet Velen (17468)
+#   Horde City Leaders: Thrall (4949), Cairne Bloodhoof (3057),
+#                       Lady Sylvanas Windrunner (10181), Lor'themar Theron (16802)
 
 #
 #    CitySiege.Creature.Alliance.Minion
@@ -502,11 +510,6 @@ CitySiege.Creature.Alliance.Elite = 17920
 #        Default:     17921 (Alliance Rifleman from Mount Hyjal)
 CitySiege.Creature.Alliance.MiniBoss = 17921
 
-#
-#    CitySiege.Creature.Alliance.Leader
-#        Description: Creature entry for Alliance city attackers (faction leaders).
-#        Default:     17928 (Alliance Priest from Mount Hyjal)
-CitySiege.Creature.Alliance.Leader = 17928
 
 #
 #    CitySiege.Creature.Horde.Minion
@@ -526,11 +529,6 @@ CitySiege.Creature.Horde.Elite = 17933
 #        Default:     17934 (Horde Headhunter from Mount Hyjal)
 CitySiege.Creature.Horde.MiniBoss = 17934
 
-#
-#    CitySiege.Creature.Horde.Leader
-#        Description: Creature entry for Horde city attackers (faction leaders).
-#        Default:     17936 (Horde Shaman from Mount Hyjal)
-CitySiege.Creature.Horde.Leader = 17936
 
 #
 #    CitySiege.AggroPlayers
@@ -679,6 +677,54 @@ CitySiege.Weather.Type = 3
 #                     Example: 0.5 = Moderate rain/snow/storm
 #        Default:     1.0 (maximum intensity)
 CitySiege.Weather.Grade = 1.0
+
+###############################################
+# Music Settings
+###############################################
+
+#
+#    CitySiege.Music.Enabled
+#        Description: Enable music playback during siege events.
+#                     When enabled, thematic battle music will play during different siege phases.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Music.Enabled = 1
+
+#
+#    CitySiege.Music.RPMusicId
+#        Description: SoundKit ID for music played during the RP/cinematic phase.
+#                     This music plays when siege forces first spawn and during the preparation phase.
+#                     Find music IDs in AzerothCore's SoundEntries.dbc or by searching existing scripts.
+#                     Example: 17289 (battle music from various instances)
+#        Default:     17289
+CitySiege.Music.RPMusicId = 17289
+
+#
+#    CitySiege.Music.CombatMusicId
+#        Description: SoundKit ID for music played during active combat.
+#                     This music plays when the cinematic phase ends and battle begins.
+#                     Should be intense, thematic battle music to enhance immersion.
+#                     Example: 17459 (combat music from Icecrown Citadel)
+#        Default:     17459
+CitySiege.Music.CombatMusicId = 17459
+
+#
+#    CitySiege.Music.VictoryMusicId
+#        Description: SoundKit ID for music played when defenders win the siege.
+#                     This music plays when the city leader survives and attackers are defeated.
+#                     Should be triumphant, celebratory music.
+#                     Example: 17460 (victory music from various events)
+#        Default:     17460
+CitySiege.Music.VictoryMusicId = 17460
+
+#
+#    CitySiege.Music.DefeatMusicId
+#        Description: SoundKit ID for music played when attackers win the siege.
+#                     This music plays when the city leader is killed and attackers conquer the city.
+#                     Should be somber, dramatic music to reflect the city's fall.
+#                     Example: 17458 (defeat music from various events)
+#        Default:     17458
+CitySiege.Music.DefeatMusicId = 17458
 
 ###############################################
 # Respawn Settings

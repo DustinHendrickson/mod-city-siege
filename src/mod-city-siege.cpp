@@ -39,6 +39,7 @@
 #include "GridNotifiersImpl.h"
 #include "Weather.h"
 #include "WeatherMgr.h"
+#include "MiscPackets.h"
 #include <vector>
 #include <unordered_map>
 #include <string>
@@ -128,12 +129,27 @@ static uint32 g_SpawnCountLeaders = 1;
 static uint32 g_CreatureAllianceMinion = 17919;   // Alliance Footman
 static uint32 g_CreatureAllianceElite = 17920;    // Alliance Knight  
 static uint32 g_CreatureAllianceMiniBoss = 17921; // Alliance Rifleman
-static uint32 g_CreatureAllianceLeader = 17928;   // Alliance Priest (commander)
 // Horde attackers: Grunts, Tauren Warriors, Headhunters, Shamans
 static uint32 g_CreatureHordeMinion = 17932;      // Horde Grunt
 static uint32 g_CreatureHordeElite = 17933;       // Tauren Warrior
 static uint32 g_CreatureHordeMiniBoss = 17934;    // Horde Headhunter
-static uint32 g_CreatureHordeLeader = 17936;      // Horde Shaman (commander)
+
+// City leader pools - randomly selected per siege for variety
+// Alliance city leaders (used when Horde attacks Alliance cities)
+static std::vector<uint32> g_AllianceCityLeaders = {
+    29611,  // King Varian Wrynn (Stormwind)
+    2784,   // King Magni Bronzebeard (Ironforge)
+    7999,   // Princess Tyrande Whisperwind (Darnassus)
+    17468   // Prophet Velen (Exodar)
+};
+
+// Horde city leaders (used when Alliance attacks Horde cities)
+static std::vector<uint32> g_HordeCityLeaders = {
+    4949,   // Thrall (Orgrimmar)
+    3057,   // Chief Cairne Bloodhoof (Thunder Bluff)
+    10181,  // Lady Sylvanas Windrunner (Undercity)
+    16802   // Lor'themar Theron (Silvermoon)
+};
 
 // Aggro settings
 static bool g_AggroPlayers = true;
@@ -205,6 +221,13 @@ static bool g_WeatherEnabled = true;
 static WeatherState g_WeatherType = WEATHER_STATE_MEDIUM_RAIN;
 static float g_WeatherGrade = 0.8f;
 
+// Music settings
+static bool g_MusicEnabled = true;
+static uint32 g_RPMusicId = 11803;        // The Burning Legion (epic orchestral music)
+static uint32 g_CombatMusicId = 11804;   // Battle of Mount Hyjal (intense battle music)
+static uint32 g_VictoryMusicId = 16039;  // Invincible (triumphant victory music)
+static uint32 g_DefeatMusicId = 14127;   // Wrath of the Lich King main theme (somber/defeat)
+
 // -----------------------------------------------------------------------------
 // CITY SIEGE DATA STRUCTURES
 // -----------------------------------------------------------------------------
@@ -252,11 +275,11 @@ static std::vector<CityData> g_Cities = {
     { CITY_STORMWIND,   "Stormwind",      0,   -8913.23f, 554.633f,  93.7944f,  -9161.16f, 353.365f,  88.117f,   -8442.578f, 334.6064f, 122.476685f,  29611,  {} },
     { CITY_IRONFORGE,   "Ironforge",      0,   -4981.25f, -881.542f, 501.660f,  -5174.09f, -594.361f, 397.853f,  -4981.25f, -881.542f, 501.660f,  2784,  {} },
     { CITY_DARNASSUS,   "Darnassus",      1,    9947.52f, 2482.73f,  1316.21f,   9887.36f, 1856.49f,  1317.14f,   9947.52f, 2482.73f,  1316.21f,  7999,  {} },
-    { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, -4080.80f, -12193.2f, 1.712f,    -3864.92f, -11643.7f, -137.644f, 17949, {} },
+    { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, -4080.80f, -12193.2f, 1.712f,    -3864.92f, -11643.7f, -137.644f, 17468, {} },
     { CITY_ORGRIMMAR,   "Orgrimmar",      1,    1633.75f, -4439.39f, 15.4396f,   1114.96f, -4374.63f, 25.813f,    1633.75f, -4439.39f, 15.4396f,  4949,  {} },
     { CITY_UNDERCITY,   "Undercity",      0,    1633.75f, 240.167f,  -43.1034f,  1982.26f, 226.674f,  35.951f,    1633.75f, 240.167f,  -43.1034f, 10181, {} },
     { CITY_THUNDERBLUFF, "ThunderBluff", 1,   -1043.11f, 285.809f,  135.165f,  -1558.61f, -5.071f,   5.384f,    -1043.11f, 285.809f,  135.165f,  3057,  {} },
-    { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f,   9230.47f, -6962.67f, 5.004f,     9338.74f, -7277.27f, 13.7014f,  16283, {} }
+    { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f,   9230.47f, -6962.67f, 5.004f,     9338.74f, -7277.27f, 13.7014f,  16802, {} }
 };
 
 struct SiegeEvent
@@ -435,11 +458,9 @@ void LoadCitySiegeConfiguration()
     g_CreatureAllianceMinion = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Minion", 17919);   // Alliance Footman
     g_CreatureAllianceElite = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Elite", 17920);     // Alliance Knight
     g_CreatureAllianceMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.MiniBoss", 17921); // Alliance Rifleman
-    g_CreatureAllianceLeader = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Leader", 17928);   // Alliance Priest
     g_CreatureHordeMinion = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Minion", 17932);         // Horde Grunt
     g_CreatureHordeElite = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Elite", 17933);           // Tauren Warrior
     g_CreatureHordeMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.MiniBoss", 17934);     // Horde Headhunter
-    g_CreatureHordeLeader = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Leader", 17936);         // Horde Shaman
 
     // Aggro settings
     g_AggroPlayers = sConfigMgr->GetOption<bool>("CitySiege.AggroPlayers", true);
@@ -513,6 +534,13 @@ void LoadCitySiegeConfiguration()
     g_WeatherEnabled = sConfigMgr->GetOption<bool>("CitySiege.Weather.Enabled", true);
     g_WeatherType = static_cast<WeatherState>(sConfigMgr->GetOption<uint32>("CitySiege.Weather.Type", WEATHER_STATE_MEDIUM_RAIN));
     g_WeatherGrade = sConfigMgr->GetOption<float>("CitySiege.Weather.Grade", 0.8f);
+
+    // Music settings
+    g_MusicEnabled = sConfigMgr->GetOption<bool>("CitySiege.Music.Enabled", true);
+    g_RPMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.RP", 11803);        // The Burning Legion
+    g_CombatMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Combat", 11804); // Battle of Mount Hyjal
+    g_VictoryMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Victory", 16039); // Invincible
+    g_DefeatMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Defeat", 14127);   // Wrath of the Lich King
 
     // Load spawn locations for each city
     g_Cities[CITY_STORMWIND].spawnX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnX", -9161.16f);
@@ -761,7 +789,33 @@ void SpawnSiegeCreatures(SiegeEvent& event)
     uint32 minionEntry = isAllianceCity ? g_CreatureHordeMinion : g_CreatureAllianceMinion;
     uint32 eliteEntry = isAllianceCity ? g_CreatureHordeElite : g_CreatureAllianceElite;
     uint32 miniBossEntry = isAllianceCity ? g_CreatureHordeMiniBoss : g_CreatureAllianceMiniBoss;
-    uint32 leaderEntry = isAllianceCity ? g_CreatureHordeLeader : g_CreatureAllianceLeader;
+    
+    // Randomly select a city leader from the opposing faction's leader pool
+    uint32 leaderEntry;
+    if (isAllianceCity)
+    {
+        // Horde attacking Alliance city - pick random Horde leader
+        uint32 randomIndex = urand(0, g_HordeCityLeaders.size() - 1);
+        leaderEntry = g_HordeCityLeaders[randomIndex];
+        
+        if (g_DebugMode)
+        {
+            LOG_INFO("server.loading", "[City Siege] Randomly selected Horde leader entry {} for attack on Alliance city {}", 
+                     leaderEntry, city.name);
+        }
+    }
+    else
+    {
+        // Alliance attacking Horde city - pick random Alliance leader
+        uint32 randomIndex = urand(0, g_AllianceCityLeaders.size() - 1);
+        leaderEntry = g_AllianceCityLeaders[randomIndex];
+        
+        if (g_DebugMode)
+        {
+            LOG_INFO("server.loading", "[City Siege] Randomly selected Alliance leader entry {} for attack on Horde city {}", 
+                     leaderEntry, city.name);
+        }
+    }
     
     // Military formation setup - organized ranks like a real army assault
     // Leaders at center, mini-bosses forming command circle, elites in mid-rank, minions in outer perimeter
@@ -1941,6 +1995,32 @@ void StartSiegeEvent(int targetCityId = -1)
     AnnounceSiege(*city, true);
     SpawnSiegeCreatures(g_ActiveSieges.back());
 
+    // Play RP phase music if enabled
+    if (g_MusicEnabled && g_RPMusicId > 0)
+    {
+        Map* map = sMapMgr->FindMap(city->mapId, 0);
+        if (map)
+        {
+            // Send music to players within announce radius
+            Map::PlayerList const& players = map->GetPlayers();
+            for (auto itr = players.begin(); itr != players.end(); ++itr)
+            {
+                if (Player* player = itr->GetSource())
+                {
+                    if (player->GetDistance(city->centerX, city->centerY, city->centerZ) <= g_AnnounceRadius)
+                    {
+                        player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_RPMusicId).Write());
+                    }
+                }
+            }
+            
+            if (g_DebugMode)
+            {
+                LOG_INFO("server.loading", "[City Siege] Playing RP phase music (ID: {}) for siege of {}", g_RPMusicId, city->name);
+            }
+        }
+    }
+
     if (g_DebugMode)
     {
         LOG_INFO("server.loading", "[City Siege] Started siege event at {}", city->name);
@@ -2077,6 +2157,55 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     if (g_DebugMode)
     {
         LOG_INFO("server.loading", "[City Siege] {}", winnerAnnouncement);
+    }
+
+    // Play victory or defeat music if enabled
+    if (g_MusicEnabled)
+    {
+        Map* map = sMapMgr->FindMap(city.mapId, 0);
+        if (map)
+        {
+            if (defendersWon && g_VictoryMusicId > 0)
+            {
+                // Send victory music to players within announce radius
+                Map::PlayerList const& players = map->GetPlayers();
+                for (auto itr = players.begin(); itr != players.end(); ++itr)
+                {
+                    if (Player* player = itr->GetSource())
+                    {
+                        if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                        {
+                            player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_VictoryMusicId).Write());
+                        }
+                    }
+                }
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Playing victory music (ID: {}) for defenders' victory at {}", g_VictoryMusicId, city.name);
+                }
+            }
+            else if (!defendersWon && g_DefeatMusicId > 0)
+            {
+                // Send defeat music to players within announce radius
+                Map::PlayerList const& players = map->GetPlayers();
+                for (auto itr = players.begin(); itr != players.end(); ++itr)
+                {
+                    if (Player* player = itr->GetSource())
+                    {
+                        if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                        {
+                            player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_DefeatMusicId).Write());
+                        }
+                    }
+                }
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Playing defeat music (ID: {}) for attackers' victory at {}", g_DefeatMusicId, city.name);
+                }
+            }
+        }
     }
 
     if (g_RewardOnDefense)
@@ -2707,10 +2836,12 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             if (Creature* creature = map->GetCreature(guid))
                             {
                                 uint32 entry = creature->GetEntry();
-                                // Only leaders and mini-bosses do RP
-                                if (creature->IsAlive() &&
-                                    (entry == g_CreatureAllianceLeader || entry == g_CreatureHordeLeader ||
-                                     entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss))
+                                // Only leaders and mini-bosses do RP - check if entry is in leader pools or is a mini-boss
+                                bool isLeader = (std::find(g_AllianceCityLeaders.begin(), g_AllianceCityLeaders.end(), entry) != g_AllianceCityLeaders.end()) ||
+                                               (std::find(g_HordeCityLeaders.begin(), g_HordeCityLeaders.end(), entry) != g_HordeCityLeaders.end());
+                                bool isMiniBoss = (entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss);
+                                
+                                if (creature->IsAlive() && (isLeader || isMiniBoss))
                                 {
                                     rpCreatures.push_back(creature);
                                 }
@@ -2749,6 +2880,32 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             // Announce battle has begun!
             std::string battleStart = "|cffff0000[City Siege]|r |cffFF0000THE BATTLE HAS BEGUN!|r The siege of " + city.name + " is now underway! Defenders, to arms!";
             sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, battleStart);
+            
+            // Play combat phase music if enabled
+            if (g_MusicEnabled && g_CombatMusicId > 0)
+            {
+                Map* map = sMapMgr->FindMap(city.mapId, 0);
+                if (map)
+                {
+                    // Send combat music to players within announce radius
+                    Map::PlayerList const& players = map->GetPlayers();
+                    for (auto itr = players.begin(); itr != players.end(); ++itr)
+                    {
+                        if (Player* player = itr->GetSource())
+                        {
+                            if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                            {
+                                player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_CombatMusicId).Write());
+                            }
+                        }
+                    }
+                    
+                    if (g_DebugMode)
+                    {
+                        LOG_INFO("server.loading", "[City Siege] Playing combat phase music (ID: {}) for siege of {}", g_CombatMusicId, city.name);
+                    }
+                }
+            }
             
             // Activate playerbots for combat
             ActivatePlayerbotsForSiege(event);
@@ -2942,9 +3099,10 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                     {
                         uint32 entry = creature->GetEntry();
                         // Only leaders and mini-bosses yell (and they must be alive)
-                        if (creature->IsAlive() && 
-                            (entry == g_CreatureAllianceLeader || entry == g_CreatureHordeLeader ||
-                            entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss))
+                        bool isLeader = (std::find(g_AllianceCityLeaders.begin(), g_AllianceCityLeaders.end(), entry) != g_AllianceCityLeaders.end()) ||
+                                       (std::find(g_HordeCityLeaders.begin(), g_HordeCityLeaders.end(), entry) != g_HordeCityLeaders.end());
+                        bool isMiniBoss = (entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss);
+                        if (creature->IsAlive() && (isLeader || isMiniBoss))
                         {
                             // Parse combat yells from configuration (semicolon separated)
                             std::vector<std::string> yells;
@@ -3013,12 +3171,14 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                                 
                                 if (g_DebugMode)
                                 {
+                                    bool isLeader = (std::find(g_AllianceCityLeaders.begin(), g_AllianceCityLeaders.end(), respawnData.entry) != g_AllianceCityLeaders.end()) ||
+                                                   (std::find(g_HordeCityLeaders.begin(), g_HordeCityLeaders.end(), respawnData.entry) != g_HordeCityLeaders.end());
+                                    uint32 respawnTime = isLeader ? g_RespawnTimeLeader :
+                                                         respawnData.entry == g_CreatureAllianceMiniBoss || respawnData.entry == g_CreatureHordeMiniBoss ? g_RespawnTimeMiniBoss :
+                                                         respawnData.entry == g_CreatureAllianceElite || respawnData.entry == g_CreatureHordeElite ? g_RespawnTimeElite :
+                                                         g_RespawnTimeMinion;
                                     LOG_INFO("server.loading", "[City Siege] Attacker {} (entry {}) died, will respawn at siege spawn point in {} seconds",
-                                             creature->GetGUID().ToString(), respawnData.entry,
-                                             respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader ? g_RespawnTimeLeader :
-                                             respawnData.entry == g_CreatureAllianceMiniBoss || respawnData.entry == g_CreatureHordeMiniBoss ? g_RespawnTimeMiniBoss :
-                                             respawnData.entry == g_CreatureAllianceElite || respawnData.entry == g_CreatureHordeElite ? g_RespawnTimeElite :
-                                             g_RespawnTimeMinion);
+                                             creature->GetGUID().ToString(), respawnData.entry, respawnTime);
                                 }
                             }
                             continue;
@@ -3427,7 +3587,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                     {
                         // Attackers use type-based respawn times
                         respawnDelay = g_RespawnTimeMinion; // Default
-                        if (respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader)
+                        bool isLeader = (std::find(g_AllianceCityLeaders.begin(), g_AllianceCityLeaders.end(), respawnData.entry) != g_AllianceCityLeaders.end()) ||
+                                       (std::find(g_HordeCityLeaders.begin(), g_HordeCityLeaders.end(), respawnData.entry) != g_HordeCityLeaders.end());
+                        if (isLeader)
                         {
                             respawnDelay = g_RespawnTimeLeader;
                         }
@@ -3488,7 +3650,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             else
                             {
                                 // Determine attacker level and scale by entry
-                                if (respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader)
+                                bool isLeader = (std::find(g_AllianceCityLeaders.begin(), g_AllianceCityLeaders.end(), respawnData.entry) != g_AllianceCityLeaders.end()) ||
+                                               (std::find(g_HordeCityLeaders.begin(), g_HordeCityLeaders.end(), respawnData.entry) != g_HordeCityLeaders.end());
+                                if (isLeader)
                                 {
                                     creature->SetLevel(g_LevelLeader);
                                     creature->SetObjectScale(g_ScaleLeader);
