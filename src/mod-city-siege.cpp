@@ -275,11 +275,28 @@ static std::vector<CityData> g_Cities = {
     { CITY_STORMWIND,   "Stormwind",      0,   -8913.23f, 554.633f,  93.7944f,  -9161.16f, 353.365f,  88.117f,   -8442.578f, 334.6064f, 122.476685f,  29611,  {} },
     { CITY_IRONFORGE,   "Ironforge",      0,   -4981.25f, -881.542f, 501.660f,  -5174.09f, -594.361f, 397.853f,  -4981.25f, -881.542f, 501.660f,  2784,  {} },
     { CITY_DARNASSUS,   "Darnassus",      1,    9947.52f, 2482.73f,  1316.21f,   9887.36f, 1856.49f,  1317.14f,   9947.52f, 2482.73f,  1316.21f,  7999,  {} },
-    { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, -4080.80f, -12193.2f, 1.712f,    -3864.92f, -11643.7f, -137.644f, 17949, {} },
+    { CITY_EXODAR,      "Exodar",         530, -3864.92f, -11643.7f, -137.644f, -4080.80f, -12193.2f, 1.712f,    -3864.92f, -11643.7f, -137.644f, 17468, {} },
     { CITY_ORGRIMMAR,   "Orgrimmar",      1,    1633.75f, -4439.39f, 15.4396f,   1114.96f, -4374.63f, 25.813f,    1633.75f, -4439.39f, 15.4396f,  4949,  {} },
     { CITY_UNDERCITY,   "Undercity",      0,    1633.75f, 240.167f,  -43.1034f,  1982.26f, 226.674f,  35.951f,    1633.75f, 240.167f,  -43.1034f, 10181, {} },
     { CITY_THUNDERBLUFF, "ThunderBluff", 1,   -1043.11f, 285.809f,  135.165f,  -1558.61f, -5.071f,   5.384f,    -1043.11f, 285.809f,  135.165f,  3057,  {} },
-    { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f,   9230.47f, -6962.67f, 5.004f,     9338.74f, -7277.27f, 13.7014f,  16283, {} }
+    { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f,   9230.47f, -6962.67f, 5.004f,     9338.74f, -7277.27f, 13.7014f,  16802, {} }
+};
+
+// City leader pools - randomly selected per siege for variety
+// Alliance city leaders (used when Horde attacks Alliance cities)
+static std::vector<uint32> g_AllianceCityLeaders = {
+    29611,  // King Varian Wrynn (Stormwind)
+    2784,   // King Magni Bronzebeard (Ironforge)
+    7999,   // Princess Tyrande Whisperwind (Darnassus)
+    17468   // Prophet Velen (Exodar)
+};
+
+// Horde city leaders (used when Alliance attacks Horde cities)
+static std::vector<uint32> g_HordeCityLeaders = {
+    4949,   // Thrall (Orgrimmar)
+    3057,   // Chief Cairne Bloodhoof (Thunder Bluff)
+    10181,  // Lady Sylvanas Windrunner (Undercity)
+    16802   // Lor'themar Theron (Silvermoon)
 };
 
 struct SiegeEvent
