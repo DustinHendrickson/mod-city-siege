@@ -128,12 +128,27 @@ static uint32 g_SpawnCountLeaders = 1;
 static uint32 g_CreatureAllianceMinion = 17919;   // Alliance Footman
 static uint32 g_CreatureAllianceElite = 17920;    // Alliance Knight  
 static uint32 g_CreatureAllianceMiniBoss = 17921; // Alliance Rifleman
-static uint32 g_CreatureAllianceLeader = 17928;   // Alliance Priest (commander)
 // Horde attackers: Grunts, Tauren Warriors, Headhunters, Shamans
 static uint32 g_CreatureHordeMinion = 17932;      // Horde Grunt
 static uint32 g_CreatureHordeElite = 17933;       // Tauren Warrior
 static uint32 g_CreatureHordeMiniBoss = 17934;    // Horde Headhunter
-static uint32 g_CreatureHordeLeader = 17936;      // Horde Shaman (commander)
+
+// City leader pools - randomly selected per siege for variety
+// Alliance city leaders (used when Horde attacks Alliance cities)
+static std::vector<uint32> g_AllianceCityLeaders = {
+    29611,  // King Varian Wrynn (Stormwind)
+    2784,   // King Magni Bronzebeard (Ironforge)
+    7999,   // Princess Tyrande Whisperwind (Darnassus)
+    17468   // Prophet Velen (Exodar)
+};
+
+// Horde city leaders (used when Alliance attacks Horde cities)
+static std::vector<uint32> g_HordeCityLeaders = {
+    4949,   // Thrall (Orgrimmar)
+    3057,   // Chief Cairne Bloodhoof (Thunder Bluff)
+    10181,  // Lady Sylvanas Windrunner (Undercity)
+    16802   // Lor'themar Theron (Silvermoon)
+};
 
 // Aggro settings
 static bool g_AggroPlayers = true;
@@ -442,11 +457,9 @@ void LoadCitySiegeConfiguration()
     g_CreatureAllianceMinion = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Minion", 17919);   // Alliance Footman
     g_CreatureAllianceElite = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Elite", 17920);     // Alliance Knight
     g_CreatureAllianceMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.MiniBoss", 17921); // Alliance Rifleman
-    g_CreatureAllianceLeader = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Alliance.Leader", 17928);   // Alliance Priest
     g_CreatureHordeMinion = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Minion", 17932);         // Horde Grunt
     g_CreatureHordeElite = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Elite", 17933);           // Tauren Warrior
     g_CreatureHordeMiniBoss = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.MiniBoss", 17934);     // Horde Headhunter
-    g_CreatureHordeLeader = sConfigMgr->GetOption<uint32>("CitySiege.Creature.Horde.Leader", 17936);         // Horde Shaman
 
     // Aggro settings
     g_AggroPlayers = sConfigMgr->GetOption<bool>("CitySiege.AggroPlayers", true);
@@ -775,7 +788,33 @@ void SpawnSiegeCreatures(SiegeEvent& event)
     uint32 minionEntry = isAllianceCity ? g_CreatureHordeMinion : g_CreatureAllianceMinion;
     uint32 eliteEntry = isAllianceCity ? g_CreatureHordeElite : g_CreatureAllianceElite;
     uint32 miniBossEntry = isAllianceCity ? g_CreatureHordeMiniBoss : g_CreatureAllianceMiniBoss;
-    uint32 leaderEntry = isAllianceCity ? g_CreatureHordeLeader : g_CreatureAllianceLeader;
+    
+    // Randomly select a city leader from the opposing faction's leader pool
+    uint32 leaderEntry;
+    if (isAllianceCity)
+    {
+        // Horde attacking Alliance city - pick random Horde leader
+        uint32 randomIndex = urand(0, g_HordeCityLeaders.size() - 1);
+        leaderEntry = g_HordeCityLeaders[randomIndex];
+        
+        if (g_DebugMode)
+        {
+            LOG_INFO("server.loading", "[City Siege] Randomly selected Horde leader entry {} for attack on Alliance city {}", 
+                     leaderEntry, city.name);
+        }
+    }
+    else
+    {
+        // Alliance attacking Horde city - pick random Alliance leader
+        uint32 randomIndex = urand(0, g_AllianceCityLeaders.size() - 1);
+        leaderEntry = g_AllianceCityLeaders[randomIndex];
+        
+        if (g_DebugMode)
+        {
+            LOG_INFO("server.loading", "[City Siege] Randomly selected Alliance leader entry {} for attack on Horde city {}", 
+                     leaderEntry, city.name);
+        }
+    }
     
     // Military formation setup - organized ranks like a real army assault
     // Leaders at center, mini-bosses forming command circle, elites in mid-rank, minions in outer perimeter
@@ -1961,7 +2000,18 @@ void StartSiegeEvent(int targetCityId = -1)
         Map* map = sMapMgr->FindMap(city->mapId, 0);
         if (map)
         {
-            map->PlayRadiusMusic(g_RPMusicId, city->centerX, city->centerY, city->centerZ, g_AnnounceRadius);
+            // Send music to players within announce radius
+            Map::PlayerList const& players = map->GetPlayers();
+            for (auto itr = players.begin(); itr != players.end(); ++itr)
+            {
+                if (Player* player = itr->GetSource())
+                {
+                    if (player->GetDistance(city->centerX, city->centerY, city->centerZ) <= g_AnnounceRadius)
+                    {
+                        player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_RPMusicId).Write());
+                    }
+                }
+            }
             
             if (g_DebugMode)
             {
@@ -2116,7 +2166,18 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
         {
             if (defendersWon && g_VictoryMusicId > 0)
             {
-                map->PlayRadiusMusic(g_VictoryMusicId, city.centerX, city.centerY, city.centerZ, g_AnnounceRadius);
+                // Send victory music to players within announce radius
+                Map::PlayerList const& players = map->GetPlayers();
+                for (auto itr = players.begin(); itr != players.end(); ++itr)
+                {
+                    if (Player* player = itr->GetSource())
+                    {
+                        if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                        {
+                            player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_VictoryMusicId).Write());
+                        }
+                    }
+                }
                 
                 if (g_DebugMode)
                 {
@@ -2125,7 +2186,18 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
             }
             else if (!defendersWon && g_DefeatMusicId > 0)
             {
-                map->PlayRadiusMusic(g_DefeatMusicId, city.centerX, city.centerY, city.centerZ, g_AnnounceRadius);
+                // Send defeat music to players within announce radius
+                Map::PlayerList const& players = map->GetPlayers();
+                for (auto itr = players.begin(); itr != players.end(); ++itr)
+                {
+                    if (Player* player = itr->GetSource())
+                    {
+                        if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                        {
+                            player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_DefeatMusicId).Write());
+                        }
+                    }
+                }
                 
                 if (g_DebugMode)
                 {
@@ -2812,7 +2884,18 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 Map* map = sMapMgr->FindMap(city.mapId, 0);
                 if (map)
                 {
-                    map->PlayRadiusMusic(g_CombatMusicId, city.centerX, city.centerY, city.centerZ, g_AnnounceRadius);
+                    // Send combat music to players within announce radius
+                    Map::PlayerList const& players = map->GetPlayers();
+                    for (auto itr = players.begin(); itr != players.end(); ++itr)
+                    {
+                        if (Player* player = itr->GetSource())
+                        {
+                            if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                            {
+                                player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_CombatMusicId).Write());
+                            }
+                        }
+                    }
                     
                     if (g_DebugMode)
                     {

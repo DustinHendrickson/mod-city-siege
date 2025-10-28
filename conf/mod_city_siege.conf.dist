@@ -480,9 +480,17 @@ CitySiege.SpawnCount.Leaders = 1
 # Creature Entry Configurations
 ###############################################
 # These define which creature entries to use for siege forces.
-# Using Mount Hyjal battle units for authentic faction warfare feel.
-# Alliance attackers spawn Footmen, Knights, Riflemen, and Priests.
-# Horde attackers spawn Grunts, Tauren Warriors, Headhunters, and Shamans.
+# Attacking faction leaders are now randomly selected from opposing faction city leader pools for variety.
+# Each siege will feature a different opposing faction leader leading the attack.
+#
+# Alliance attackers spawn Footmen, Knights, Riflemen, and a random Horde city leader.
+# Horde attackers spawn Grunts, Tauren Warriors, Headhunters, and a random Alliance city leader.
+#
+# Leader pools (randomly selected per siege):
+#   Alliance City Leaders: King Varian Wrynn (29611), King Magni Bronzebeard (2784),
+#                          Tyrande Whisperwind (7999), Prophet Velen (17468)
+#   Horde City Leaders: Thrall (4949), Cairne Bloodhoof (3057),
+#                       Lady Sylvanas Windrunner (10181), Lor'themar Theron (16802)
 
 #
 #    CitySiege.Creature.Alliance.Minion
@@ -502,11 +510,6 @@ CitySiege.Creature.Alliance.Elite = 17920
 #        Default:     17921 (Alliance Rifleman from Mount Hyjal)
 CitySiege.Creature.Alliance.MiniBoss = 17921
 
-#
-#    CitySiege.Creature.Alliance.Leader
-#        Description: Creature entry for Alliance city attackers (faction leaders).
-#        Default:     17928 (Alliance Priest from Mount Hyjal)
-CitySiege.Creature.Alliance.Leader = 17928
 
 #
 #    CitySiege.Creature.Horde.Minion
@@ -526,11 +529,6 @@ CitySiege.Creature.Horde.Elite = 17933
 #        Default:     17934 (Horde Headhunter from Mount Hyjal)
 CitySiege.Creature.Horde.MiniBoss = 17934
 
-#
-#    CitySiege.Creature.Horde.Leader
-#        Description: Creature entry for Horde city attackers (faction leaders).
-#        Default:     17936 (Horde Shaman from Mount Hyjal)
-CitySiege.Creature.Horde.Leader = 17936
 
 #
 #    CitySiege.AggroPlayers
