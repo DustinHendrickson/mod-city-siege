@@ -74,21 +74,21 @@ CitySiege.Stormwind.Enabled = 1
 #        Description: Enable siege events in Ironforge.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Ironforge.Enabled = 1
+CitySiege.Ironforge.Enabled = 0
 
 #
 #    CitySiege.Darnassus.Enabled
 #        Description: Enable siege events in Darnassus.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Darnassus.Enabled = 1
+CitySiege.Darnassus.Enabled = 0
 
 #
 #    CitySiege.Exodar.Enabled
 #        Description: Enable siege events in the Exodar.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Exodar.Enabled = 1
+CitySiege.Exodar.Enabled = 0
 
 #
 #    CitySiege.Orgrimmar.Enabled
@@ -102,21 +102,21 @@ CitySiege.Orgrimmar.Enabled = 1
 #        Description: Enable siege events in Undercity.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Undercity.Enabled = 1
+CitySiege.Undercity.Enabled = 0
 
 #
 #    CitySiege.ThunderBluff.Enabled
 #        Description: Enable siege events in Thunder Bluff.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.ThunderBluff.Enabled = 1
+CitySiege.ThunderBluff.Enabled = 0
 
 #
 #    CitySiege.Silvermoon.Enabled
 #        Description: Enable siege events in Silvermoon City.
 #        Default:     1 (enabled)
 #                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Silvermoon.Enabled = 1
+CitySiege.Silvermoon.Enabled = 0
 
 ###############################################
 # City Spawn Locations
