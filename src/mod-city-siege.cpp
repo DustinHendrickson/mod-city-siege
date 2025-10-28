@@ -39,6 +39,7 @@
 #include "GridNotifiersImpl.h"
 #include "Weather.h"
 #include "WeatherMgr.h"
+#include "MiscPackets.h"
 #include <vector>
 #include <unordered_map>
 #include <string>
