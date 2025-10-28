@@ -2836,10 +2836,12 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             if (Creature* creature = map->GetCreature(guid))
                             {
                                 uint32 entry = creature->GetEntry();
-                                // Only leaders and mini-bosses do RP
-                                if (creature->IsAlive() &&
-                                    (entry == g_CreatureAllianceLeader || entry == g_CreatureHordeLeader ||
-                                     entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss))
+                                // Only leaders and mini-bosses do RP - check if entry is in leader pools or is a mini-boss
+                                bool isLeader = (std::find(g_AllianceCityLeaders.begin(), g_AllianceCityLeaders.end(), entry) != g_AllianceCityLeaders.end()) ||
+                                               (std::find(g_HordeCityLeaders.begin(), g_HordeCityLeaders.end(), entry) != g_HordeCityLeaders.end());
+                                bool isMiniBoss = (entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss);
+                                
+                                if (creature->IsAlive() && (isLeader || isMiniBoss))
                                 {
                                     rpCreatures.push_back(creature);
                                 }
@@ -3097,9 +3099,10 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                     {
                         uint32 entry = creature->GetEntry();
                         // Only leaders and mini-bosses yell (and they must be alive)
-                        if (creature->IsAlive() && 
-                            (entry == g_CreatureAllianceLeader || entry == g_CreatureHordeLeader ||
-                            entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss))
+                        bool isLeader = (std::find(g_AllianceCityLeaders.begin(), g_AllianceCityLeaders.end(), entry) != g_AllianceCityLeaders.end()) ||
+                                       (std::find(g_HordeCityLeaders.begin(), g_HordeCityLeaders.end(), entry) != g_HordeCityLeaders.end());
+                        bool isMiniBoss = (entry == g_CreatureAllianceMiniBoss || entry == g_CreatureHordeMiniBoss);
+                        if (creature->IsAlive() && (isLeader || isMiniBoss))
                         {
                             // Parse combat yells from configuration (semicolon separated)
                             std::vector<std::string> yells;
@@ -3168,12 +3171,14 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                                 
                                 if (g_DebugMode)
                                 {
+                                    bool isLeader = (std::find(g_AllianceCityLeaders.begin(), g_AllianceCityLeaders.end(), respawnData.entry) != g_AllianceCityLeaders.end()) ||
+                                                   (std::find(g_HordeCityLeaders.begin(), g_HordeCityLeaders.end(), respawnData.entry) != g_HordeCityLeaders.end());
+                                    uint32 respawnTime = isLeader ? g_RespawnTimeLeader :
+                                                         respawnData.entry == g_CreatureAllianceMiniBoss || respawnData.entry == g_CreatureHordeMiniBoss ? g_RespawnTimeMiniBoss :
+                                                         respawnData.entry == g_CreatureAllianceElite || respawnData.entry == g_CreatureHordeElite ? g_RespawnTimeElite :
+                                                         g_RespawnTimeMinion;
                                     LOG_INFO("server.loading", "[City Siege] Attacker {} (entry {}) died, will respawn at siege spawn point in {} seconds",
-                                             creature->GetGUID().ToString(), respawnData.entry,
-                                             respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader ? g_RespawnTimeLeader :
-                                             respawnData.entry == g_CreatureAllianceMiniBoss || respawnData.entry == g_CreatureHordeMiniBoss ? g_RespawnTimeMiniBoss :
-                                             respawnData.entry == g_CreatureAllianceElite || respawnData.entry == g_CreatureHordeElite ? g_RespawnTimeElite :
-                                             g_RespawnTimeMinion);
+                                             creature->GetGUID().ToString(), respawnData.entry, respawnTime);
                                 }
                             }
                             continue;
@@ -3582,7 +3587,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                     {
                         // Attackers use type-based respawn times
                         respawnDelay = g_RespawnTimeMinion; // Default
-                        if (respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader)
+                        bool isLeader = (std::find(g_AllianceCityLeaders.begin(), g_AllianceCityLeaders.end(), respawnData.entry) != g_AllianceCityLeaders.end()) ||
+                                       (std::find(g_HordeCityLeaders.begin(), g_HordeCityLeaders.end(), respawnData.entry) != g_HordeCityLeaders.end());
+                        if (isLeader)
                         {
                             respawnDelay = g_RespawnTimeLeader;
                         }
@@ -3643,7 +3650,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                             else
                             {
                                 // Determine attacker level and scale by entry
-                                if (respawnData.entry == g_CreatureAllianceLeader || respawnData.entry == g_CreatureHordeLeader)
+                                bool isLeader = (std::find(g_AllianceCityLeaders.begin(), g_AllianceCityLeaders.end(), respawnData.entry) != g_AllianceCityLeaders.end()) ||
+                                               (std::find(g_HordeCityLeaders.begin(), g_HordeCityLeaders.end(), respawnData.entry) != g_HordeCityLeaders.end());
+                                if (isLeader)
                                 {
                                     creature->SetLevel(g_LevelLeader);
                                     creature->SetObjectScale(g_ScaleLeader);
