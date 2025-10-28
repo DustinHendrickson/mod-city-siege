@@ -205,6 +205,13 @@ static bool g_WeatherEnabled = true;
 static WeatherState g_WeatherType = WEATHER_STATE_MEDIUM_RAIN;
 static float g_WeatherGrade = 0.8f;
 
+// Music settings
+static bool g_MusicEnabled = true;
+static uint32 g_RPMusicId = 17289;        // Gunship Battle music (epic siege atmosphere)
+static uint32 g_CombatMusicId = 17459;   // Fury of Frostmourne (intense battle music)
+static uint32 g_VictoryMusicId = 17460;  // Lich King final music (triumphant)
+static uint32 g_DefeatMusicId = 17458;   // Lich King special music (somber/defeat)
+
 // -----------------------------------------------------------------------------
 // CITY SIEGE DATA STRUCTURES
 // -----------------------------------------------------------------------------
@@ -513,6 +520,13 @@ void LoadCitySiegeConfiguration()
     g_WeatherEnabled = sConfigMgr->GetOption<bool>("CitySiege.Weather.Enabled", true);
     g_WeatherType = static_cast<WeatherState>(sConfigMgr->GetOption<uint32>("CitySiege.Weather.Type", WEATHER_STATE_MEDIUM_RAIN));
     g_WeatherGrade = sConfigMgr->GetOption<float>("CitySiege.Weather.Grade", 0.8f);
+
+    // Music settings
+    g_MusicEnabled = sConfigMgr->GetOption<bool>("CitySiege.Music.Enabled", true);
+    g_RPMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.RP", 17289);        // Gunship Battle music
+    g_CombatMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Combat", 17459); // Fury of Frostmourne
+    g_VictoryMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Victory", 17460); // Lich King final
+    g_DefeatMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Defeat", 17458);   // Lich King special
 
     // Load spawn locations for each city
     g_Cities[CITY_STORMWIND].spawnX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnX", -9161.16f);
@@ -1941,6 +1955,21 @@ void StartSiegeEvent(int targetCityId = -1)
     AnnounceSiege(*city, true);
     SpawnSiegeCreatures(g_ActiveSieges.back());
 
+    // Play RP phase music if enabled
+    if (g_MusicEnabled && g_RPMusicId > 0)
+    {
+        Map* map = sMapMgr->FindMap(city->mapId, 0);
+        if (map)
+        {
+            map->PlayRadiusMusic(g_RPMusicId, city->centerX, city->centerY, city->centerZ, g_AnnounceRadius);
+            
+            if (g_DebugMode)
+            {
+                LOG_INFO("server.loading", "[City Siege] Playing RP phase music (ID: {}) for siege of {}", g_RPMusicId, city->name);
+            }
+        }
+    }
+
     if (g_DebugMode)
     {
         LOG_INFO("server.loading", "[City Siege] Started siege event at {}", city->name);
@@ -2077,6 +2106,33 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     if (g_DebugMode)
     {
         LOG_INFO("server.loading", "[City Siege] {}", winnerAnnouncement);
+    }
+
+    // Play victory or defeat music if enabled
+    if (g_MusicEnabled)
+    {
+        Map* map = sMapMgr->FindMap(city.mapId, 0);
+        if (map)
+        {
+            if (defendersWon && g_VictoryMusicId > 0)
+            {
+                map->PlayRadiusMusic(g_VictoryMusicId, city.centerX, city.centerY, city.centerZ, g_AnnounceRadius);
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Playing victory music (ID: {}) for defenders' victory at {}", g_VictoryMusicId, city.name);
+                }
+            }
+            else if (!defendersWon && g_DefeatMusicId > 0)
+            {
+                map->PlayRadiusMusic(g_DefeatMusicId, city.centerX, city.centerY, city.centerZ, g_AnnounceRadius);
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Playing defeat music (ID: {}) for attackers' victory at {}", g_DefeatMusicId, city.name);
+                }
+            }
+        }
     }
 
     if (g_RewardOnDefense)
@@ -2749,6 +2805,21 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             // Announce battle has begun!
             std::string battleStart = "|cffff0000[City Siege]|r |cffFF0000THE BATTLE HAS BEGUN!|r The siege of " + city.name + " is now underway! Defenders, to arms!";
             sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, battleStart);
+            
+            // Play combat phase music if enabled
+            if (g_MusicEnabled && g_CombatMusicId > 0)
+            {
+                Map* map = sMapMgr->FindMap(city.mapId, 0);
+                if (map)
+                {
+                    map->PlayRadiusMusic(g_CombatMusicId, city.centerX, city.centerY, city.centerZ, g_AnnounceRadius);
+                    
+                    if (g_DebugMode)
+                    {
+                        LOG_INFO("server.loading", "[City Siege] Playing combat phase music (ID: {}) for siege of {}", g_CombatMusicId, city.name);
+                    }
+                }
+            }
             
             // Activate playerbots for combat
             ActivatePlayerbotsForSiege(event);

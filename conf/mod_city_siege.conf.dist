@@ -681,6 +681,54 @@ CitySiege.Weather.Type = 3
 CitySiege.Weather.Grade = 1.0
 
 ###############################################
+# Music Settings
+###############################################
+
+#
+#    CitySiege.Music.Enabled
+#        Description: Enable music playback during siege events.
+#                     When enabled, thematic battle music will play during different siege phases.
+#        Default:     1 (enabled)
+#                     Valid values: 0 (disabled) / 1 (enabled)
+CitySiege.Music.Enabled = 1
+
+#
+#    CitySiege.Music.RPMusicId
+#        Description: SoundKit ID for music played during the RP/cinematic phase.
+#                     This music plays when siege forces first spawn and during the preparation phase.
+#                     Find music IDs in AzerothCore's SoundEntries.dbc or by searching existing scripts.
+#                     Example: 17289 (battle music from various instances)
+#        Default:     17289
+CitySiege.Music.RPMusicId = 17289
+
+#
+#    CitySiege.Music.CombatMusicId
+#        Description: SoundKit ID for music played during active combat.
+#                     This music plays when the cinematic phase ends and battle begins.
+#                     Should be intense, thematic battle music to enhance immersion.
+#                     Example: 17459 (combat music from Icecrown Citadel)
+#        Default:     17459
+CitySiege.Music.CombatMusicId = 17459
+
+#
+#    CitySiege.Music.VictoryMusicId
+#        Description: SoundKit ID for music played when defenders win the siege.
+#                     This music plays when the city leader survives and attackers are defeated.
+#                     Should be triumphant, celebratory music.
+#                     Example: 17460 (victory music from various events)
+#        Default:     17460
+CitySiege.Music.VictoryMusicId = 17460
+
+#
+#    CitySiege.Music.DefeatMusicId
+#        Description: SoundKit ID for music played when attackers win the siege.
+#                     This music plays when the city leader is killed and attackers conquer the city.
+#                     Should be somber, dramatic music to reflect the city's fall.
+#                     Example: 17458 (defeat music from various events)
+#        Default:     17458
+CitySiege.Music.DefeatMusicId = 17458
+
+###############################################
 # Respawn Settings
 ###############################################
 
