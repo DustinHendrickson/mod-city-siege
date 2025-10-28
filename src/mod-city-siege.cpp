@@ -223,10 +223,10 @@ static float g_WeatherGrade = 0.8f;
 
 // Music settings
 static bool g_MusicEnabled = true;
-static uint32 g_RPMusicId = 17289;        // Gunship Battle music (epic siege atmosphere)
-static uint32 g_CombatMusicId = 17459;   // Fury of Frostmourne (intense battle music)
-static uint32 g_VictoryMusicId = 17460;  // Lich King final music (triumphant)
-static uint32 g_DefeatMusicId = 17458;   // Lich King special music (somber/defeat)
+static uint32 g_RPMusicId = 11803;        // The Burning Legion (epic orchestral music)
+static uint32 g_CombatMusicId = 11804;   // Battle of Mount Hyjal (intense battle music)
+static uint32 g_VictoryMusicId = 16039;  // Invincible (triumphant victory music)
+static uint32 g_DefeatMusicId = 14127;   // Wrath of the Lich King main theme (somber/defeat)
 
 // -----------------------------------------------------------------------------
 // CITY SIEGE DATA STRUCTURES
@@ -537,10 +537,10 @@ void LoadCitySiegeConfiguration()
 
     // Music settings
     g_MusicEnabled = sConfigMgr->GetOption<bool>("CitySiege.Music.Enabled", true);
-    g_RPMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.RP", 17289);        // Gunship Battle music
-    g_CombatMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Combat", 17459); // Fury of Frostmourne
-    g_VictoryMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Victory", 17460); // Lich King final
-    g_DefeatMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Defeat", 17458);   // Lich King special
+    g_RPMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.RP", 11803);        // The Burning Legion
+    g_CombatMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Combat", 11804); // Battle of Mount Hyjal
+    g_VictoryMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Victory", 16039); // Invincible
+    g_DefeatMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Defeat", 14127);   // Wrath of the Lich King
 
     // Load spawn locations for each city
     g_Cities[CITY_STORMWIND].spawnX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnX", -9161.16f);
