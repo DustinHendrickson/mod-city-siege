@@ -282,23 +282,6 @@ static std::vector<CityData> g_Cities = {
     { CITY_SILVERMOON,  "Silvermoon",     530,  9338.74f, -7277.27f, 13.7014f,   9230.47f, -6962.67f, 5.004f,     9338.74f, -7277.27f, 13.7014f,  16802, {} }
 };
 
-// City leader pools - randomly selected per siege for variety
-// Alliance city leaders (used when Horde attacks Alliance cities)
-static std::vector<uint32> g_AllianceCityLeaders = {
-    29611,  // King Varian Wrynn (Stormwind)
-    2784,   // King Magni Bronzebeard (Ironforge)
-    7999,   // Princess Tyrande Whisperwind (Darnassus)
-    17468   // Prophet Velen (Exodar)
-};
-
-// Horde city leaders (used when Alliance attacks Horde cities)
-static std::vector<uint32> g_HordeCityLeaders = {
-    4949,   // Thrall (Orgrimmar)
-    3057,   // Chief Cairne Bloodhoof (Thunder Bluff)
-    10181,  // Lady Sylvanas Windrunner (Undercity)
-    16802   // Lor'themar Theron (Silvermoon)
-};
-
 struct SiegeEvent
 {
     CityId cityId;
