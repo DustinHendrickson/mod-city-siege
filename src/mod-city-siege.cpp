@@ -899,10 +899,12 @@ void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messa
     std::string message = ss.str();
     
     // Send SILENTLY to ALL online players (addon users will intercept it)
-    SessionMap const& sessions = sWorld->GetAllSessions();
-    for (auto const& [accountId, session] : sessions)
+    std::shared_lock<std::shared_mutex> lock(*HashMapHolder<Player>::GetLock());
+    HashMapHolder<Player>::MapType const& players = ObjectAccessor::GetPlayers();
+    
+    for (auto const& pair : players)
     {
-        if (Player* player = session->GetPlayer())
+        if (Player* player = pair.second)
         {
             if (player->IsInWorld())
             {
@@ -951,10 +953,12 @@ void BroadcastPositionUpdate(const SiegeEvent& event, ObjectGuid guid, float x, 
     std::string addonMessage = "CITYSIEGE_" + message;
     
     // Send to ALL online players with addon (no distance restriction)
-    SessionMap const& sessions = sWorld->GetAllSessions();
-    for (auto const& [accountId, session] : sessions)
+    std::shared_lock<std::shared_mutex> lock(*HashMapHolder<Player>::GetLock());
+    HashMapHolder<Player>::MapType const& players = ObjectAccessor::GetPlayers();
+    
+    for (auto const& pair : players)
     {
-        if (Player* player = session->GetPlayer())
+        if (Player* player = pair.second)
         {
             if (player->IsInWorld())
             {
