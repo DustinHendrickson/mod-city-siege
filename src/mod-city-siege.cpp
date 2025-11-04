@@ -758,6 +758,117 @@ void AnnounceSiege(const CityData& city, bool isStart)
 }
 
 /**
+ * @brief Broadcasts siege data to clients via addon messages
+ * @param event The siege event to broadcast
+ * @param messageType Type of message (START, UPDATE, END, POSITION)
+ */
+void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messageType)
+{
+    const CityData& city = g_Cities[event.cityId];
+    Map* map = sMapMgr->FindMap(city.mapId, 0);
+    if (!map)
+        return;
+
+    std::ostringstream ss;
+    
+    if (messageType == "START")
+    {
+        // Format: START:cityId:faction
+        bool isAllianceCity = (event.cityId <= CITY_EXODAR);
+        std::string attackingFaction = isAllianceCity ? "Horde" : "Alliance";
+        ss << "START:" << static_cast<uint32>(event.cityId) << ":" << attackingFaction;
+    }
+    else if (messageType == "UPDATE")
+    {
+        // Format: UPDATE:cityId:phase:attackers:defenders:elapsed
+        uint32 attackerCount = event.spawnedCreatures.size();
+        uint32 defenderCount = event.spawnedDefenders.size();
+        uint32 elapsed = time(nullptr) - event.startTime;
+        
+        // Determine phase (1-4 based on time elapsed)
+        uint32 phase = 1;
+        if (!event.cinematicPhase)
+        {
+            uint32 duration = event.endTime - event.startTime;
+            if (elapsed > duration * 0.75f) phase = 4;
+            else if (elapsed > duration * 0.5f) phase = 3;
+            else if (elapsed > duration * 0.25f) phase = 2;
+        }
+        
+        ss << "UPDATE:" << static_cast<uint32>(event.cityId) << ":" << phase 
+           << ":" << attackerCount << ":" << defenderCount << ":" << elapsed;
+    }
+    else if (messageType == "END")
+    {
+        // Format: END:cityId:winner
+        ss << "END:" << static_cast<uint32>(event.cityId) << ":unknown";
+    }
+    
+    std::string message = ss.str();
+    std::string addonMessage = "CITYSIEGE_" + message;
+    
+    // Send to all players on the map within range
+    Map::PlayerList const& players = map->GetPlayers();
+    for (auto itr = players.begin(); itr != players.end(); ++itr)
+    {
+        if (Player* player = itr->GetSource())
+        {
+            // Only send to players within reasonable range of the siege
+            if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= 500.0f)
+            {
+                // Send as a chat message that the addon can intercept
+                ChatHandler(player->GetSession()).PSendSysMessage(addonMessage.c_str());
+                
+                if (g_DebugMode)
+                {
+                    LOG_INFO("server.loading", "[City Siege] Sent addon message to {}: {}", 
+                             player->GetName(), addonMessage);
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief Broadcasts position updates for siege participants
+ * @param event The siege event
+ * @param guid The GUID of the unit
+ * @param x X coordinate
+ * @param y Y coordinate  
+ * @param z Z coordinate
+ * @param unitType Type of unit (ATTACKER, DEFENDER, NPC)
+ */
+void BroadcastPositionUpdate(const SiegeEvent& event, ObjectGuid guid, float x, float y, float z, const std::string& unitType)
+{
+    const CityData& city = g_Cities[event.cityId];
+    Map* map = sMapMgr->FindMap(city.mapId, 0);
+    if (!map)
+        return;
+        
+    std::ostringstream ss;
+    ss << "POS:" << static_cast<uint32>(event.cityId) << ":" 
+       << guid.GetRawValue() << ":" 
+       << std::fixed << std::setprecision(2) << x << ":" << y << ":" << z 
+       << ":" << unitType;
+       
+    std::string message = ss.str();
+    std::string addonMessage = "CITYSIEGE_" + message;
+    
+    // Send to players near the siege
+    Map::PlayerList const& players = map->GetPlayers();
+    for (auto itr = players.begin(); itr != players.end(); ++itr)
+    {
+        if (Player* player = itr->GetSource())
+        {
+            if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= 500.0f)
+            {
+                ChatHandler(player->GetSession()).PSendSysMessage(addonMessage.c_str());
+            }
+        }
+    }
+}
+
+/**
  * @brief Spawns siege creatures for a city siege event.
  * @param event The siege event to spawn creatures for.
  */
@@ -1980,6 +2091,9 @@ void StartSiegeEvent(int targetCityId = -1)
 
     g_ActiveSieges.push_back(newEvent);
 
+    // Broadcast siege start to addons
+    BroadcastSiegeDataToAddon(g_ActiveSieges.back(), "START");
+
     // Set siege weather during RP phase
     SetSiegeWeather(*city, g_ActiveSieges.back());
 
@@ -2105,6 +2219,9 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
 
     DespawnSiegeCreatures(event);
     AnnounceSiege(city, false);
+    
+    // Broadcast siege end to addons
+    BroadcastSiegeDataToAddon(event, "END");
 
     // Restore original weather
     RestoreSiegeWeather(city, event);
@@ -3912,6 +4029,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             }
             
             sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, statusMsg);
+            
+            // Broadcast siege update to addons
+            BroadcastSiegeDataToAddon(event, "UPDATE");
         }
 
         // Check if city leader is dead (attackers win)
