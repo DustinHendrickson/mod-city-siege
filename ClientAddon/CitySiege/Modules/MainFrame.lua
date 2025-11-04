@@ -649,7 +649,20 @@ function MainFrame:Show()
     
     if frame then
         frame:Show()
+        frame:Raise() -- Bring to front
         self:UpdateSiegeDisplay()
+        
+        -- Ensure all child frames are visible
+        if frame.contentFrame then
+            frame.contentFrame:Show()
+        end
+        
+        -- Show the current tab
+        if self.currentTab then
+            self:ShowTab(self.currentTab)
+        else
+            self:ShowTab(1) -- Default to Commands tab
+        end
     end
 end
 

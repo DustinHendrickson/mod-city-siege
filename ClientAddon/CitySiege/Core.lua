@@ -127,6 +127,17 @@ function Core:PLAYER_REGEN_ENABLED()
 end
 
 function Core:CHAT_MSG_SYSTEM(event, message)
+    -- Check if this is a CitySiege addon message (should be invisible)
+    if message and string.match(message, "^CitySiege\t") then
+        -- Extract the actual message after the tab
+        local addonMessage = string.match(message, "^CitySiege\t(.+)$")
+        if addonMessage and CitySiege_EventHandler then
+            CitySiege_EventHandler:ParseAddonMessage(addonMessage)
+        end
+        -- Return early to prevent further processing (makes it invisible)
+        return
+    end
+    
     -- Monitor system messages for siege-related announcements
     if CitySiege_SiegeTracker then
         CitySiege_SiegeTracker:ParseSystemMessage(message)

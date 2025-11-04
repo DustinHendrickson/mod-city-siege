@@ -908,15 +908,16 @@ void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messa
         {
             if (player->IsInWorld())
             {
-                // Send using addon message packet (INVISIBLE to user)
-                WorldPacket data(SMSG_MESSAGECHAT, 2000); // Increased size for all the data
+                // Send as CHAT_MSG_SYSTEM with CitySiege prefix (addon will filter it)
+                WorldPacket data(SMSG_MESSAGECHAT, 2000);
                 data << uint8(CHAT_MSG_SYSTEM);
                 data << uint32(LANG_UNIVERSAL);
                 data << uint64(0);
                 data << uint32(0);
                 data << uint64(player->GetGUID().GetRawValue());
                 
-                std::string fullMessage = "CITYSIEGE_" + message;
+                // Use tab separator that addon expects
+                std::string fullMessage = "CitySiege\t" + message;
                 data << uint32(fullMessage.length() + 1);
                 data << fullMessage;
                 data << uint8(0);

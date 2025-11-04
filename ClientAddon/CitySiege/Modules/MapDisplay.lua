@@ -112,32 +112,61 @@ function MapDisplay:SetCity(cityID)
         frame.titleText:SetText(string.format("%s%s|r Map", color, cityData.displayName))
     end
     
-    -- Set city map texture using WorldMap tiles
-    -- NOTE: WorldMap BLP files are NOT accessible in addons in WoW 3.3.5
-    -- You need to provide your own map images in the addon's Media folder
-    -- For now, using tactical overlay with grid
+    -- Set city map texture using our custom TGA files
     if frame and frame.mapTexture then
-        -- Fallback to tactical overlay (no map textures available by default)
-        frame.mapTexture:SetTexture(nil)
-        frame.mapTexture:SetColorTexture(0.05, 0.05, 0.08, 1.0)
-        frame.mapTexture:SetAlpha(1.0)
+        -- Map city names to file names (use actual folder names)
+        local mapFiles = {
+            [CitySiege_Cities.STORMWIND] = "Stormwind",
+            [CitySiege_Cities.IRONFORGE] = "Ironforge",
+            [CitySiege_Cities.DARNASSUS] = "Darnassis",
+            [CitySiege_Cities.EXODAR] = "TheExodar",
+            [CitySiege_Cities.ORGRIMMAR] = "Ogrimmar",
+            [CitySiege_Cities.UNDERCITY] = "Undercity",
+            [CitySiege_Cities.THUNDERBLUFF] = "ThunderBluff",
+            [CitySiege_Cities.SILVERMOON] = "SilvermoonCity",
+        }
         
-        -- Show grid overlay
-        if frame.gridTexture then
-            frame.gridTexture:Show()
+        local mapFile = mapFiles[cityID]
+        if mapFile then
+            -- Try to load the custom TGA map
+            local texturePath = "Interface\\AddOns\\CitySiege\\Media\\Maps\\" .. mapFile
+            frame.mapTexture:SetTexture(texturePath)
+            frame.mapTexture:SetAlpha(0.7) -- Slightly transparent so grid shows through
+            frame.mapTexture:Show()
+            
+            -- Show grid overlay
+            if frame.gridTexture then
+                frame.gridTexture:Show()
+                frame.gridTexture:SetAlpha(0.15)
+            end
+            
+            -- Hide city name overlay since we have a real map
+            if frame.mapCityLabel then
+                frame.mapCityLabel:Hide()
+            end
+        else
+            -- Fallback to tactical overlay if no map file
+            frame.mapTexture:SetTexture(nil)
+            frame.mapTexture:SetColorTexture(0.05, 0.05, 0.08, 1.0)
+            frame.mapTexture:SetAlpha(1.0)
+            
+            -- Show grid overlay
+            if frame.gridTexture then
+                frame.gridTexture:Show()
+            end
+            
+            -- Show city name overlay
+            if not frame.mapCityLabel then
+                frame.mapCityLabel = frame.mapContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+                frame.mapCityLabel:SetPoint("TOP", frame.mapContainer, "TOP", 0, -10)
+                frame.mapCityLabel:SetAlpha(0.3)
+            end
+            
+            local color = cityData.color
+            frame.mapCityLabel:SetTextColor(color.r, color.g, color.b, 0.5)
+            frame.mapCityLabel:SetText(cityData.displayName:upper())
+            frame.mapCityLabel:Show()
         end
-        
-        -- Show city name overlay
-        if not frame.mapCityLabel then
-            frame.mapCityLabel = frame.mapContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-            frame.mapCityLabel:SetPoint("TOP", frame.mapContainer, "TOP", 0, -10)
-            frame.mapCityLabel:SetAlpha(0.3)
-        end
-        
-        local color = cityData.color
-        frame.mapCityLabel:SetTextColor(color.r, color.g, color.b, 0.5)
-        frame.mapCityLabel:SetText(cityData.displayName:upper())
-        frame.mapCityLabel:Show()
     end
     
     -- Clear existing icons and lines
