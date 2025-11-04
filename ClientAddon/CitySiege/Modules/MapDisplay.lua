@@ -99,7 +99,32 @@ function MapDisplay:SetCity(cityID)
     currentCityID = cityID
     
     if not cityID then
-        self:Clear()
+        -- Show placeholder when no city selected
+        if frame and frame.mapTexture then
+            frame.mapTexture:SetTexture(nil)
+            frame.mapTexture:SetColorTexture(0.05, 0.05, 0.08, 1.0)
+            
+            if frame.gridTexture then
+                frame.gridTexture:Show()
+            end
+            
+            if not frame.noMapText then
+                frame.noMapText = frame.mapContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+                frame.noMapText:SetPoint("CENTER", frame.mapContainer, "CENTER", 0, 0)
+                frame.noMapText:SetTextColor(0.8, 0.6, 0.2, 1)
+            end
+            
+            frame.noMapText:SetText("|cFF808080Select a city from the dropdown above|r")
+            frame.noMapText:Show()
+            
+            if frame.mapCityLabel then
+                frame.mapCityLabel:Hide()
+            end
+        end
+        
+        if frame and frame.titleText then
+            frame.titleText:SetText("City Map")
+        end
         return
     end
     
@@ -112,7 +137,7 @@ function MapDisplay:SetCity(cityID)
         frame.titleText:SetText(string.format("%s%s|r Map", color, cityData.displayName))
     end
     
-    -- Set city map texture using our custom TGA files
+    -- Set city map texture using our custom map files
     if frame and frame.mapTexture then
         -- Map city names to file names (use actual folder names)
         local mapFiles = {
@@ -127,33 +152,62 @@ function MapDisplay:SetCity(cityID)
         }
         
         local mapFile = mapFiles[cityID]
+        local mapLoaded = false
+        
         if mapFile then
-            -- Try to load the custom TGA map
-            local texturePath = "Interface\\AddOns\\CitySiege\\Media\\Maps\\" .. mapFile
-            frame.mapTexture:SetTexture(texturePath)
-            frame.mapTexture:SetAlpha(0.7) -- Slightly transparent so grid shows through
-            frame.mapTexture:Show()
-            
-            -- Show grid overlay
-            if frame.gridTexture then
-                frame.gridTexture:Show()
-                frame.gridTexture:SetAlpha(0.15)
+            -- Try BLP first (native WoW format), then TGA fallback
+            local formats = {".blp", ".tga"}
+            for _, ext in ipairs(formats) do
+                local texturePath = "Interface\\AddOns\\CitySiege\\Media\\Maps\\" .. mapFile .. ext
+                frame.mapTexture:SetTexture(texturePath)
+                
+                -- Check if texture loaded (GetTexture returns nil if failed)
+                if frame.mapTexture:GetTexture() then
+                    frame.mapTexture:SetAlpha(0.8)
+                    frame.mapTexture:Show()
+                    mapLoaded = true
+                    
+                    -- Show grid overlay
+                    if frame.gridTexture then
+                        frame.gridTexture:Show()
+                        frame.gridTexture:SetAlpha(0.2)
+                    end
+                    
+                    -- Hide fallback messages
+                    if frame.mapCityLabel then
+                        frame.mapCityLabel:Hide()
+                    end
+                    if frame.noMapText then
+                        frame.noMapText:Hide()
+                    end
+                    
+                    break -- Stop trying formats
+                end
             end
-            
-            -- Hide city name overlay since we have a real map
-            if frame.mapCityLabel then
-                frame.mapCityLabel:Hide()
-            end
-        else
-            -- Fallback to tactical overlay if no map file
+        end
+        
+        -- If no map loaded, show fallback
+        if not mapLoaded then
             frame.mapTexture:SetTexture(nil)
             frame.mapTexture:SetColorTexture(0.05, 0.05, 0.08, 1.0)
-            frame.mapTexture:SetAlpha(1.0)
             
-            -- Show grid overlay
             if frame.gridTexture then
                 frame.gridTexture:Show()
             end
+            
+            -- Show "no map available" message
+            if not frame.noMapText then
+                frame.noMapText = frame.mapContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+                frame.noMapText:SetPoint("CENTER", frame.mapContainer, "CENTER", 0, 20)
+                frame.noMapText:SetTextColor(0.8, 0.6, 0.2, 1)
+            end
+            
+            if mapFile then
+                frame.noMapText:SetText("|cFFFFAA00Map texture not loaded|r\n\n" .. cityData.displayName .. "\n\n|cFF808080Convert TGA to BLP format|r")
+            else
+                frame.noMapText:SetText("|cFFFFAA00No map configured|r\n\n" .. cityData.displayName)
+            end
+            frame.noMapText:Show()
             
             -- Show city name overlay
             if not frame.mapCityLabel then

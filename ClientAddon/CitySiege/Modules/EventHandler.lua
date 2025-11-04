@@ -10,16 +10,7 @@ function EventHandler:Initialize()
     -- Register for addon communication
     RegisterAddonMessagePrefix("CitySiege")
     
-    -- Register event frame for chat messages
-    if not self.eventFrame then
-        self.eventFrame = CreateFrame("Frame")
-        self.eventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
-        self.eventFrame:SetScript("OnEvent", function(frame, event, ...)
-            if event == "CHAT_MSG_SYSTEM" then
-                EventHandler:OnChatMessage(...)
-            end
-        end)
-    end
+    -- Note: CHAT_MSG_SYSTEM is handled by Core.lua which calls EventHandler:OnChatMessage
     
     CitySiege_Utils:Debug("Event Handler initialized - listening for server data")
 end
@@ -28,10 +19,16 @@ end
 function EventHandler:OnChatMessage(message, ...)
     if not message then return end
     
-    -- Check if it's a City Siege addon message (supports both formats)
+    -- Check for CitySiege tab-separated format (primary)
+    if string.find(message, "^CitySiege\t") then
+        local data = string.gsub(message, "^CitySiege\t", "")
+        self:ParseAddonMessage(data)
+        return
+    end
+    
+    -- Check for legacy formats (backup)
     if string.find(message, "^CITYSIEGE_") or string.find(message, "^CITYSIEGE:") then
         local data = string.gsub(message, "^CITYSIEGE[_:]", "")
-        CitySiege_Utils:Debug("Received: " .. data)
         self:ParseAddonMessage(data)
         return
     end
@@ -87,7 +84,7 @@ function EventHandler:CHAT_MSG_ADDON(prefix, message, channel, sender)
 end
 
 function EventHandler:ParseAddonMessage(message)
-    -- Parse structured messages from server
+    if not message then return end
     
     local command = string.match(message, "^([^:]+)")
     if not command then return end

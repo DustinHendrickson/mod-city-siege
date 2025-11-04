@@ -58,6 +58,14 @@ function Core:OnEnable()
     self:RegisterEvent("PLAYER_REGEN_DISABLED") -- Enter combat
     self:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Leave combat
     
+    -- Add chat filter to hide CitySiege messages
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", function(self, event, message, ...)
+        if message and string.match(message, "^CitySiege\t") then
+            return true -- Filter it out (hide it)
+        end
+        return false -- Show it
+    end)
+    
     -- Initialize modules
     if CitySiege_EventHandler then
         CitySiege_EventHandler:Initialize()
@@ -134,13 +142,17 @@ function Core:CHAT_MSG_SYSTEM(event, message)
         if addonMessage and CitySiege_EventHandler then
             CitySiege_EventHandler:ParseAddonMessage(addonMessage)
         end
-        -- Return early to prevent further processing (makes it invisible)
-        return
+        -- Don't return - let it continue to parse as system message
     end
     
     -- Monitor system messages for siege-related announcements
     if CitySiege_SiegeTracker then
         CitySiege_SiegeTracker:ParseSystemMessage(message)
+    end
+    
+    -- Also let EventHandler parse it
+    if CitySiege_EventHandler and CitySiege_EventHandler.OnChatMessage then
+        CitySiege_EventHandler:OnChatMessage(message)
     end
 end
 
@@ -187,28 +199,38 @@ function Core:SlashCommand(input)
         self:ToggleDebug()
     elseif cmd == "testmap" then
         -- Enable test mode for map visualization
-        if CitySiege_EventHandler then
+        if CitySiege_MainFrame then
             local cityID = tonumber(args[2]) or CitySiege_Cities.STORMWIND
-            CitySiege_Utils:Print("Testing siege data for city " .. cityID)
+            CitySiege_Utils:Print("Opening addon with test city " .. cityID)
             
-            -- Simulate START message
-            CitySiege_EventHandler:ParseAddonMessage("START:" .. cityID .. ":Horde")
+            -- Show the main frame first
+            CitySiege_MainFrame:Show()
             
-            -- Use a frame timer for delayed UPDATE (3.3.5 compatible)
-            local frame = CreateFrame("Frame")
-            local elapsed = 0
-            frame:SetScript("OnUpdate", function(self, delta)
-                elapsed = elapsed + delta
-                if elapsed >= 1 then
-                    self:SetScript("OnUpdate", nil)
-                    CitySiege_EventHandler:ParseAddonMessage("UPDATE:" .. cityID .. ":2:25:30:120")
-                end
-            end)
+            -- Then select the city (will trigger data fetch)
+            CitySiege_MainFrame:SelectCity(cityID)
             
-            -- Show the main frame
-            if CitySiege_MainFrame then
-                CitySiege_MainFrame:Show()
-                CitySiege_MainFrame:SelectCity(cityID)
+            -- Simulate siege data after delay
+            if CitySiege_EventHandler then
+                local frame = CreateFrame("Frame")
+                local elapsed = 0
+                frame:SetScript("OnUpdate", function(self, delta)
+                    elapsed = elapsed + delta
+                    if elapsed >= 0.5 then
+                        self:SetScript("OnUpdate", nil)
+                        CitySiege_EventHandler:ParseAddonMessage("START:" .. cityID .. ":Horde")
+                        
+                        -- Wait another second then send UPDATE
+                        local frame2 = CreateFrame("Frame")
+                        local elapsed2 = 0
+                        frame2:SetScript("OnUpdate", function(self, delta)
+                            elapsed2 = elapsed2 + delta
+                            if elapsed2 >= 1 then
+                                self:SetScript("OnUpdate", nil)
+                                CitySiege_EventHandler:ParseAddonMessage("UPDATE:" .. cityID .. ":2:25:30:120")
+                            end
+                        end)
+                    end
+                end)
             end
         end
     elseif cmd == "testoff" then

@@ -292,9 +292,10 @@ function MainFrame:CreateInfoPanel(parent)
     infoText:SetWidth(730)
     infoText:SetJustifyH("LEFT")
     infoText:SetJustifyV("TOP")
+    infoText:SetText("|cFFFF0000INFO TEXT CREATED|r") -- Debug marker
     panel.infoText = infoText
     
-    self:UpdateInfoText()
+    CitySiege_Utils:Debug("CreateInfoPanel: Panel created with infoText")
     
     return panel
 end
@@ -323,8 +324,9 @@ function MainFrame:CreateStatsPanel(parent)
 end
 
 function MainFrame:ShowTab(tabIndex)
-    if not frame or not currentCityID then return end -- Don't show tabs without a city selected
+    if not frame then return end
     
+    self.currentTab = tabIndex
     frame.currentTab = tabIndex
     
     -- Hide all content frames
@@ -359,10 +361,16 @@ function MainFrame:ShowTab(tabIndex)
         end
     elseif tabIndex == 3 and frame.infoContent then
         frame.infoContent:Show()
-        self:UpdateInfoText()
+        -- Force update the text
+        if frame.infoContent.infoText then
+            self:UpdateInfoText()
+        end
     elseif tabIndex == 4 and frame.statsContent then
         frame.statsContent:Show()
-        self:UpdateStatsText()
+        -- Force update the text
+        if frame.statsContent.statsText then
+            self:UpdateStatsText()
+        end
     end
 end
 
@@ -374,35 +382,21 @@ function MainFrame:SelectCity(cityID)
         SendChatMessage(".citysiege sync " .. cityID, "GUILD")
     end
     
-    -- Show or hide tabs based on city selection
-    if cityID then
-        -- City selected - show all tabs
-        for i, tab in ipairs(frame.tabs) do
-            tab:Show()
-        end
-        
-        -- Hide welcome message if it exists
-        if frame.welcomeText then
-            frame.welcomeText:Hide()
-        end
-        
-        -- Show current tab
-        if not frame.currentTab or frame.currentTab == 0 then
-            self:ShowTab(1)
-        end
+    -- Always show all tabs
+    for i, tab in ipairs(frame.tabs) do
+        tab:Show()
+    end
+    
+    -- Hide welcome message if it exists
+    if frame.welcomeText then
+        frame.welcomeText:Hide()
+    end
+    
+    -- Refresh current tab display
+    if frame.currentTab and frame.currentTab > 0 then
+        self:ShowTab(frame.currentTab)
     else
-        -- No city selected - hide all tabs
-        for i, tab in ipairs(frame.tabs) do
-            tab:Hide()
-        end
-        
-        -- Hide all content
-        if frame.commandsContent then frame.commandsContent:Hide() end
-        if frame.mapContent then frame.mapContent:Hide() end
-        if frame.infoContent then frame.infoContent:Hide() end
-        if frame.statsContent then frame.statsContent:Hide() end
-        
-        -- Show welcome message
+        self:ShowTab(3) -- Default to Info tab which has placeholder content
         if not frame.welcomeText then
             frame.welcomeText = frame.contentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
             frame.welcomeText:SetPoint("CENTER", frame.contentFrame, "CENTER", 0, 0)
@@ -450,7 +444,10 @@ function MainFrame:UpdateSiegeDisplay()
 end
 
 function MainFrame:UpdateInfoText()
-    if not frame or not frame.infoContent or not frame.infoContent.infoText then return end
+    if not frame or not frame.infoContent or not frame.infoContent.infoText then 
+        CitySiege_Utils:Debug("UpdateInfoText: frame or infoText not found")
+        return 
+    end
     
     local text = "|cFFFFFF00=== City Siege Information ===|r\n\n"
     
@@ -539,7 +536,12 @@ function MainFrame:UpdateInfoText()
     text = text .. "|cFF808080Use Commands tab to start/manage sieges|r\n"
     text = text .. "|cFF808080Use Map tab to view siege battlefield|r"
     
-    frame.infoContent.infoText:SetText(text)
+    if frame.infoContent and frame.infoContent.infoText then
+        frame.infoContent.infoText:SetText(text)
+        CitySiege_Utils:Debug("UpdateInfoText: Text set successfully, length: " .. string.len(text))
+    else
+        CitySiege_Utils:Debug("UpdateInfoText: infoText not found!")
+    end
 end
 
 function MainFrame:UpdateStatsText()
@@ -639,7 +641,12 @@ function MainFrame:UpdateStatsText()
     
     text = text .. "\n|cFF808080Stats update in real-time during sieges|r"
     
-    frame.statsContent.statsText:SetText(text)
+    if frame.statsContent and frame.statsContent.statsText then
+        frame.statsContent.statsText:SetText(text)
+        CitySiege_Utils:Debug("UpdateStatsText: Text set successfully")
+    else
+        CitySiege_Utils:Debug("UpdateStatsText: statsText not found")
+    end
 end
 
 function MainFrame:Show()
@@ -650,18 +657,24 @@ function MainFrame:Show()
     if frame then
         frame:Show()
         frame:Raise() -- Bring to front
-        self:UpdateSiegeDisplay()
+        
+        -- Show all tabs
+        for i, tab in ipairs(frame.tabs) do
+            tab:Show()
+        end
         
         -- Ensure all child frames are visible
         if frame.contentFrame then
             frame.contentFrame:Show()
         end
         
-        -- Show the current tab
-        if self.currentTab then
+        self:UpdateSiegeDisplay()
+        
+        -- Show the current tab or default to Info (has placeholder content)
+        if self.currentTab and self.currentTab > 0 then
             self:ShowTab(self.currentTab)
         else
-            self:ShowTab(1) -- Default to Commands tab
+            self:ShowTab(3) -- Default to Info tab
         end
     end
 end
