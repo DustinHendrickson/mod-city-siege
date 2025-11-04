@@ -106,7 +106,7 @@ function MainFrame:CreateFrame()
     settingsBtn:SetText("Settings")
     settingsBtn:SetScript("OnClick", function()
         if CitySiege_SettingsPanel then
-            CitySiege_SettingsPanel:Show()
+            CitySiege_SettingsPanel:Toggle()
         end
     end)
     
@@ -369,6 +369,11 @@ end
 function MainFrame:SelectCity(cityID)
     currentCityID = cityID
     
+    -- Request current siege data from server when city selected
+    if cityID then
+        SendChatMessage(".citysiege sync " .. cityID, "GUILD")
+    end
+    
     -- Show or hide tabs based on city selection
     if cityID then
         -- City selected - show all tabs
@@ -498,6 +503,17 @@ function MainFrame:UpdateInfoText()
                 
                 if siegeData.elapsedTime then
                     text = text .. string.format("║ Duration: %s\n", CitySiege_Utils:FormatTime(siegeData.elapsedTime))
+                end
+                
+                if siegeData.remaining then
+                    text = text .. string.format("║ |cFFFFFF00Time Remaining:|r %s\n", CitySiege_Utils:FormatTime(siegeData.remaining))
+                end
+                
+                if siegeData.leaderHealth then
+                    local healthColor = "00FF00"
+                    if siegeData.leaderHealth < 50 then healthColor = "FFFF00" end
+                    if siegeData.leaderHealth < 25 then healthColor = "FF0000" end
+                    text = text .. string.format("║ |cFF%sLeader Health:|r %.1f%%\n", healthColor, siegeData.leaderHealth)
                 end
                 
                 if siegeData.attackingFaction then

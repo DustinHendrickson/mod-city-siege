@@ -74,7 +74,6 @@ function CommandPanel:Create(parent)
     -- Status button
     frame.statusButton = self:CreateCommandButton(buttonsFrame, "Show Status", function()
         SendChatMessage(".citysiege status", "GUILD")
-        CitySiege_Utils:Print("Requesting siege status...")
     end, buttonWidth, buttonHeight)
     frame.statusButton:SetPoint("TOP", 0, buttonY)
     buttonY = buttonY - buttonSpacing
@@ -82,7 +81,6 @@ function CommandPanel:Create(parent)
     -- Info button
     frame.infoButton = self:CreateCommandButton(buttonsFrame, "Detailed Info", function()
         SendChatMessage(".citysiege info", "GUILD")
-        CitySiege_Utils:Print("Requesting detailed siege info...")
     end, buttonWidth, buttonHeight)
     frame.infoButton:SetPoint("TOP", 0, buttonY)
     buttonY = buttonY - buttonSpacing
@@ -90,7 +88,6 @@ function CommandPanel:Create(parent)
     -- Reload button
     frame.reloadButton = self:CreateCommandButton(buttonsFrame, "Reload Config", function()
         SendChatMessage(".citysiege reload", "GUILD")
-        CitySiege_Utils:Print("Reloading siege configuration...")
     end, buttonWidth, buttonHeight)
     frame.reloadButton:SetPoint("TOP", 0, buttonY)
     

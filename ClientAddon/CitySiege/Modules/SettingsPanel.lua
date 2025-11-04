@@ -9,7 +9,10 @@ local SettingsPanel = CitySiege_SettingsPanel
 local frame = nil
 
 function SettingsPanel:Create()
-    if frame then return frame end
+    if frame then 
+        -- Frame already exists, just return it
+        return frame
+    end
     
     frame = CreateFrame("Frame", "CitySiegeSettingsPanel", UIParent)
     frame:SetSize(500, 600)
@@ -275,10 +278,23 @@ function SettingsPanel:Hide()
 end
 
 function SettingsPanel:Toggle()
-    if frame and frame:IsShown() then
-        self:Hide()
+    -- Create frame if it doesn't exist
+    if not frame then
+        self:Create()
+    end
+    
+    -- NOW check if frame was successfully created
+    if not frame then
+        CitySiege_Utils:Print("|cFFFF0000ERROR:|r Failed to create settings panel!")
+        return
+    end
+    
+    -- Toggle visibility
+    if frame:IsShown() then
+        frame:Hide()
     else
-        self:Show()
+        frame:Show()
+        self:LoadSettings()
     end
 end
 

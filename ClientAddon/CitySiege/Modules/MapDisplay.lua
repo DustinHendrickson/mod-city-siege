@@ -253,23 +253,86 @@ function MapDisplay:UpdatePlayerPositions(siegeData)
 end
 
 function MapDisplay:UpdateNPCPositions(siegeData)
-    if not siegeData or not siegeData.npcs then return end
+    if not siegeData then return end
     
     local cityData = CitySiege_CityData[currentCityID]
     if not cityData then return end
     
-    for guid, npcData in pairs(siegeData.npcs) do
-        if npcData.x and npcData.y then
-            local icon = self:GetOrCreateIcon(guid, "NPC")
-            self:PositionIcon(icon, npcData.x, npcData.y, cityData)
-            
-            -- Color based on side
-            if npcData.side == "attacker" then
+    -- Clear previous NPC icons
+    for id, icon in pairs(icons) do
+        if type(id) == "string" and (string.match(id, "^npc_atk") or string.match(id, "^npc_def") or string.match(id, "^bot_atk") or string.match(id, "^bot_def")) then
+            icon:Hide()
+            icons[id] = nil
+        end
+    end
+    
+    -- Draw attacker NPC positions (red)
+    if siegeData.attackerPositions then
+        for i, pos in ipairs(siegeData.attackerPositions) do
+            if pos.x and pos.y then
+                local icon = self:GetOrCreateIcon("npc_atk_" .. i, "NPC_ATTACKER")
+                self:PositionIcon(icon, pos.x, pos.y, cityData)
+                icon:SetColorTexture(1, 0, 0, 0.9) -- Red
+                icon:SetSize(8, 8)
+                icon:Show()
+            end
+        end
+    end
+    
+    -- Draw defender NPC positions (blue)
+    if siegeData.defenderPositions then
+        for i, pos in ipairs(siegeData.defenderPositions) do
+            if pos.x and pos.y then
+                local icon = self:GetOrCreateIcon("npc_def_" .. i, "NPC_DEFENDER")
+                self:PositionIcon(icon, pos.x, pos.y, cityData)
+                icon:SetColorTexture(0, 0.5, 1, 0.9) -- Blue
+                icon:SetSize(8, 8)
+                icon:Show()
+            end
+        end
+    end
+    
+    -- Draw attacker bot positions (orange)
+    if siegeData.attackerBots then
+        for i, pos in ipairs(siegeData.attackerBots) do
+            if pos.x and pos.y then
+                local icon = self:GetOrCreateIcon("bot_atk_" .. i, "BOT_ATTACKER")
+                self:PositionIcon(icon, pos.x, pos.y, cityData)
                 icon:SetColorTexture(1, 0.5, 0, 0.9) -- Orange
-            elseif npcData.side == "defender" then
-                icon:SetColorTexture(0, 1, 0, 0.9) -- Green
-            else
-                icon:SetColorTexture(1, 1, 0, 0.9) -- Yellow
+                icon:SetSize(6, 6)
+                icon:Show()
+            end
+        end
+    end
+    
+    -- Draw defender bot positions (cyan)
+    if siegeData.defenderBots then
+        for i, pos in ipairs(siegeData.defenderBots) do
+            if pos.x and pos.y then
+                local icon = self:GetOrCreateIcon("bot_def_" .. i, "BOT_DEFENDER")
+                self:PositionIcon(icon, pos.x, pos.y, cityData)
+                icon:SetColorTexture(0, 1, 1, 0.9) -- Cyan
+                icon:SetSize(6, 6)
+                icon:Show()
+            end
+        end
+    end
+    
+    -- Old code for legacy npcs table
+    if siegeData.npcs then
+        for guid, npcData in pairs(siegeData.npcs) do
+            if npcData.x and npcData.y then
+                local icon = self:GetOrCreateIcon(guid, "NPC")
+                self:PositionIcon(icon, npcData.x, npcData.y, cityData)
+                
+                -- Color based on side
+                if npcData.side == "attacker" then
+                    icon:SetColorTexture(1, 0.5, 0, 0.9) -- Orange
+                elseif npcData.side == "defender" then
+                    icon:SetColorTexture(0, 1, 0, 0.9) -- Green
+                else
+                    icon:SetColorTexture(1, 1, 0, 0.9) -- Yellow
+                end
             end
         end
     end

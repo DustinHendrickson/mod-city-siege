@@ -59,6 +59,10 @@ function Core:OnEnable()
     self:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Leave combat
     
     -- Initialize modules
+    if CitySiege_EventHandler then
+        CitySiege_EventHandler:Initialize()
+    end
+    
     if CitySiege_SiegeTracker then
         CitySiege_SiegeTracker:Initialize()
     end
@@ -148,6 +152,14 @@ function Core:SlashCommand(input)
         self:ToggleMinimap()
     elseif cmd == "status" then
         self:RequestStatus()
+    elseif cmd == "sync" then
+        -- Force sync with server (silent operation)
+        self:RequestStatus()
+        -- Also manually create siege data if we know there's one
+        local cityID = tonumber(args[2])
+        if cityID and CitySiege_EventHandler then
+            CitySiege_EventHandler:ParseAddonMessage("UPDATE:" .. cityID .. ":2:0:0:0")
+        end
     elseif cmd == "start" then
         self:SendCommand("start", args[2])
     elseif cmd == "stop" then
@@ -164,14 +176,35 @@ function Core:SlashCommand(input)
         self:ToggleDebug()
     elseif cmd == "testmap" then
         -- Enable test mode for map visualization
-        if CitySiege_MapDisplay then
+        if CitySiege_EventHandler then
             local cityID = tonumber(args[2]) or CitySiege_Cities.STORMWIND
-            CitySiege_MapDisplay:EnableTestMode(cityID)
+            CitySiege_Utils:Print("Testing siege data for city " .. cityID)
+            
+            -- Simulate START message
+            CitySiege_EventHandler:ParseAddonMessage("START:" .. cityID .. ":Horde")
+            
+            -- Use a frame timer for delayed UPDATE (3.3.5 compatible)
+            local frame = CreateFrame("Frame")
+            local elapsed = 0
+            frame:SetScript("OnUpdate", function(self, delta)
+                elapsed = elapsed + delta
+                if elapsed >= 1 then
+                    self:SetScript("OnUpdate", nil)
+                    CitySiege_EventHandler:ParseAddonMessage("UPDATE:" .. cityID .. ":2:25:30:120")
+                end
+            end)
+            
+            -- Show the main frame
+            if CitySiege_MainFrame then
+                CitySiege_MainFrame:Show()
+                CitySiege_MainFrame:SelectCity(cityID)
+            end
         end
     elseif cmd == "testoff" then
         -- Disable test mode
-        if CitySiege_MapDisplay then
-            CitySiege_MapDisplay:DisableTestMode()
+        if CitySiege_SiegeTracker then
+            CitySiege_SiegeTracker:Clear()
+            CitySiege_Utils:Print("Test data cleared")
         end
     else
         CitySiege_Utils:Print("Unknown command. Type |cFFFFFF00/cs help|r for available commands.")
@@ -229,7 +262,7 @@ end
 
 function Core:RequestStatus()
     SendChatMessage(".citysiege status", "GUILD")
-    CitySiege_Utils:Print("Requesting siege status...")
+    -- Silent operation - no user-facing message
 end
 
 function Core:SendCommand(cmd, arg1, arg2)

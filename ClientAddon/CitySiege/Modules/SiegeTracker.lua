@@ -278,9 +278,8 @@ function Tracker:GetNPCs(cityID)
 end
 
 function Tracker:RequestStatusUpdate()
-    -- Send command to get status
+    -- Send command to get status (silent operation)
     SendChatMessage(".citysiege status", "GUILD")
-    CitySiege_Utils:Print("Requesting siege status update...")
 end
 
 function Tracker:CheckCitySiege(cityID)
