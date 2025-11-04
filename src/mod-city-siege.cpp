@@ -5216,7 +5216,7 @@ public:
             {
                 if (event.isActive)
                 {
-                    BroadcastSiegeDataToAddon(event, player);
+                    BroadcastSiegeDataToAddon(event, "UPDATE");
                 }
             }
             return true;
@@ -5233,7 +5233,7 @@ public:
         {
             if (event.isActive && event.cityId == static_cast<int>(cityId))
             {
-                BroadcastSiegeDataToAddon(event, player);
+                BroadcastSiegeDataToAddon(event, "UPDATE");
                 return true;
             }
         }
