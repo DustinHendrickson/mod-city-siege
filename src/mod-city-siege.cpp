@@ -5268,15 +5268,6 @@ public:
         
         return true;
     }
-        std::stringstream ss;
-        ss << "CITYSIEGE_END:" << cityId << ":none";
-        std::string message = ss.str();
-        data << message;
-        data << uint8(0);
-        player->SendDirectMessage(&data);
-
-        return true;
-    }
 
     static bool HandleCitySiegeDistanceCommand(ChatHandler* handler, Optional<std::string> cityNameArg)
     {
