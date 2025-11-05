@@ -59,9 +59,9 @@ def assemble_map(city_name, cols, rows, tile_count):
     square_img.paste(temp_img, (offset_x, offset_y))
     temp_img.close()
     
-    # Save as TGA (ready for BLP conversion)
-    output_path = f"{city_name}.tga"
-    square_img.save(output_path)
+    # Save as PNG (ready for BLP conversion)
+    output_path = f"{city_name}.png"
+    square_img.save(output_path, 'PNG')
     square_img.close()
     
     print(f"  ✓ Created {output_path} ({TARGET_SIZE}x{TARGET_SIZE} SQUARE)")
@@ -85,12 +85,10 @@ def main():
     print(f"✓ Successfully assembled {success_count}/{len(MAP_CONFIGS)} maps")
     print("=" * 60)
     print("\nNEXT STEPS:")
-    print("1. Download BLPConverter:")
-    print("   https://www.wowinterface.com/downloads/info8127")
-    print("2. Drag TGA files into BLPConverter")
-    print("3. Convert to BLP format")
-    print("4. Copy BLP files to: CitySiege\\Media\\Maps\\")
-    print("\n✓ Square 1024x1024 images are BLP-compatible!")
+    print("1. Convert PNG files to BLP using BLPConverter:")
+    print("   .\BLPConverter.exe /FBLP_DXT1_A0 /N /M *.png")
+    print("2. Copy BLP files to: CitySiege\\Media\\Maps\\")
+    print("\n✓ Square 1024x1024 PNG images ready for BLP conversion!")
 
 if __name__ == "__main__":
     main()
