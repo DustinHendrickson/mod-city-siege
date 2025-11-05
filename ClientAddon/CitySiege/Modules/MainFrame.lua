@@ -243,20 +243,29 @@ function MainFrame:CreateTabContent()
     frame.commandsContent:SetPoint("BOTTOMRIGHT", -5, 5)
     frame.commandsContent:Hide()
     commandPanel = CitySiege_CommandPanel:Create(frame.commandsContent)
-    if commandPanel then
-        commandPanel:ClearAllPoints()
-        commandPanel:SetAllPoints(frame.commandsContent)
-    end
     
     -- Map tab (using MapDisplay)
     frame.mapContent = CreateFrame("Frame", nil, frame.contentFrame)
     frame.mapContent:SetPoint("TOPLEFT", 5, -5)
     frame.mapContent:SetPoint("BOTTOMRIGHT", -5, 5)
     frame.mapContent:Hide()
-    mapDisplay = CitySiege_MapDisplay:Create(frame.mapContent)
-    if mapDisplay then
-        mapDisplay:ClearAllPoints()
-        mapDisplay:SetAllPoints(frame.mapContent)
+    
+    print("CitySiege MainFrame: About to create MapDisplay")
+    print("CitySiege MainFrame: CitySiege_MapDisplay exists: " .. tostring(CitySiege_MapDisplay ~= nil))
+    
+    if CitySiege_MapDisplay then
+        local success, result = pcall(function()
+            return CitySiege_MapDisplay:Create(frame.mapContent)
+        end)
+        
+        if success then
+            mapDisplay = result
+            print("CitySiege MainFrame: MapDisplay created successfully, result: " .. tostring(mapDisplay))
+        else
+            print("CitySiege MainFrame: ERROR creating MapDisplay: " .. tostring(result))
+        end
+    else
+        print("CitySiege MainFrame: ERROR - CitySiege_MapDisplay module not loaded!")
     end
     
     -- Info tab
@@ -275,27 +284,24 @@ end
 function MainFrame:CreateInfoPanel(parent)
     local panel = CreateFrame("Frame", nil, parent)
     panel:SetAllPoints()
+    panel:Show()
     
-    -- Add visible background
-    CitySiege_Utils:SetBackdrop(panel, 0.1, 0.1, 0.1, 0.9)
+    -- Title
+    local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", 0, -25)
+    title:SetText("Siege Information")
     
-    local scrollFrame = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 15, -15)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -30, 15)
-    
-    local content = CreateFrame("Frame", nil, scrollFrame)
-    content:SetSize(750, 1000)
-    scrollFrame:SetScrollChild(content)
-    
-    local infoText = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    infoText:SetPoint("TOPLEFT", 10, -10)
-    infoText:SetWidth(730)
+    -- Info text directly on panel
+    local infoText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    infoText:SetPoint("TOPLEFT", 25, -65)
+    infoText:SetPoint("BOTTOMRIGHT", -25, 25)
     infoText:SetJustifyH("LEFT")
     infoText:SetJustifyV("TOP")
-    infoText:SetText("|cFFFF0000INFO TEXT CREATED|r") -- Debug marker
+    infoText:SetSpacing(2)
     panel.infoText = infoText
     
-    CitySiege_Utils:Debug("CreateInfoPanel: Panel created with infoText")
+    -- Set initial text immediately
+    self:UpdateInfoText()
     
     return panel
 end
@@ -303,21 +309,23 @@ end
 function MainFrame:CreateStatsPanel(parent)
     local panel = CreateFrame("Frame", nil, parent)
     panel:SetAllPoints()
+    panel:Show()
     
-    -- Add visible background
-    CitySiege_Utils:SetBackdrop(panel, 0.1, 0.1, 0.1, 0.9)
-    
+    -- Title
     local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -25)
     title:SetText("Siege Statistics")
     
+    -- Stats text directly on panel
     local statsText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     statsText:SetPoint("TOPLEFT", 25, -65)
-    statsText:SetWidth(750)
+    statsText:SetPoint("BOTTOMRIGHT", -25, 25)
     statsText:SetJustifyH("LEFT")
     statsText:SetJustifyV("TOP")
+    statsText:SetSpacing(2)
     panel.statsText = statsText
     
+    -- Set initial text immediately
     self:UpdateStatsText()
     
     return panel
@@ -355,31 +363,43 @@ function MainFrame:ShowTab(tabIndex)
         frame.commandsContent:Show()
     elseif tabIndex == 2 and frame.mapContent then
         frame.mapContent:Show()
+        print("CitySiege: Showing Map tab, currentCityID: " .. tostring(currentCityID))
         if mapDisplay then
-            mapDisplay:SetCity(currentCityID)
-            mapDisplay:UpdateDisplay()
+            print("CitySiege: mapDisplay frame exists, calling CitySiege_MapDisplay:SetCity")
+            CitySiege_MapDisplay:SetCity(currentCityID)
+            
+            -- Request map data from server if a city is selected
+            if currentCityID then
+                print("CitySiege: Requesting map data for city " .. currentCityID)
+                -- Request map data from the server using the server command directly.
+                -- Sending an addon message to ourselves can be unreliable; running the
+                -- slash command ensures the server receives the request (requires
+                -- appropriate permissions on the server).
+                RunMacroText(".citysiege mapdata " .. currentCityID)
+            end
+            end
+        else
+            print("CitySiege: ERROR - mapDisplay frame is nil!")
         end
     elseif tabIndex == 3 and frame.infoContent then
         frame.infoContent:Show()
-        -- Force update the text
-        if frame.infoContent.infoText then
-            self:UpdateInfoText()
-        end
+        self:UpdateInfoText()
     elseif tabIndex == 4 and frame.statsContent then
         frame.statsContent:Show()
-        -- Force update the text
-        if frame.statsContent.statsText then
-            self:UpdateStatsText()
-        end
+        self:UpdateStatsText()
     end
 end
 
 function MainFrame:SelectCity(cityID)
+    print("CitySiege: SelectCity called with cityID: " .. tostring(cityID))
+    
     currentCityID = cityID
     
-    -- Request current siege data from server when city selected
-    if cityID then
-        SendChatMessage(".citysiege sync " .. cityID, "GUILD")
+    print("CitySiege: currentCityID set to: " .. tostring(currentCityID))
+    
+    -- Update CommandPanel with the selected city
+    if commandPanel then
+        CitySiege_CommandPanel:SetSelectedCity(cityID)
     end
     
     -- Always show all tabs
@@ -458,33 +478,33 @@ function MainFrame:UpdateInfoText()
         text = text .. "|cFFFF6600No active sieges at this time.|r\n\n"
         
         -- Show available cities
-        text = text .. "|cFFFFFF00Available Cities for Siege:|r\n"
-        text = text .. "├─ |cFF0088FFAlliance Cities:|r\n"
-        text = text .. "│  ├─ Stormwind City\n"
-        text = text .. "│  ├─ Ironforge\n"
-        text = text .. "│  ├─ Darnassus\n"
-        text = text .. "│  └─ The Exodar\n"
-        text = text .. "└─ |cFFFF0000Horde Cities:|r\n"
-        text = text .. "   ├─ Orgrimmar\n"
-        text = text .. "   ├─ Undercity\n"
-        text = text .. "   ├─ Thunder Bluff\n"
-        text = text .. "   └─ Silvermoon City\n\n"
+        text = text .. "|cFFFFFF00Available Cities for Siege:|r\n\n"
+        text = text .. "|cFF0088FFAlliance Cities:|r\n"
+        text = text .. "  - Stormwind City\n"
+        text = text .. "  - Ironforge\n"
+        text = text .. "  - Darnassus\n"
+        text = text .. "  - The Exodar\n\n"
+        text = text .. "|cFFFF0000Horde Cities:|r\n"
+        text = text .. "  - Orgrimmar\n"
+        text = text .. "  - Undercity\n"
+        text = text .. "  - Thunder Bluff\n"
+        text = text .. "  - Silvermoon City\n\n"
         
         text = text .. "|cFFFFFF00How City Sieges Work:|r\n\n"
         text = text .. "A City Siege is a large-scale battle where one faction\n"
         text = text .. "attempts to capture an enemy capital city.\n\n"
         
         text = text .. "|cFF00FF00Siege Phases:|r\n"
-        text = text .. "• Phase 1: Initial assault begins\n"
-        text = text .. "• Phase 2: Breach the outer defenses\n"
-        text = text .. "• Phase 3: Fight through the city\n"
-        text = text .. "• Phase 4: Assault the city leader\n\n"
+        text = text .. "  Phase 1: Initial assault begins\n"
+        text = text .. "  Phase 2: Breach the outer defenses\n"
+        text = text .. "  Phase 3: Fight through the city\n"
+        text = text .. "  Phase 4: Assault the city leader\n\n"
         
         text = text .. "|cFF00FF00Participation:|r\n"
-        text = text .. "• Join as attacker or defender\n"
-        text = text .. "• Earn kills and honor\n"
-        text = text .. "• Defend your faction's honor\n"
-        text = text .. "• Strategic waypoint system\n\n"
+        text = text .. "  - Join as attacker or defender\n"
+        text = text .. "  - Earn kills and honor\n"
+        text = text .. "  - Defend your faction's honor\n"
+        text = text .. "  - Strategic waypoint system\n\n"
         
     else
         text = text .. string.format("|cFF00FF00Active Sieges: %d|r\n\n", siegeCount)
@@ -493,46 +513,46 @@ function MainFrame:UpdateInfoText()
             local cityData = CitySiege_CityData[cityID]
             if cityData then
                 local color = CitySiege_GetCityColorString(cityID)
-                text = text .. string.format("%s╔═══ %s ═══╗|r\n", color, cityData.displayName)
-                text = text .. string.format("║ Status: %s\n", siegeData.status or "Active")
-                text = text .. string.format("║ Phase: %d/4\n", siegeData.phase or 1)
-                text = text .. string.format("║ Faction: %s\n", cityData.faction)
+                text = text .. string.format("%s=== %s ===|r\n", color, cityData.displayName)
+                text = text .. string.format("Status: %s\n", siegeData.status or "Active")
+                text = text .. string.format("Phase: %d/4\n", siegeData.phase or 1)
+                text = text .. string.format("Faction: %s\n", cityData.faction)
                 
                 if siegeData.elapsedTime then
-                    text = text .. string.format("║ Duration: %s\n", CitySiege_Utils:FormatTime(siegeData.elapsedTime))
+                    text = text .. string.format("Duration: %s\n", CitySiege_Utils:FormatTime(siegeData.elapsedTime))
                 end
                 
                 if siegeData.remaining then
-                    text = text .. string.format("║ |cFFFFFF00Time Remaining:|r %s\n", CitySiege_Utils:FormatTime(siegeData.remaining))
+                    text = text .. string.format("|cFFFFFF00Time Remaining:|r %s\n", CitySiege_Utils:FormatTime(siegeData.remaining))
                 end
                 
                 if siegeData.leaderHealth then
                     local healthColor = "00FF00"
                     if siegeData.leaderHealth < 50 then healthColor = "FFFF00" end
                     if siegeData.leaderHealth < 25 then healthColor = "FF0000" end
-                    text = text .. string.format("║ |cFF%sLeader Health:|r %.1f%%\n", healthColor, siegeData.leaderHealth)
+                    text = text .. string.format("|cFF%sLeader Health:|r %.1f%%\n", healthColor, siegeData.leaderHealth)
                 end
                 
                 if siegeData.attackingFaction then
-                    text = text .. string.format("║ Attacking: %s\n", siegeData.attackingFaction)
+                    text = text .. string.format("Attacking: %s\n", siegeData.attackingFaction)
                 end
                 
-                text = text .. "║\n"
-                text = text .. string.format("║ |cFFFF0000⚔ Attackers:|r %d players\n", siegeData.attackerCount or 0)
-                text = text .. string.format("║ |cFF0088FF🛡 Defenders:|r %d players\n", siegeData.defenderCount or 0)
+                text = text .. "\n"
+                text = text .. string.format("|cFFFF0000Attackers:|r %d players\n", siegeData.attackerCount or 0)
+                text = text .. string.format("|cFF0088FFDefenders:|r %d players\n", siegeData.defenderCount or 0)
                 
                 if siegeData.stats then
-                    text = text .. "║\n"
-                    text = text .. string.format("║ Attacker Kills: %d\n", siegeData.stats.attackerKills or 0)
-                    text = text .. string.format("║ Defender Kills: %d\n", siegeData.stats.defenderKills or 0)
+                    text = text .. "\n"
+                    text = text .. string.format("Attacker Kills: %d\n", siegeData.stats.attackerKills or 0)
+                    text = text .. string.format("Defender Kills: %d\n", siegeData.stats.defenderKills or 0)
                 end
                 
-                text = text .. string.format("%s╚═══════════════╝|r\n\n", color)
+                text = text .. "==================\n\n"
             end
         end
     end
     
-    text = text .. "|cFF808080═══════════════════════════════|r\n"
+    text = text .. "|cFF808080==============================|r\n"
     text = text .. "|cFF808080Use Commands tab to start/manage sieges|r\n"
     text = text .. "|cFF808080Use Map tab to view siege battlefield|r"
     
@@ -549,7 +569,7 @@ function MainFrame:UpdateStatsText()
     
     local stats = CitySiege_Config:GetStatistics()
     
-    local text = "|cFFFFFF00═══ Personal Statistics ═══|r\n\n"
+    local text = "|cFFFFFF00=== Personal Statistics ===|r\n\n"
     
     -- Check if player has any siege experience
     local hasExperience = (stats.siegesParticipated and stats.siegesParticipated > 0)
@@ -557,18 +577,18 @@ function MainFrame:UpdateStatsText()
     if not hasExperience then
         text = text .. "|cFFFF6600You haven't participated in any sieges yet!|r\n\n"
         text = text .. "Start your siege career by:\n"
-        text = text .. "• Using Commands tab to start a siege (GM/Admin)\n"
-        text = text .. "• Joining an active siege as attacker or defender\n"
-        text = text .. "• Helping your faction defend or attack cities\n\n"
+        text = text .. "  - Using Commands tab to start a siege (GM/Admin)\n"
+        text = text .. "  - Joining an active siege as attacker or defender\n"
+        text = text .. "  - Helping your faction defend or attack cities\n\n"
         text = text .. "|cFF808080Your statistics will appear here once you participate.|r\n\n"
     end
     
     -- Siege Participation
-    text = text .. "|cFF00FF00━━━ Siege Participation ━━━|r\n"
+    text = text .. "|cFF00FF00=== Siege Participation ===|r\n"
     text = text .. string.format("Total Sieges: |cFFFFFFFF%s|r\n", CitySiege_Utils:FormatNumber(stats.siegesParticipated or 0))
-    text = text .. string.format("├─ Victories: |cFF00FF00%s|r\n", CitySiege_Utils:FormatNumber(stats.siegesWon or 0))
-    text = text .. string.format("├─ Defeats: |cFFFF0000%s|r\n", CitySiege_Utils:FormatNumber(stats.siegesLost or 0))
-    text = text .. string.format("└─ Ongoing: |cFFFFFF00%s|r\n\n", CitySiege_Utils:FormatNumber((stats.siegesParticipated or 0) - (stats.siegesWon or 0) - (stats.siegesLost or 0)))
+    text = text .. string.format("  Victories: |cFF00FF00%s|r\n", CitySiege_Utils:FormatNumber(stats.siegesWon or 0))
+    text = text .. string.format("  Defeats: |cFFFF0000%s|r\n", CitySiege_Utils:FormatNumber(stats.siegesLost or 0))
+    text = text .. string.format("  Ongoing: |cFFFFFF00%s|r\n\n", CitySiege_Utils:FormatNumber((stats.siegesParticipated or 0) - (stats.siegesWon or 0) - (stats.siegesLost or 0)))
     
     -- Win Rate
     if stats.siegesParticipated and stats.siegesParticipated > 0 then
@@ -580,7 +600,7 @@ function MainFrame:UpdateStatsText()
     end
     
     -- Combat Statistics
-    text = text .. "|cFF00FF00━━━ Combat Statistics ━━━|r\n"
+    text = text .. "|cFF00FF00=== Combat Statistics ===|r\n"
     text = text .. string.format("Total Kills: |cFF00FF00%s|r\n", CitySiege_Utils:FormatNumber(stats.totalKills or 0))
     text = text .. string.format("Total Deaths: |cFFFF0000%s|r\n", CitySiege_Utils:FormatNumber(stats.totalDeaths or 0))
     
@@ -597,21 +617,21 @@ function MainFrame:UpdateStatsText()
     if stats.siegesParticipated and stats.siegesParticipated > 0 then
         local avgKills = (stats.totalKills or 0) / stats.siegesParticipated
         local avgDeaths = (stats.totalDeaths or 0) / stats.siegesParticipated
-        text = text .. "|cFF00FF00━━━ Averages Per Siege ━━━|r\n"
+        text = text .. "|cFF00FF00=== Averages Per Siege ===|r\n"
         text = text .. string.format("Avg Kills: |cFFFFFFFF%.1f|r\n", avgKills)
         text = text .. string.format("Avg Deaths: |cFFFFFFFF%.1f|r\n\n", avgDeaths)
     end
     
     -- Role Performance (if data available)
     if stats.attackerSieges or stats.defenderSieges then
-        text = text .. "|cFF00FF00━━━ Role Performance ━━━|r\n"
+        text = text .. "|cFF00FF00=== Role Performance ===|r\n"
         text = text .. string.format("As Attacker: |cFFFF0000%d|r sieges\n", stats.attackerSieges or 0)
         text = text .. string.format("As Defender: |cFF0088FF%d|r sieges\n\n", stats.defenderSieges or 0)
     end
     
     -- City-specific stats (if available)
     if stats.citiesAttacked or stats.citiesDefended then
-        text = text .. "|cFF00FF00━━━ City Experience ━━━|r\n"
+        text = text .. "|cFF00FF00=== City Experience ===|r\n"
         text = text .. string.format("Cities Attacked: %d\n", stats.citiesAttacked or 0)
         text = text .. string.format("Cities Defended: %d\n\n", stats.citiesDefended or 0)
     end
@@ -635,7 +655,7 @@ function MainFrame:UpdateStatsText()
             ratingColor = "|cFF00FF00"
         end
         
-        text = text .. "|cFF00FF00━━━━━━━━━━━━━━━━━━━━|r\n"
+        text = text .. "|cFF00FF00====================|r\n"
         text = text .. string.format("Rank: %s%s|r\n", ratingColor, rating)
     end
     

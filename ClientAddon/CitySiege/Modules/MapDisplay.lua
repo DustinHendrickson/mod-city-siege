@@ -13,51 +13,45 @@ local lines = {}
 local updateThrottle = 0
 
 function MapDisplay:Create(parent)
-    if frame then return frame end
+    print("CitySiege MapDisplay: Create() called")
+    
+    if frame then 
+        print("CitySiege MapDisplay: Frame already exists, returning existing frame")
+        return frame 
+    end
+    
+    print("CitySiege MapDisplay: Creating new frame")
     
     frame = CreateFrame("Frame", "CitySiegeMapDisplay", parent)
     frame:SetAllPoints(parent)
-    frame:Show() -- Explicitly show the frame
-    -- No backdrop on the main frame - let parent show through
+    frame:Show()
     
     -- Title
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -15)
     title:SetText("City Map")
-    title:SetTextColor(1, 1, 1, 1)
     frame.titleText = title
     
-    -- Map texture container (the actual map area)
+    -- Map container - 4:3 aspect ratio to match the actual map
     local mapContainer = CreateFrame("Frame", nil, frame)
-    mapContainer:SetPoint("TOPLEFT", 20, -50)
-    mapContainer:SetPoint("BOTTOMRIGHT", -20, 50)
-    mapContainer:Show() -- Explicitly show
+    mapContainer:SetPoint("CENTER", frame, "CENTER", -15, -10)
+    mapContainer:SetSize(460, 345)  -- Slightly smaller, maintain 4:3
+    mapContainer:Show()
     frame.mapContainer = mapContainer
     
-    -- Map background (visible dark blue layer)
+    -- Map background - transparent
     local mapBg = mapContainer:CreateTexture(nil, "BACKGROUND")
     mapBg:SetAllPoints(mapContainer)
-    mapBg:SetColorTexture(0.1, 0.1, 0.15, 1)  -- Slightly lighter so it's visible
-    mapBg:Show()
+    mapBg:SetTexture(0, 0, 0, 0)  -- Fully transparent
     frame.mapBg = mapBg
     
-    -- Map texture (city map image layer) - don't set default texture yet
+    -- Map texture - constrain to exact size
     local mapTexture = mapContainer:CreateTexture(nil, "ARTWORK")
     mapTexture:SetAllPoints(mapContainer)
-    -- Don't set any default texture - will be set when city is selected
     frame.mapTexture = mapTexture
     
-    -- Grid overlay for tactical look
-    local gridTexture = mapContainer:CreateTexture(nil, "OVERLAY")
-    gridTexture:SetAllPoints(mapContainer)
-    gridTexture:SetTexture("Interface\\RaidFrame\\Raid-HSeparator")
-    gridTexture:SetAlpha(0.15)
-    gridTexture:SetTexCoord(0, 1, 0, 1)
-    frame.gridTexture = gridTexture
-    
-    -- Border for map (only border, no background to avoid covering textures)
+    -- Border
     mapContainer:SetBackdrop({
-        bgFile = nil,  -- No background file - let our textures show
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = false,
         edgeSize = 16,
@@ -65,32 +59,37 @@ function MapDisplay:Create(parent)
     })
     mapContainer:SetBackdropBorderColor(0.8, 0.8, 0.8, 1)
     
-    -- Map overlay frame for icons
+    -- Overlay frame
     local overlay = CreateFrame("Frame", nil, mapContainer)
     overlay:SetAllPoints(mapContainer)
+    overlay:Show()
     frame.overlay = overlay
     
-    -- Legend (always visible)
+    -- Legend
     local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     legend:SetPoint("BOTTOMLEFT", 20, 15)
     legend:SetJustifyH("LEFT")
-    legend:SetText("|cFF0088FFBlue|r = Defenders  |cFFFF0000Red|r = Attackers  |cFFFFFF00Yellow|r = NPCs  |cFFFFFFFFWhite|r = City Center")
-    legend:SetTextColor(1, 1, 1, 1)
+    legend:SetText("|cFF0088FFBlue|r = Defenders  |cFFFF0000Red|r = Attackers")
+    legend:Show()
+    frame.legend = legend
     
-    -- Stats text (always visible)
-    local stats = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    stats:SetPoint("BOTTOMRIGHT", -20, 15)
-    stats:SetJustifyH("RIGHT")
-    stats:SetText("Select a city from the dropdown above")
-    stats:SetTextColor(0.8, 0.8, 0.8, 1)
-    frame.statsText = stats
+    -- Stats text
+    local statsText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    statsText:SetPoint("BOTTOMRIGHT", -20, 15)
+    statsText:SetJustifyH("RIGHT")
+    statsText:SetText("Select a city from the dropdown")
+    statsText:Show()
+    frame.statsText = statsText
     
-    -- No siege message (shown when no siege is active)
+    -- No siege message
     local noSiegeText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     noSiegeText:SetPoint("CENTER", mapContainer, "CENTER", 0, 0)
-    noSiegeText:SetText("|cFF808080No active siege selected\n\nSelect a city with an active siege|r")
+    noSiegeText:SetText("|cFF808080No active siege\n\nSelect a city|r")
     noSiegeText:SetJustifyH("CENTER")
+    noSiegeText:Show()
     frame.noSiegeText = noSiegeText
+    
+    print("CitySiege: MapDisplay created successfully")
     
     return frame
 end
@@ -98,11 +97,13 @@ end
 function MapDisplay:SetCity(cityID)
     currentCityID = cityID
     
+    print("CitySiege MapDisplay: SetCity called with cityID: " .. tostring(cityID))
+    
     if not cityID then
         -- Show placeholder when no city selected
         if frame and frame.mapTexture then
             frame.mapTexture:SetTexture(nil)
-            frame.mapTexture:SetColorTexture(0.05, 0.05, 0.08, 1.0)
+            frame.mapTexture:SetTexture(0.05, 0.05, 0.08, 1.0)
             
             if frame.gridTexture then
                 frame.gridTexture:Show()
@@ -139,6 +140,8 @@ function MapDisplay:SetCity(cityID)
     
     -- Set city map texture using our custom map files
     if frame and frame.mapTexture then
+        print("CitySiege MapDisplay: frame and mapTexture exist")
+        
         -- Map city names to file names (use actual folder names)
         local mapFiles = {
             [CitySiege_Cities.STORMWIND] = "Stormwind",
@@ -151,83 +154,61 @@ function MapDisplay:SetCity(cityID)
             [CitySiege_Cities.SILVERMOON] = "SilvermoonCity",
         }
         
+        print("CitySiege MapDisplay: Looking up map file for cityID: " .. tostring(cityID))
         local mapFile = mapFiles[cityID]
-        local mapLoaded = false
-        
+        print("CitySiege MapDisplay: mapFile = " .. tostring(mapFile))
         if mapFile then
-            -- Try BLP first (native WoW format), then TGA fallback
-            local formats = {".blp", ".tga"}
-            for _, ext in ipairs(formats) do
-                local texturePath = "Interface\\AddOns\\CitySiege\\Media\\Maps\\" .. mapFile .. ext
-                frame.mapTexture:SetTexture(texturePath)
-                
-                -- Check if texture loaded (GetTexture returns nil if failed)
-                if frame.mapTexture:GetTexture() then
-                    frame.mapTexture:SetAlpha(0.8)
-                    frame.mapTexture:Show()
-                    mapLoaded = true
-                    
-                    -- Show grid overlay
-                    if frame.gridTexture then
-                        frame.gridTexture:Show()
-                        frame.gridTexture:SetAlpha(0.2)
-                    end
-                    
-                    -- Hide fallback messages
-                    if frame.mapCityLabel then
-                        frame.mapCityLabel:Hide()
-                    end
-                    if frame.noMapText then
-                        frame.noMapText:Hide()
-                    end
-                    
-                    break -- Stop trying formats
-                end
-            end
+            -- BLP files (no extension needed, WoW adds .blp automatically)
+            local texturePath = "Interface\\AddOns\\CitySiege\\Media\\Maps\\" .. mapFile
+            
+            frame.mapTexture:SetTexture(texturePath)
+            -- Crop black borders: aggressive crop to remove all black padding
+            frame.mapTexture:SetTexCoord(0.01, 0.96, 0.13, 0.78)
+            
+            -- Hide placeholders
+            if frame.mapCityLabel then frame.mapCityLabel:Hide() end
+            if frame.noMapText then frame.noMapText:Hide() end
+            if frame.noSiegeText then frame.noSiegeText:Hide() end
+            
+            print("CitySiege: Texture set for " .. cityData.displayName)
+        else
+            print("CitySiege: No map file found for city ID: " .. tostring(cityID))
+            MapDisplay:ShowMapFallback(cityID, cityData, nil)
         end
-        
-        -- If no map loaded, show fallback
-        if not mapLoaded then
-            frame.mapTexture:SetTexture(nil)
-            frame.mapTexture:SetColorTexture(0.05, 0.05, 0.08, 1.0)
-            
-            if frame.gridTexture then
-                frame.gridTexture:Show()
-            end
-            
-            -- Show "no map available" message
-            if not frame.noMapText then
-                frame.noMapText = frame.mapContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-                frame.noMapText:SetPoint("CENTER", frame.mapContainer, "CENTER", 0, 20)
-                frame.noMapText:SetTextColor(0.8, 0.6, 0.2, 1)
-            end
-            
-            if mapFile then
-                frame.noMapText:SetText("|cFFFFAA00Map texture not loaded|r\n\n" .. cityData.displayName .. "\n\n|cFF808080Convert TGA to BLP format|r")
-            else
-                frame.noMapText:SetText("|cFFFFAA00No map configured|r\n\n" .. cityData.displayName)
-            end
-            frame.noMapText:Show()
-            
-            -- Show city name overlay
-            if not frame.mapCityLabel then
-                frame.mapCityLabel = frame.mapContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-                frame.mapCityLabel:SetPoint("TOP", frame.mapContainer, "TOP", 0, -10)
-                frame.mapCityLabel:SetAlpha(0.3)
-            end
-            
-            local color = cityData.color
-            frame.mapCityLabel:SetTextColor(color.r, color.g, color.b, 0.5)
-            frame.mapCityLabel:SetText(cityData.displayName:upper())
-            frame.mapCityLabel:Show()
-        end
+    else
+        print("CitySiege MapDisplay: ERROR - frame or mapTexture is nil")
+    end
+end
+
+function MapDisplay:ShowMapFallback(cityID, cityData, mapFile)
+    if not frame or not frame.mapTexture then return end
+    
+    frame.mapTexture:SetTexture(nil)
+    frame.mapTexture:SetTexture(0.05, 0.05, 0.08, 1.0)
+    
+    -- Show "no map available" message
+    if not frame.noMapText then
+        frame.noMapText = frame.mapContainer:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+        frame.noMapText:SetPoint("CENTER", frame.mapContainer, "CENTER", 0, 20)
+        frame.noMapText:SetTextColor(0.8, 0.6, 0.2, 1)
     end
     
-    -- Clear existing icons and lines
-    self:Clear()
+    if mapFile then
+        frame.noMapText:SetText("|cFFFFAA00Map not loaded|r\n\n" .. cityData.displayName .. "\n\n|cFF808080Ensure BLP files are in:\nInterface/AddOns/CitySiege/Media/Maps/\nRestart game after adding files|r")
+    else
+        frame.noMapText:SetText("|cFFFFAA00No map configured|r\n\n" .. cityData.displayName)
+    end
     
-    -- Update display
-    self:UpdateDisplay()
+    -- Show city name overlay
+    if not frame.mapCityLabel then
+        frame.mapCityLabel = frame.mapContainer:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge")
+        frame.mapCityLabel:SetPoint("TOP", frame.mapContainer, "TOP", 0, -10)
+        frame.mapCityLabel:SetAlpha(0.3)
+    end
+    
+    local color = cityData.color
+    frame.mapCityLabel:SetTextColor(color.r, color.g, color.b, 0.5)
+    frame.mapCityLabel:SetText(cityData.displayName:upper())
 end
 
 function MapDisplay:UpdateDisplay()
@@ -318,7 +299,7 @@ function MapDisplay:UpdatePlayerPositions(siegeData)
             if playerData.x and playerData.y then
                 local icon = self:GetOrCreateIcon(guid, "PLAYER_ATTACKER")
                 self:PositionIcon(icon, playerData.x, playerData.y, cityData)
-                icon:SetColorTexture(1, 0, 0, 0.8) -- Red for attackers
+                icon:SetTexture(1, 0, 0, 0.8) -- Red for attackers
             end
         end
     end
@@ -329,7 +310,7 @@ function MapDisplay:UpdatePlayerPositions(siegeData)
             if playerData.x and playerData.y then
                 local icon = self:GetOrCreateIcon(guid, "PLAYER_DEFENDER")
                 self:PositionIcon(icon, playerData.x, playerData.y, cityData)
-                icon:SetColorTexture(0, 0.5, 1, 0.8) -- Blue for defenders
+                icon:SetTexture(0, 0.5, 1, 0.8) -- Blue for defenders
             end
         end
     end
@@ -355,7 +336,7 @@ function MapDisplay:UpdateNPCPositions(siegeData)
             if pos.x and pos.y then
                 local icon = self:GetOrCreateIcon("npc_atk_" .. i, "NPC_ATTACKER")
                 self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetColorTexture(1, 0, 0, 0.9) -- Red
+                icon:SetTexture(1, 0, 0, 0.9) -- Red
                 icon:SetSize(8, 8)
                 icon:Show()
             end
@@ -368,7 +349,7 @@ function MapDisplay:UpdateNPCPositions(siegeData)
             if pos.x and pos.y then
                 local icon = self:GetOrCreateIcon("npc_def_" .. i, "NPC_DEFENDER")
                 self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetColorTexture(0, 0.5, 1, 0.9) -- Blue
+                icon:SetTexture(0, 0.5, 1, 0.9) -- Blue
                 icon:SetSize(8, 8)
                 icon:Show()
             end
@@ -381,7 +362,7 @@ function MapDisplay:UpdateNPCPositions(siegeData)
             if pos.x and pos.y then
                 local icon = self:GetOrCreateIcon("bot_atk_" .. i, "BOT_ATTACKER")
                 self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetColorTexture(1, 0.5, 0, 0.9) -- Orange
+                icon:SetTexture(1, 0.5, 0, 0.9) -- Orange
                 icon:SetSize(6, 6)
                 icon:Show()
             end
@@ -394,7 +375,7 @@ function MapDisplay:UpdateNPCPositions(siegeData)
             if pos.x and pos.y then
                 local icon = self:GetOrCreateIcon("bot_def_" .. i, "BOT_DEFENDER")
                 self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetColorTexture(0, 1, 1, 0.9) -- Cyan
+                icon:SetTexture(0, 1, 1, 0.9) -- Cyan
                 icon:SetSize(6, 6)
                 icon:Show()
             end
@@ -410,11 +391,11 @@ function MapDisplay:UpdateNPCPositions(siegeData)
                 
                 -- Color based on side
                 if npcData.side == "attacker" then
-                    icon:SetColorTexture(1, 0.5, 0, 0.9) -- Orange
+                    icon:SetTexture(1, 0.5, 0, 0.9) -- Orange
                 elseif npcData.side == "defender" then
-                    icon:SetColorTexture(0, 1, 0, 0.9) -- Green
+                    icon:SetTexture(0, 1, 0, 0.9) -- Green
                 else
-                    icon:SetColorTexture(1, 1, 0, 0.9) -- Yellow
+                    icon:SetTexture(1, 1, 0, 0.9) -- Yellow
                 end
             end
         end
@@ -442,7 +423,7 @@ function MapDisplay:UpdateWaypoints(siegeData)
         if wp.x and wp.y then
             local icon = self:GetOrCreateIcon("waypoint_" .. i, "WAYPOINT")
             self:PositionIcon(icon, wp.x, wp.y, cityData)
-            icon:SetColorTexture(1, 1, 0, 0.9) -- Yellow waypoints
+            icon:SetTexture(1, 1, 0, 0.9) -- Yellow waypoints
             icon:SetSize(6, 6) -- Smaller for waypoints
             icon:Show()
         end
@@ -555,7 +536,7 @@ function MapDisplay:DrawLine(x1, y1, x2, y2, cityData)
     if not line then
         line = frame.overlay:CreateTexture(nil, "BACKGROUND")
         line:SetTexture("Interface\\Buttons\\WHITE8X8")
-        line:SetColorTexture(0.5, 0.5, 0, 0.4) -- Yellow-ish line
+        line:SetTexture(0.5, 0.5, 0, 0.4) -- Yellow-ish line
         lines[lineID] = line
     end
     
@@ -618,6 +599,86 @@ function MapDisplay:Show()
     end
 end
 
+function MapDisplay:UpdateMapData(cityID, data)
+    print("CitySiege MapDisplay: UpdateMapData called")
+    print("CitySiege MapDisplay: cityID=" .. tostring(cityID) .. ", currentCityID=" .. tostring(currentCityID))
+    print("CitySiege MapDisplay: frame=" .. tostring(frame) .. ", data=" .. tostring(data))
+    
+    if not frame or not data then 
+        print("CitySiege MapDisplay: ERROR - frame or data is nil!")
+        return 
+    end
+    if currentCityID ~= cityID then 
+        print("CitySiege MapDisplay: ERROR - cityID mismatch!")
+        return 
+    end
+    
+    print("CitySiege MapDisplay: Clearing existing icons")
+    -- Clear existing icons
+    if frame.mapIcons then
+        for _, icon in ipairs(frame.mapIcons) do
+            icon:Hide()
+        end
+    end
+    frame.mapIcons = {}
+    
+    -- Add waypoint icons
+    if data.waypoints then
+        print("CitySiege MapDisplay: Adding " .. #data.waypoints .. " waypoint icons")
+        for i, wp in ipairs(data.waypoints) do
+            print(string.format("CitySiege MapDisplay: Creating waypoint icon %d at %.2f, %.2f, %.2f", 
+                i, wp.x, wp.y, wp.z))
+            local icon = MapDisplay:CreateIcon(wp.x, wp.y, wp.z, "waypoint", i)
+            table.insert(frame.mapIcons, icon)
+        end
+    else
+        print("CitySiege MapDisplay: No waypoints in data")
+    end
+    
+    -- Add leader icon
+    if data.leaderPos then
+        print("CitySiege MapDisplay: Adding leader icon")
+        local icon = MapDisplay:CreateIcon(data.leaderPos.x, data.leaderPos.y, data.leaderPos.z, "leader")
+        table.insert(frame.mapIcons, icon)
+    else
+        print("CitySiege MapDisplay: No leader position in data")
+    end
+    
+    print("CitySiege MapDisplay: Total icons created: " .. #frame.mapIcons)
+end
+
+function MapDisplay:CreateIcon(x, y, z, iconType, index)
+    local icon = frame.overlay:CreateTexture(nil, "OVERLAY")
+    icon:SetSize(16, 16)
+
+    -- Different icons for different types
+    if iconType == "waypoint" then
+        icon:SetTexture("Interface\\MINIMAP\\POIIcons")
+        icon:SetTexCoord(0.5, 0.625, 0.5, 0.625)  -- Star icon
+    elseif iconType == "leader" then
+        icon:SetTexture("Interface\\MINIMAP\\POIIcons")
+        icon:SetTexCoord(0.625, 0.75, 0, 0.125)  -- Skull icon
+    end
+
+    -- Use PositionIcon helper to convert world coords to overlay pixels
+    local cityData = CitySiege_CityData[currentCityID]
+    if cityData then
+        self:PositionIcon(icon, x, y, cityData)
+    else
+        -- Fallback: center the icon
+        icon:ClearAllPoints()
+        icon:SetPoint("CENTER", frame.overlay, "CENTER")
+    end
+
+    icon:Show()
+    return icon
+end
+
+-- NOTE: The older WorldToMap(worldX, worldY, cityID) implementation was removed
+-- because it returned pixel coordinates and conflicted with the normalized
+-- WorldToMap(worldX, worldY, cityData) helper above. Use PositionIcon to
+-- place icons consistently on the overlay.
+
 function MapDisplay:Hide()
     if frame then
         frame:Hide()
@@ -627,3 +688,4 @@ end
 function MapDisplay:GetFrame()
     return frame
 end
+

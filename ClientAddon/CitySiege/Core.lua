@@ -58,9 +58,12 @@ function Core:OnEnable()
     self:RegisterEvent("PLAYER_REGEN_DISABLED") -- Enter combat
     self:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Leave combat
     
+    -- Register addon message prefix
+    RegisterAddonMessagePrefix("CitySiege")
+    
     -- Add chat filter to hide CitySiege messages
     ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", function(self, event, message, ...)
-        if message and string.match(message, "^CitySiege\t") then
+        if message and (string.find(message, "CitySiege") or string.find(message, "UPDATE:") or string.find(message, "START:") or string.find(message, "MAP_DATA:")) then
             return true -- Filter it out (hide it)
         end
         return false -- Show it

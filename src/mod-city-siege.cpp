@@ -821,73 +821,11 @@ void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messa
            << ":" << elapsed << ":" << remaining
            << ":" << std::fixed << std::setprecision(1) << leaderHealthPct;
         
-        // Add waypoint data
+        // Only send waypoint data (removed NPC/player positions to reduce packet size)
         ss << ":WP:" << city.waypoints.size();
         for (const auto& wp : city.waypoints)
         {
             ss << ":" << std::fixed << std::setprecision(2) << wp.x << ":" << wp.y << ":" << wp.z;
-        }
-        
-        // Add attacker positions (up to 50 to avoid packet size issues)
-        ss << ":ATK:" << std::min(static_cast<size_t>(50), event.spawnedCreatures.size());
-        size_t atkCount = 0;
-        for (const auto& guid : event.spawnedCreatures)
-        {
-            if (atkCount >= 50) break;
-            if (Creature* creature = map->GetCreature(guid))
-            {
-                if (creature->IsAlive())
-                {
-                    ss << ":" << std::fixed << std::setprecision(1) 
-                       << creature->GetPositionX() << ":" << creature->GetPositionY() << ":" << creature->GetPositionZ();
-                    atkCount++;
-                }
-            }
-        }
-        
-        // Add defender positions (up to 50)
-        ss << ":DEF:" << std::min(static_cast<size_t>(50), event.spawnedDefenders.size());
-        size_t defCount = 0;
-        for (const auto& guid : event.spawnedDefenders)
-        {
-            if (defCount >= 50) break;
-            if (Creature* creature = map->GetCreature(guid))
-            {
-                if (creature->IsAlive())
-                {
-                    ss << ":" << std::fixed << std::setprecision(1)
-                       << creature->GetPositionX() << ":" << creature->GetPositionY() << ":" << creature->GetPositionZ();
-                    defCount++;
-                }
-            }
-        }
-        
-        // Add bot positions (attackers)
-        ss << ":BATK:" << event.attackerBots.size();
-        for (const auto& guid : event.attackerBots)
-        {
-            if (Player* bot = ObjectAccessor::FindPlayer(guid))
-            {
-                if (bot->IsAlive())
-                {
-                    ss << ":" << std::fixed << std::setprecision(1)
-                       << bot->GetPositionX() << ":" << bot->GetPositionY() << ":" << bot->GetPositionZ();
-                }
-            }
-        }
-        
-        // Add bot positions (defenders)
-        ss << ":BDEF:" << event.defenderBots.size();
-        for (const auto& guid : event.defenderBots)
-        {
-            if (Player* bot = ObjectAccessor::FindPlayer(guid))
-            {
-                if (bot->IsAlive())
-                {
-                    ss << ":" << std::fixed << std::setprecision(1)
-                       << bot->GetPositionX() << ":" << bot->GetPositionY() << ":" << bot->GetPositionZ();
-                }
-            }
         }
     }
     else if (messageType == "END")
@@ -926,6 +864,56 @@ void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messa
             }
         }
     }
+}
+
+/**
+ * @brief Sends map data (waypoints and leader position) to a player's addon
+ * @param player The player to send data to
+ * @param cityId The city ID
+ */
+void SendMapDataToPlayer(Player* player, CityId cityId)
+{
+    if (!player || cityId >= CITY_COUNT)
+        return;
+        
+    const CityData& city = g_Cities[cityId];
+    Map* map = sMapMgr->FindMap(city.mapId, 0);
+    if (!map)
+        return;
+    
+    std::ostringstream ss;
+    
+    // Format: MAP_DATA:cityID:WP:count:x:y:z...:LEADER:x:y:z
+    ss << "MAP_DATA:" << static_cast<uint32>(cityId);
+    
+    // Add waypoint data
+    ss << ":WP:" << city.waypoints.size();
+    for (const auto& wp : city.waypoints)
+    {
+        ss << ":" << std::fixed << std::setprecision(2) << wp.x << ":" << wp.y << ":" << wp.z;
+    }
+    
+    // Add leader position
+    ss << ":LEADER:" << std::fixed << std::setprecision(2) 
+       << city.leaderX << ":" << city.leaderY << ":" << city.leaderZ;
+    
+    std::string message = ss.str();
+    
+    // Send as CHAT_MSG_SYSTEM with CitySiege prefix (addon will filter it)
+    WorldPacket data(SMSG_MESSAGECHAT, 2000);
+    data << uint8(CHAT_MSG_SYSTEM);
+    data << uint32(LANG_UNIVERSAL);
+    data << uint64(0);
+    data << uint32(0);
+    data << uint64(player->GetGUID().GetRawValue());
+    
+    // Use tab separator that addon expects
+    std::string fullMessage = "CitySiege\t" + message;
+    data << uint32(fullMessage.length() + 1);
+    data << fullMessage;
+    data << uint8(0);
+    
+    player->GetSession()->SendPacket(&data);
 }
 
 /**
@@ -4328,7 +4316,8 @@ public:
             { "distance",     HandleCitySiegeDistanceCommand,     SEC_GAMEMASTER, Console::No },
             { "info",         HandleCitySiegeInfoCommand,         SEC_GAMEMASTER, Console::No },
             { "reload",       HandleCitySiegeReloadCommand,       SEC_ADMINISTRATOR, Console::No },
-            { "sync",         HandleCitySiegeSyncCommand,         SEC_PLAYER, Console::No }
+            { "sync",         HandleCitySiegeSyncCommand,         SEC_PLAYER, Console::No },
+            { "mapdata",      HandleCitySiegeMapDataCommand,      SEC_PLAYER, Console::No }
         };
 
         static ChatCommandTable commandTable =
@@ -5247,6 +5236,38 @@ public:
         data << uint32(0);
         data << uint64(0);
         data << uint32(0);
+        
+        return true;
+    }
+    
+    static bool HandleCitySiegeMapDataCommand(ChatHandler* handler, Optional<uint32> cityIdArg)
+    {
+        Player* player = handler->GetSession()->GetPlayer();
+        if (!player)
+        {
+            return false;
+        }
+
+        // If no city ID provided, return error
+        if (!cityIdArg)
+        {
+            handler->PSendSysMessage("Usage: .citysiege mapdata <cityID>");
+            handler->PSendSysMessage("City IDs: 0=Stormwind, 1=Ironforge, 2=Darnassus, 3=Exodar, 4=Orgrimmar, 5=Undercity, 6=ThunderBluff, 7=Silvermoon");
+            return true;
+        }
+
+        uint32 cityId = *cityIdArg;
+        if (cityId >= CITY_MAX)
+        {
+            handler->PSendSysMessage("Invalid city ID. Must be 0-7.");
+            return true;
+        }
+
+        // Send map data to the player's addon
+        SendMapDataToPlayer(player, static_cast<CityId>(cityId));
+        
+        return true;
+    }
         std::stringstream ss;
         ss << "CITYSIEGE_END:" << cityId << ":none";
         std::string message = ss.str();

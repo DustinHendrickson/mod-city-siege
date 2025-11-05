@@ -91,7 +91,23 @@ function EventHandler:ParseAddonMessage(message)
     
     command = string.upper(command)
     
-    if command == "START" then
+    if command == "REQUEST_MAP" then
+        -- Format: REQUEST_MAP:cityID
+        -- Client is requesting map data, execute the server command
+        local parts = {}
+        for part in string.gmatch(message, "([^:]+)") do
+            table.insert(parts, part)
+        end
+        
+        if #parts >= 2 then
+            local cityID = tonumber(parts[2])
+            print("CitySiege: Executing .citysiege mapdata " .. cityID)
+            -- Use RunMacroText to properly execute the slash command
+            RunMacroText(".citysiege mapdata " .. cityID)
+        end
+        return
+        
+    elseif command == "START" then
         -- Format: START:cityId:faction:spawnX:spawnY:spawnZ:leaderX:leaderY:leaderZ:centerX:centerY:centerZ
         local parts = {}
         for part in string.gmatch(message, "([^:]+)") do
@@ -137,11 +153,7 @@ function EventHandler:ParseAddonMessage(message)
             
             -- Parse waypoints, attacker positions, defender positions, bot positions
             local data = {
-                waypoints = {},
-                attackerPositions = {},
-                defenderPositions = {},
-                attackerBots = {},
-                defenderBots = {}
+                waypoints = {}
             }
             
             local i = 9
@@ -163,70 +175,6 @@ function EventHandler:ParseAddonMessage(message)
                             i = i + 3
                         end
                     end
-                    
-                elseif section == "ATK" then
-                    -- Attacker positions
-                    i = i + 1
-                    local atkCount = tonumber(parts[i]) or 0
-                    i = i + 1
-                    for j = 1, atkCount do
-                        if i + 2 <= #parts then
-                            table.insert(data.attackerPositions, {
-                                x = tonumber(parts[i]),
-                                y = tonumber(parts[i + 1]),
-                                z = tonumber(parts[i + 2])
-                            })
-                            i = i + 3
-                        end
-                    end
-                    
-                elseif section == "DEF" then
-                    -- Defender positions
-                    i = i + 1
-                    local defCount = tonumber(parts[i]) or 0
-                    i = i + 1
-                    for j = 1, defCount do
-                        if i + 2 <= #parts then
-                            table.insert(data.defenderPositions, {
-                                x = tonumber(parts[i]),
-                                y = tonumber(parts[i + 1]),
-                                z = tonumber(parts[i + 2])
-                            })
-                            i = i + 3
-                        end
-                    end
-                    
-                elseif section == "BATK" then
-                    -- Attacker bot positions
-                    i = i + 1
-                    local botCount = tonumber(parts[i]) or 0
-                    i = i + 1
-                    for j = 1, botCount do
-                        if i + 2 <= #parts then
-                            table.insert(data.attackerBots, {
-                                x = tonumber(parts[i]),
-                                y = tonumber(parts[i + 1]),
-                                z = tonumber(parts[i + 2])
-                            })
-                            i = i + 3
-                        end
-                    end
-                    
-                elseif section == "BDEF" then
-                    -- Defender bot positions
-                    i = i + 1
-                    local botCount = tonumber(parts[i]) or 0
-                    i = i + 1
-                    for j = 1, botCount do
-                        if i + 2 <= #parts then
-                            table.insert(data.defenderBots, {
-                                x = tonumber(parts[i]),
-                                y = tonumber(parts[i + 1]),
-                                z = tonumber(parts[i + 2])
-                            })
-                            i = i + 3
-                        end
-                    end
                 else
                     i = i + 1
                 end
@@ -240,6 +188,78 @@ function EventHandler:ParseAddonMessage(message)
         local cityID, winner = string.match(message, "^END:(%d+):(%w+)")
         if cityID then
             self:HandleSiegeEnd(tonumber(cityID), winner)
+        end
+        
+    elseif command == "MAP_DATA" then
+        -- Format: MAP_DATA:cityID:WP:count:x:y:z...:LEADER:x:y:z
+        print("CitySiege: Received MAP_DATA command")
+        print("CitySiege: Full message: " .. tostring(message))
+        
+        local parts = {}
+        for part in string.gmatch(message, "([^:]+)") do
+            table.insert(parts, part)
+        end
+        
+        print("CitySiege: Parsed " .. #parts .. " parts")
+        
+        if #parts >= 2 then
+            local cityID = tonumber(parts[2])
+            print("CitySiege: CityID: " .. tostring(cityID))
+            
+            local data = {
+                waypoints = {},
+                leaderPos = nil
+            }
+            
+            local i = 3
+            while i <= #parts do
+                local section = parts[i]
+                
+                if section == "WP" then
+                    -- Waypoints
+                    i = i + 1
+                    local wpCount = tonumber(parts[i]) or 0
+                    print("CitySiege: Found " .. wpCount .. " waypoints")
+                    i = i + 1
+                    for j = 1, wpCount do
+                        if i + 2 <= #parts then
+                            local wp = {
+                                x = tonumber(parts[i]),
+                                y = tonumber(parts[i + 1]),
+                                z = tonumber(parts[i + 2])
+                            }
+                            print(string.format("CitySiege: Waypoint %d: %.2f, %.2f, %.2f", j, wp.x, wp.y, wp.z))
+                            table.insert(data.waypoints, wp)
+                            i = i + 3
+                        end
+                    end
+                    
+                elseif section == "LEADER" then
+                    -- Leader position
+                    if i + 3 <= #parts then
+                        data.leaderPos = {
+                            x = tonumber(parts[i + 1]),
+                            y = tonumber(parts[i + 2]),
+                            z = tonumber(parts[i + 3])
+                        }
+                        print(string.format("CitySiege: Leader pos: %.2f, %.2f, %.2f", 
+                            data.leaderPos.x, data.leaderPos.y, data.leaderPos.z))
+                        i = i + 4
+                    end
+                else
+                    i = i + 1
+                end
+            end
+            
+            print("CitySiege: Total waypoints parsed: " .. #data.waypoints)
+            
+            -- Send to MapDisplay
+            if CitySiege_MapDisplay then
+                print("CitySiege: Calling MapDisplay:UpdateMapData")
+                CitySiege_MapDisplay:UpdateMapData(cityID, data)
+            else
+                print("CitySiege: ERROR - CitySiege_MapDisplay is nil!")
+            end
         end
     end
 end
@@ -260,10 +280,6 @@ function EventHandler:HandleSiegeStart(cityID, faction, coords)
         npcs = {},
         waypoints = {},
         coords = coords or {},
-        attackerPositions = {},
-        defenderPositions = {},
-        attackerBots = {},
-        defenderBots = {},
         leaderHealth = 100,
         remaining = 0,
         stats = {
@@ -318,13 +334,9 @@ function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCo
             siegeData.remaining = remaining
             siegeData.leaderHealth = leaderHealth
             
-            -- Update position data if provided
+            -- Update waypoint data if provided
             if data then
                 siegeData.waypoints = data.waypoints or {}
-                siegeData.attackerPositions = data.attackerPositions or {}
-                siegeData.defenderPositions = data.defenderPositions or {}
-                siegeData.attackerBots = data.attackerBots or {}
-                siegeData.defenderBots = data.defenderBots or {}
             end
             
             if not siegeData.stats then
