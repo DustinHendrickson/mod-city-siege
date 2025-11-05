@@ -101,9 +101,10 @@ function EventHandler:ParseAddonMessage(message)
         
         if #parts >= 2 then
             local cityID = tonumber(parts[2])
-            print("CitySiege: Executing .citysiege mapdata " .. cityID)
-            -- Use RunMacroText to properly execute the slash command
-            RunMacroText(".citysiege mapdata " .. cityID)
+            print("CitySiege: Requesting map data from server for city " .. cityID)
+            -- Use SendChatMessage instead of RunMacroText to avoid permission issues
+            -- This sends the command to the server which is available to all players (SEC_PLAYER)
+            SendChatMessage(".citysiege mapdata " .. cityID, "GUILD")
         end
         return
         

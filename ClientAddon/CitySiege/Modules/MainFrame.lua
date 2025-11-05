@@ -371,12 +371,11 @@ function MainFrame:ShowTab(tabIndex)
             -- Request map data from server if a city is selected
             if currentCityID then
                 print("CitySiege: Requesting map data for city " .. currentCityID)
-                -- Request map data from the server using the server command directly.
-                -- Sending an addon message to ourselves can be unreliable; running the
-                -- slash command ensures the server receives the request (requires
-                -- appropriate permissions on the server).
-                RunMacroText(".citysiege mapdata " .. currentCityID)
-            end
+                -- Trigger local REQUEST_MAP handling which will execute the server command
+                -- This allows non-GM players to request map data
+                if CitySiege_EventHandler then
+                    CitySiege_EventHandler:ParseAddonMessage("REQUEST_MAP:" .. currentCityID)
+                end
             end
         else
             print("CitySiege: ERROR - mapDisplay frame is nil!")

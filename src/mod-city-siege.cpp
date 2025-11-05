@@ -873,7 +873,7 @@ void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messa
  */
 void SendMapDataToPlayer(Player* player, CityId cityId)
 {
-    if (!player || cityId >= CITY_COUNT)
+    if (!player || cityId >= CITY_MAX)
         return;
         
     const CityData& city = g_Cities[cityId];
