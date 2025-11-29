@@ -536,11 +536,11 @@ void LoadCitySiegeConfiguration()
     g_WeatherGrade = sConfigMgr->GetOption<float>("CitySiege.Weather.Grade", 0.8f);
 
     // Music settings
-    g_MusicEnabled = sConfigMgr->GetOption<bool>("CitySiege.Music.Enabled", true);
-    g_RPMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.RP", 11803);        // The Burning Legion
-    g_CombatMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Combat", 11804); // Battle of Mount Hyjal
-    g_VictoryMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Victory", 16039); // Invincible
-    g_DefeatMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.Defeat", 14127);   // Wrath of the Lich King
+    g_MusicEnabled   = sConfigMgr->GetOption<bool>("CitySiege.Music.Enabled", true);
+    g_RPMusicId      = sConfigMgr->GetOption<uint32>("CitySiege.Music.RPMusicId", 17289);        // The Burning Legion
+    g_CombatMusicId  = sConfigMgr->GetOption<uint32>("CitySiege.Music.CombatMusicId", 17459); // Battle of Mount Hyjal
+    g_VictoryMusicId = sConfigMgr->GetOption<uint32>("CitySiege.Music.VictoryMusicId", 17460); // Invincible
+    g_DefeatMusicId  = sConfigMgr->GetOption<uint32>("CitySiege.Music.DefeatMusicId", 17458);   // Wrath of the Lich King
 
     // Load spawn locations for each city
     g_Cities[CITY_STORMWIND].spawnX = sConfigMgr->GetOption<float>("CitySiege.Stormwind.SpawnX", -9161.16f);
