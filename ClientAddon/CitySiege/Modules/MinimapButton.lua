@@ -63,28 +63,8 @@ function MinimapButton:OnTooltipShow(tooltip)
     
     tooltip:AddLine("|cFF16C3F2City Siege|r")
     tooltip:AddLine(" ")
-    
-    -- Show active sieges
-    local activeSieges = CitySiege_Config:GetActiveSieges()
-    local siegeCount = CitySiege_Utils:TableSize(activeSieges)
-    
-    if siegeCount > 0 then
-        tooltip:AddLine("|cFFFFFF00Active Sieges:|r")
-        for cityID, siegeData in pairs(activeSieges) do
-            local cityData = CitySiege_CityData[cityID]
-            if cityData then
-                local color = CitySiege_GetCityColorString(cityID)
-                tooltip:AddLine(string.format("  %s%s|r - %s", color, cityData.displayName, siegeData.status or "Unknown"))
-            end
-        end
-    else
-        tooltip:AddLine("|cFF808080No active sieges|r")
-    end
-    
-    tooltip:AddLine(" ")
     tooltip:AddDoubleLine("|cFFFFFFFF Left-Click:|r", "Toggle main window")
     tooltip:AddDoubleLine("|cFFFFFFFF Right-Click:|r", "Open settings")
-    tooltip:AddDoubleLine("|cFFFFFFFF Middle-Click:|r", "Update status")
 end
 
 function MinimapButton:Show()

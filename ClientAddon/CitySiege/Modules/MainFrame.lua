@@ -10,7 +10,6 @@ local frame = nil
 local currentCityID = nil
 local commandPanel = nil
 local mapDisplay = nil
-local infoPanel = nil
 
 function MainFrame:Initialize()
     if frame then return end
@@ -149,7 +148,6 @@ function MainFrame:CreateFrame()
     frame.tabs = {}
     frame.tabs[1] = self:CreateTab(tabsFrame, "Commands", 1, function() self:ShowTab(1) end)
     frame.tabs[2] = self:CreateTab(tabsFrame, "Map", 2, function() self:ShowTab(2) end)
-    frame.tabs[3] = self:CreateTab(tabsFrame, "Info", 3, function() self:ShowTab(3) end)
     
     -- Hide all tabs initially until city is selected
     for i, tab in ipairs(frame.tabs) do
@@ -291,37 +289,6 @@ function MainFrame:CreateTabContent()
             mapDisplay = CitySiege_MapDisplay
         end
     end
-    
-    -- Info tab
-    frame.infoContent = self:CreateInfoPanel(frame.contentFrame)
-    frame.infoContent:SetPoint("TOPLEFT", 5, -5)
-    frame.infoContent:SetPoint("BOTTOMRIGHT", -5, 5)
-    frame.infoContent:Hide()
-end
-
-function MainFrame:CreateInfoPanel(parent)
-    local panel = CreateFrame("Frame", nil, parent)
-    panel:SetAllPoints()
-    panel:Show()
-    
-    -- Title
-    local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -25)
-    title:SetText("Siege Information")
-    
-    -- Info text directly on panel
-    local infoText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    infoText:SetPoint("TOPLEFT", 25, -65)
-    infoText:SetPoint("BOTTOMRIGHT", -25, 25)
-    infoText:SetJustifyH("LEFT")
-    infoText:SetJustifyV("TOP")
-    infoText:SetSpacing(2)
-    panel.infoText = infoText
-    
-    -- Set initial text immediately
-    self:UpdateInfoText()
-    
-    return panel
 end
 
 
@@ -335,7 +302,6 @@ function MainFrame:ShowTab(tabIndex)
     -- Hide all content frames
     if frame.commandsContent then frame.commandsContent:Hide() end
     if frame.mapContent then frame.mapContent:Hide() end
-    if frame.infoContent then frame.infoContent:Hide() end
     
     -- Update tab appearances with enhanced styling
     for i, tab in ipairs(frame.tabs) do
@@ -369,7 +335,7 @@ function MainFrame:ShowTab(tabIndex)
             CitySiege_MapDisplay:SetCity(currentCityID)
             
             -- Request map data from server if a city is selected
-            if currentCityID then
+            if currentCityID and currentCityID > 0 then
                 -- Trigger local REQUEST_MAP handling which will execute the server command
                 -- This allows non-GM players to request map data
                 if CitySiege_EventHandler then
@@ -377,9 +343,6 @@ function MainFrame:ShowTab(tabIndex)
                 end
             end
         end
-    elseif tabIndex == 3 and frame.infoContent then
-        frame.infoContent:Show()
-        self:UpdateInfoText()
     end
 end
 
@@ -405,7 +368,7 @@ function MainFrame:SelectCity(cityID)
     if frame.currentTab and frame.currentTab > 0 then
         self:ShowTab(frame.currentTab)
     else
-        self:ShowTab(3) -- Default to Info tab which has placeholder content
+        self:ShowTab(1) -- Default to Commands tab
         if not frame.welcomeText then
             frame.welcomeText = frame.contentFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
             frame.welcomeText:SetPoint("CENTER", frame.contentFrame, "CENTER", 0, 0)
@@ -436,123 +399,16 @@ function MainFrame:SelectCity(cityID)
         CitySiege_CommandPanel:SetSelectedCity(cityID)
     end
     
-    -- Update info
-    self:UpdateInfoText()
     self:UpdateSiegeDisplay()
 end
 
 function MainFrame:UpdateSiegeDisplay()
     if not frame then return end
     
-    self:UpdateInfoText()
-    
     if mapDisplay and mapDisplay.UpdateDisplay then
         mapDisplay:UpdateDisplay()
     end
 end
-
-function MainFrame:UpdateInfoText()
-    if not frame or not frame.infoContent or not frame.infoContent.infoText then 
-        CitySiege_Utils:Debug("UpdateInfoText: frame or infoText not found")
-        return 
-    end
-    
-    local text = "|cFFFFFF00=== City Siege Information ===|r\n\n"
-    
-    local activeSieges = CitySiege_Config:GetActiveSieges()
-    local siegeCount = CitySiege_Utils:TableSize(activeSieges)
-    
-    if siegeCount == 0 then
-        text = text .. "|cFFFF6600No active sieges at this time.|r\n\n"
-        
-        -- Show available cities
-        text = text .. "|cFFFFFF00Available Cities for Siege:|r\n\n"
-        text = text .. "|cFF0088FFAlliance Cities:|r\n"
-        text = text .. "  - Stormwind City\n"
-        text = text .. "  - Ironforge\n"
-        text = text .. "  - Darnassus\n"
-        text = text .. "  - The Exodar\n\n"
-        text = text .. "|cFFFF0000Horde Cities:|r\n"
-        text = text .. "  - Orgrimmar\n"
-        text = text .. "  - Undercity\n"
-        text = text .. "  - Thunder Bluff\n"
-        text = text .. "  - Silvermoon City\n\n"
-        
-        text = text .. "|cFFFFFF00How City Sieges Work:|r\n\n"
-        text = text .. "A City Siege is a large-scale battle where one faction\n"
-        text = text .. "attempts to capture an enemy capital city.\n\n"
-        
-        text = text .. "|cFF00FF00Siege Phases:|r\n"
-        text = text .. "  Phase 1: Initial assault begins\n"
-        text = text .. "  Phase 2: Breach the outer defenses\n"
-        text = text .. "  Phase 3: Fight through the city\n"
-        text = text .. "  Phase 4: Assault the city leader\n\n"
-        
-        text = text .. "|cFF00FF00Participation:|r\n"
-        text = text .. "  - Join as attacker or defender\n"
-        text = text .. "  - Earn kills and honor\n"
-        text = text .. "  - Defend your faction's honor\n"
-        text = text .. "  - Strategic waypoint system\n\n"
-        
-    else
-        text = text .. string.format("|cFF00FF00Active Sieges: %d|r\n\n", siegeCount)
-        
-        for cityID, siegeData in pairs(activeSieges) do
-            local cityData = CitySiege_CityData[cityID]
-            if cityData then
-                local color = CitySiege_GetCityColorString(cityID)
-                text = text .. string.format("%s=== %s ===|r\n", color, cityData.displayName)
-                text = text .. string.format("Status: %s\n", siegeData.status or "Active")
-                text = text .. string.format("Phase: %d/4\n", siegeData.phase or 1)
-                text = text .. string.format("Faction: %s\n", cityData.faction)
-                
-                if siegeData.elapsedTime then
-                    text = text .. string.format("Duration: %s\n", CitySiege_Utils:FormatTime(siegeData.elapsedTime))
-                end
-                
-                if siegeData.remaining then
-                    text = text .. string.format("|cFFFFFF00Time Remaining:|r %s\n", CitySiege_Utils:FormatTime(siegeData.remaining))
-                end
-                
-                if siegeData.leaderHealth then
-                    local healthColor = "00FF00"
-                    if siegeData.leaderHealth < 50 then healthColor = "FFFF00" end
-                    if siegeData.leaderHealth < 25 then healthColor = "FF0000" end
-                    text = text .. string.format("|cFF%sLeader Health:|r %.1f%%\n", healthColor, siegeData.leaderHealth)
-                end
-                
-                if siegeData.attackingFaction then
-                    text = text .. string.format("Attacking: %s\n", siegeData.attackingFaction)
-                end
-                
-                text = text .. "\n"
-                text = text .. string.format("|cFFFF0000Attackers:|r %d players\n", siegeData.attackerCount or 0)
-                text = text .. string.format("|cFF0088FFDefenders:|r %d players\n", siegeData.defenderCount or 0)
-                
-                if siegeData.stats then
-                    text = text .. "\n"
-                    text = text .. string.format("Attacker Kills: %d\n", siegeData.stats.attackerKills or 0)
-                    text = text .. string.format("Defender Kills: %d\n", siegeData.stats.defenderKills or 0)
-                end
-                
-                text = text .. "==================\n\n"
-            end
-        end
-    end
-    
-    text = text .. "|cFF808080==============================|r\n"
-    text = text .. "|cFF808080Use Commands tab to start/manage sieges|r\n"
-    text = text .. "|cFF808080Use Map tab to view siege battlefield|r"
-    
-    if frame.infoContent and frame.infoContent.infoText then
-        frame.infoContent.infoText:SetText(text)
-        CitySiege_Utils:Debug("UpdateInfoText: Text set successfully, length: " .. string.len(text))
-    else
-        CitySiege_Utils:Debug("UpdateInfoText: infoText not found!")
-    end
-end
-
-
 
 function MainFrame:Show()
     if not frame then

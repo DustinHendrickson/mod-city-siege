@@ -4316,7 +4316,8 @@ public:
             { "start",        HandleCitySiegeStartCommand,        SEC_GAMEMASTER, Console::No },
             { "stop",         HandleCitySiegeStopCommand,         SEC_GAMEMASTER, Console::No },
             { "cleanup",      HandleCitySiegeCleanupCommand,      SEC_GAMEMASTER, Console::No },
-            { "status",       HandleCitySiegeStatusCommand,       SEC_GAMEMASTER, Console::No },
+            { "status",       HandleCitySiegeStatusCommand,       SEC_PLAYER, Console::No },
+            { "mapdata",      HandleCitySiegeMapDataCommand,      SEC_PLAYER, Console::No },
             { "testwaypoint", HandleCitySiegeTestWaypointCommand, SEC_GAMEMASTER, Console::No },
             { "waypoints",    HandleCitySiegeWaypointsCommand,    SEC_GAMEMASTER, Console::No },
             { "distance",     HandleCitySiegeDistanceCommand,     SEC_GAMEMASTER, Console::No },
@@ -4675,7 +4676,7 @@ public:
         return true;
     }
 
-    static bool HandleCitySiegeTestWaypointCommand(ChatHandler* handler)
+    static bool HandleCitySiegeTestWaypointCommand(ChatHandler* handler, Optional<std::string>)
     {
         Player* player = handler->GetSession()->GetPlayer();
         if (!player)
@@ -4951,7 +4952,7 @@ public:
         return true;
     }
 
-    static bool HandleCitySiegeInfoCommand(ChatHandler* handler)
+    static bool HandleCitySiegeInfoCommand(ChatHandler* handler, Optional<std::string>)
     {
         Player* player = handler->GetSession()->GetPlayer();
         if (!player)
@@ -5152,7 +5153,7 @@ public:
         return true;
     }
 
-    static bool HandleCitySiegeReloadCommand(ChatHandler* handler)
+    static bool HandleCitySiegeReloadCommand(ChatHandler* handler, Optional<std::string>)
     {
         handler->PSendSysMessage("|cff00ff00[City Siege]|r Reloading configuration from mod_city_siege.conf...");
         
