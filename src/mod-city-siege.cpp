@@ -45,6 +45,7 @@
 #include <string>
 #include <cmath>
 #include <algorithm>
+#include <iomanip>
 
 // Conditional include for playerbots module
 #ifdef MOD_PLAYERBOTS
