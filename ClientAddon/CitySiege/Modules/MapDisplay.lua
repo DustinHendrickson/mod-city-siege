@@ -65,11 +65,26 @@ function MapDisplay:Create(parent)
     overlay:Show()
     frame.overlay = overlay
     
-    -- Legend - spans across the bottom
-    local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    legend:SetPoint("BOTTOM", frame, "BOTTOM", 0, 15)
+    -- Leader info text (displayed above map)
+    local leaderInfo = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    leaderInfo:SetPoint("BOTTOM", mapContainer, "TOP", 0, 5)
+    leaderInfo:SetJustifyH("CENTER")
+    leaderInfo:SetText("")
+    leaderInfo:Show()
+    frame.leaderInfo = leaderInfo
+    
+    -- Legend with professional styling
+    local legendFrame = CreateFrame("Frame", nil, frame)
+    legendFrame:SetSize(450, 28)
+    legendFrame:SetPoint("BOTTOM", frame, "BOTTOM", 0, 12)
+    CitySiege_Utils:SetBackdrop(legendFrame, 0.05, 0.05, 0.08, 0.85)
+    frame.legendFrame = legendFrame
+    
+    local legend = legendFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    legend:SetPoint("CENTER", 0, 0)
+    legend:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
     legend:SetJustifyH("CENTER")
-    legend:SetText("|TInterface\\TargetingFrame\\UI-RaidTargetingIcons:16:16:0:0:64:64:48:64:16:32|t Leader     |TInterface\\TargetingFrame\\UI-RaidTargetingIcons:14:14:0:0:64:64:0:16:16:32|t Waypoint     |TInterface\\TargetingFrame\\UI-RaidTargetingIcons:14:14:0:0:64:64:32:48:16:32|t Spawn Point")
+    legend:SetText("|TInterface\\TargetingFrame\\UI-RaidTargetingIcons:18:18:0:0:64:64:48:64:16:32|t |cFFFFD700Leader|r     |TInterface\\TargetingFrame\\UI-RaidTargetingIcons:16:16:0:0:64:64:0:16:16:32|t |cFF00FF00Waypoint|r     |TInterface\\TargetingFrame\\UI-RaidTargetingIcons:16:16:0:0:64:64:32:48:16:32|t |cFF16C3F2Spawn|r")
     legend:Show()
     frame.legend = legend
     
@@ -440,43 +455,49 @@ end
 function MapDisplay:WorldToMap(worldX, worldY, cityData)
     if not cityData then return 0.5, 0.5 end
     
+    -- Per-city calibration offsets for accurate positioning
+    local cityOffsets = {
+        [0] = {x = 0.12, y = 0.04, scale = 0.35, range = 1.75},  -- Stormwind
+        [1] = {x = 0.10, y = 0.05, scale = 0.35, range = 1.75},  -- Ironforge
+        [2] = {x = 0.12, y = 0.04, scale = 0.35, range = 1.75},  -- Darnassus
+        [3] = {x = 0.12, y = 0.04, scale = 0.35, range = 1.75},  -- Exodar
+        [4] = {x = 0.10, y = 0.06, scale = 0.38, range = 1.85},  -- Orgrimmar
+        [5] = {x = 0.12, y = 0.04, scale = 0.35, range = 1.75},  -- Undercity
+        [6] = {x = 0.12, y = 0.04, scale = 0.35, range = 1.75},  -- Thunder Bluff
+        [7] = {x = 0.12, y = 0.04, scale = 0.35, range = 1.75},  -- Silvermoon
+    }
+    
     -- Get center and spawn coordinates
     local originalCenterX = cityData.centerX
     local originalCenterY = cityData.centerY
     local spawnX = cityData.spawnX
     local spawnY = cityData.spawnY
     
-    -- Calculate map range using original center (before offsets)
+    -- Get city-specific settings
+    local cityID = currentCityID or 0
+    local offsets = cityOffsets[cityID] or {x = 0.12, y = 0.04, scale = 0.35, range = 1.75}
+    
+    -- Calculate map range using original center
     local dx = spawnX - originalCenterX
     local dy = spawnY - originalCenterY
     local spawnDist = math.sqrt(dx * dx + dy * dy)
-    local mapRange = spawnDist * 1.75
+    local mapRange = spawnDist * offsets.range
     if mapRange < 50 then mapRange = 500 end
     
-    -- Now apply center offsets for positioning
-    local centerX = originalCenterX
-    local centerY = originalCenterY
-    
     -- Convert world coordinates to relative positions from center
-    local relX = (worldX - centerX) / mapRange
-    local relY = (worldY - centerY) / mapRange
+    local relX = (worldX - originalCenterX) / mapRange
+    local relY = (worldY - originalCenterY) / mapRange
     
-    -- Rotate 90 degrees counter-clockwise:
+    -- Rotate 90 degrees counter-clockwise and apply scaling:
     -- Counter-clockwise 90°: newX = -Y, newY = X
-    -- Then apply offset adjustments for proper WoW map alignment
-    local mapX = 0.5 - (relY * 0.35) + 0.05   -- Y becomes X, inverted, shift right
-    local mapY = 0.5 - (relX * 0.35) + 0.25   -- X becomes Y, inverted, shift down
+    local mapX = 0.5 - (relY * offsets.scale) + 0.05
+    local mapY = 0.5 - (relX * offsets.scale) + 0.25
     
-    -- Display shift offsets (shift all icons on the final display)
-    -- Positive X moves right, negative X moves left
-    -- Positive Y moves up, negative Y moves down
-    local displayOffsetX = 0.12   -- Adjust this to shift all icons horizontally (0.1 = 10% of screen)
-    local displayOffsetY = 0.04   -- Adjust this to shift all icons vertically (0.1 = 10% of screen)
+    -- Apply city-specific display offsets
+    mapX = mapX + offsets.x
+    mapY = mapY - offsets.y
     
-    mapX = mapX + displayOffsetX
-    mapY = mapY - displayOffsetY  -- Negative Y moves icons down in this inverted system
-    
-    -- Use full 0-1 range for proper positioning within cropped texture
+    -- Clamp to 0-1 range
     mapX = math.max(0, math.min(1, mapX))
     mapY = math.max(0, math.min(1, mapY))
     

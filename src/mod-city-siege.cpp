@@ -337,6 +337,10 @@ struct SiegeEvent
         bool isDefender; // Track if this is a defender for correct respawn
     };
     std::vector<RespawnData> deadCreatures; // Creatures waiting to respawn
+    
+    // Kill statistics
+    uint32 attackerKills;  // Number of kills by attackers
+    uint32 defenderKills;  // Number of kills by defenders
 
     // Weather storage for siege weather override
     WeatherState originalWeatherType; // Store original weather type
@@ -816,11 +820,12 @@ void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messa
             else if (elapsed > duration * 0.25f) phase = 2;
         }
         
-        // Format: UPDATE:cityId:phase:attackers:defenders:elapsed:remaining:leaderHealth
+        // Format: UPDATE:cityId:phase:attackers:defenders:elapsed:remaining:leaderHealth:leaderName
         ss << "UPDATE:" << static_cast<uint32>(event.cityId) << ":" << phase 
            << ":" << attackerCount << ":" << defenderCount 
            << ":" << elapsed << ":" << remaining
-           << ":" << std::fixed << std::setprecision(1) << leaderHealthPct;
+           << ":" << std::fixed << std::setprecision(1) << leaderHealthPct
+           << ":" << event.cityLeaderName;
         
         // Only send waypoint data (removed NPC/player positions to reduce packet size)
         ss << ":WP:" << city.waypoints.size();

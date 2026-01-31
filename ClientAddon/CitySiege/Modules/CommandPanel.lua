@@ -40,7 +40,7 @@ function CommandPanel:Create(parent)
     local buttonWidth = 220
     local buttonHeight = 28
     
-    -- Start Siege button
+    -- Start Siege button with tooltip
     frame.startButton = self:CreateCommandButton(buttonsFrame, "Start Siege", function()
         if frame.currentCity then
             SendChatMessage(".citysiege start " .. frame.currentCity.name, "GUILD")
@@ -48,6 +48,7 @@ function CommandPanel:Create(parent)
         end
     end, buttonWidth, buttonHeight)
     frame.startButton:SetPoint("TOP", 0, buttonY)
+    frame.startButton.tooltip = "Begin a new siege event in the selected city"
     buttonY = buttonY - buttonSpacing
     
     -- Stop Siege button
@@ -59,6 +60,7 @@ function CommandPanel:Create(parent)
         end
     end, buttonWidth, buttonHeight)
     frame.stopButton:SetPoint("TOP", 0, buttonY)
+    frame.stopButton.tooltip = "End the active siege and declare a winner"
     buttonY = buttonY - buttonSpacing
     
     -- Cleanup button
@@ -69,20 +71,7 @@ function CommandPanel:Create(parent)
         end
     end, buttonWidth, buttonHeight)
     frame.cleanupButton:SetPoint("TOP", 0, buttonY)
-    buttonY = buttonY - buttonSpacing
-    
-    -- Status button
-    frame.statusButton = self:CreateCommandButton(buttonsFrame, "Show Status", function()
-        SendChatMessage(".citysiege status", "GUILD")
-    end, buttonWidth, buttonHeight)
-    frame.statusButton:SetPoint("TOP", 0, buttonY)
-    buttonY = buttonY - buttonSpacing
-    
-    -- Info button
-    frame.infoButton = self:CreateCommandButton(buttonsFrame, "Detailed Info", function()
-        SendChatMessage(".citysiege info", "GUILD")
-    end, buttonWidth, buttonHeight)
-    frame.infoButton:SetPoint("TOP", 0, buttonY)
+    frame.cleanupButton.tooltip = "Remove all siege NPCs from the city"
     buttonY = buttonY - buttonSpacing
     
     -- Reload button
@@ -90,6 +79,7 @@ function CommandPanel:Create(parent)
         SendChatMessage(".citysiege reload", "GUILD")
     end, buttonWidth, buttonHeight)
     frame.reloadButton:SetPoint("TOP", 0, buttonY)
+    frame.reloadButton.tooltip = "Reload module configuration from file"
     
     -- Warning text
     local warning = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -105,11 +95,26 @@ function CommandPanel:CreateCommandButton(parent, text, onClick, width, height)
     button:SetText(text)
     button:SetScript("OnClick", onClick)
     
-    -- Make button text more readable
+    -- Enhanced button text
     local fontString = button:GetFontString()
     if fontString then
-        fontString:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+        fontString:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
+        fontString:SetShadowOffset(1, -1)
+        fontString:SetShadowColor(0, 0, 0, 1)
     end
+    
+    -- Add tooltip support
+    button:SetScript("OnEnter", function(self)
+        if self.tooltip then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(text, 1, 1, 1)
+            GameTooltip:AddLine(self.tooltip, 0.8, 0.8, 0.8, 1)
+            GameTooltip:Show()
+        end
+    end)
+    button:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
     
     return button
 end

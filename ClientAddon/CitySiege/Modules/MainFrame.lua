@@ -40,12 +40,19 @@ function MainFrame:CreateFrame()
     -- Background
     CitySiege_Utils:SetBackdrop(frame, 0, 0, 0, 0.95)
     
-    -- Title bar
+    -- Title bar with gradient
     local titleBar = CreateFrame("Frame", nil, frame)
-    titleBar:SetHeight(35)
+    titleBar:SetHeight(40)
     titleBar:SetPoint("TOPLEFT", 1, -1)
     titleBar:SetPoint("TOPRIGHT", -1, -1)
-    CitySiege_Utils:SetBackdrop(titleBar, 0.09, 0.76, 0.95, 1)
+    CitySiege_Utils:SetBackdrop(titleBar, 0.05, 0.15, 0.25, 1)
+    
+    -- Title bar gradient overlay
+    local gradient = titleBar:CreateTexture(nil, "BORDER")
+    gradient:SetAllPoints(titleBar)
+    gradient:SetTexture("Interface\\AddOns\\CitySiege\\Media\\gradient", true, true)
+    gradient:SetGradientAlpha("VERTICAL", 0.09, 0.76, 0.95, 0.6, 0.05, 0.4, 0.6, 0.9)
+    gradient:SetBlendMode("ADD")
     
     -- Drag handler with custom mouse anchor
     titleBar:EnableMouse(true)
@@ -88,10 +95,13 @@ function MainFrame:CreateFrame()
         MainFrame:SavePosition()
     end)
     
-    -- Title text
-    local title = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("CENTER")
-    title:SetText("|cFFFFFFFFCity Siege|r")
+    -- Title text with shadow
+    local title = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    title:SetPoint("CENTER", 0, -2)
+    title:SetFont("Fonts\\FRIZQT__.TTF", 16, "OUTLINE")
+    title:SetShadowOffset(2, -2)
+    title:SetShadowColor(0, 0, 0, 1)
+    title:SetText("|cFF16C3F2City Siege|r")
     frame.titleText = title
     
     -- Close button
@@ -99,9 +109,9 @@ function MainFrame:CreateFrame()
     closeBtn:SetPoint("RIGHT", -5, 0)
     closeBtn:SetScript("OnClick", function() self:Hide() end)
     
-    -- Settings button
+    -- Settings button with tooltip
     local settingsBtn = CreateFrame("Button", nil, titleBar, "UIPanelButtonTemplate")
-    settingsBtn:SetSize(80, 22)
+    settingsBtn:SetSize(85, 24)
     settingsBtn:SetPoint("RIGHT", closeBtn, "LEFT", -5, 0)
     settingsBtn:SetText("Settings")
     settingsBtn:SetScript("OnClick", function()
@@ -109,11 +119,22 @@ function MainFrame:CreateFrame()
             CitySiege_SettingsPanel:Toggle()
         end
     end)
+    settingsBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("City Siege Settings", 1, 1, 1)
+        GameTooltip:AddLine("Configure addon display, notifications, and map settings", 0.8, 0.8, 0.8, 1)
+        GameTooltip:Show()
+    end)
+    settingsBtn:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
     
-    -- City selection dropdown
-    local cityLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cityLabel:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT", 15, -15)
-    cityLabel:SetText("City:")
+    -- City selection dropdown with enhanced styling
+    local cityLabel = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    cityLabel:SetPoint("TOPLEFT", titleBar, "BOTTOMLEFT", 20, -18)
+    cityLabel:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
+    cityLabel:SetTextColor(0.09, 0.76, 0.95)
+    cityLabel:SetText("Select City:")
     
     local cityDropdown = self:CreateCityDropdown(frame)
     cityDropdown:SetPoint("LEFT", cityLabel, "RIGHT", 5, 0)
@@ -129,7 +150,6 @@ function MainFrame:CreateFrame()
     frame.tabs[1] = self:CreateTab(tabsFrame, "Commands", 1, function() self:ShowTab(1) end)
     frame.tabs[2] = self:CreateTab(tabsFrame, "Map", 2, function() self:ShowTab(2) end)
     frame.tabs[3] = self:CreateTab(tabsFrame, "Info", 3, function() self:ShowTab(3) end)
-    frame.tabs[4] = self:CreateTab(tabsFrame, "Stats", 4, function() self:ShowTab(4) end)
     
     -- Hide all tabs initially until city is selected
     for i, tab in ipairs(frame.tabs) do
@@ -207,8 +227,8 @@ end
 
 function MainFrame:CreateTab(parent, text, index, onClick)
     local tab = CreateFrame("Button", nil, parent)
-    tab:SetSize(110, 28)
-    tab:SetPoint("LEFT", (index - 1) * 115, 0)
+    tab:SetSize(130, 32)
+    tab:SetPoint("LEFT", (index - 1) * 135 + 5, 0)
     
     -- Use simple button template instead of character tab textures
     tab:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
@@ -224,8 +244,19 @@ function MainFrame:CreateTab(parent, text, index, onClick)
     
     local tabText = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     tabText:SetPoint("CENTER", 0, 0)
+    tabText:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
     tabText:SetText(text)
     tab.text = tabText
+    
+    -- Hover tooltip
+    tab:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(text .. " Tab", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    tab:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+    end)
     
     tab:SetScript("OnClick", onClick)
     
@@ -274,12 +305,6 @@ function MainFrame:CreateTabContent()
     frame.infoContent:SetPoint("TOPLEFT", 5, -5)
     frame.infoContent:SetPoint("BOTTOMRIGHT", -5, 5)
     frame.infoContent:Hide()
-    
-    -- Stats tab
-    frame.statsContent = self:CreateStatsPanel(frame.contentFrame)
-    frame.statsContent:SetPoint("TOPLEFT", 5, -5)
-    frame.statsContent:SetPoint("BOTTOMRIGHT", -5, 5)
-    frame.statsContent:Hide()
 end
 
 function MainFrame:CreateInfoPanel(parent)
@@ -307,30 +332,7 @@ function MainFrame:CreateInfoPanel(parent)
     return panel
 end
 
-function MainFrame:CreateStatsPanel(parent)
-    local panel = CreateFrame("Frame", nil, parent)
-    panel:SetAllPoints()
-    panel:Show()
-    
-    -- Title
-    local title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -25)
-    title:SetText("Siege Statistics")
-    
-    -- Stats text directly on panel
-    local statsText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    statsText:SetPoint("TOPLEFT", 25, -65)
-    statsText:SetPoint("BOTTOMRIGHT", -25, 25)
-    statsText:SetJustifyH("LEFT")
-    statsText:SetJustifyV("TOP")
-    statsText:SetSpacing(2)
-    panel.statsText = statsText
-    
-    -- Set initial text immediately
-    self:UpdateStatsText()
-    
-    return panel
-end
+
 
 function MainFrame:ShowTab(tabIndex)
     if not frame then return end
@@ -342,11 +344,27 @@ function MainFrame:ShowTab(tabIndex)
     if frame.commandsContent then frame.commandsContent:Hide() end
     if frame.mapContent then frame.mapContent:Hide() end
     if frame.infoContent then frame.infoContent:Hide() end
-    if frame.statsContent then frame.statsContent:Hide() end
     
-    -- Update tab appearances
+    -- Update tab appearances with enhanced styling
     for i, tab in ipairs(frame.tabs) do
         if i == tabIndex then
+            -- Selected tab
+            tab:SetAlpha(1)
+            tab.text:SetTextColor(1, 1, 1)
+            tab.text:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
+            if tab.selectedTexture then
+                tab:SetNormalTexture(tab.selectedTexture)
+            end
+        else
+            -- Unselected tabs
+            tab:SetAlpha(0.75)
+            tab.text:SetTextColor(0.65, 0.65, 0.7)
+            tab.text:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
+            if tab.normalTexture then
+                tab:SetNormalTexture(tab.normalTexture)
+            end
+        end
+    end
             -- Selected tab
             tab:SetNormalTexture(tab.selectedTexture)
             tab:GetNormalTexture():SetTexCoord(0, 0.625, 0, 0.6875)
@@ -384,9 +402,6 @@ function MainFrame:ShowTab(tabIndex)
     elseif tabIndex == 3 and frame.infoContent then
         frame.infoContent:Show()
         self:UpdateInfoText()
-    elseif tabIndex == 4 and frame.statsContent then
-        frame.statsContent:Show()
-        self:UpdateStatsText()
     end
 end
 
@@ -456,7 +471,6 @@ function MainFrame:UpdateSiegeDisplay()
     if not frame then return end
     
     self:UpdateInfoText()
-    self:UpdateStatsText()
     
     if mapDisplay and mapDisplay.UpdateDisplay then
         mapDisplay:UpdateDisplay()
@@ -564,110 +578,7 @@ function MainFrame:UpdateInfoText()
     end
 end
 
-function MainFrame:UpdateStatsText()
-    if not frame or not frame.statsContent or not frame.statsContent.statsText then return end
-    
-    local stats = CitySiege_Config:GetStatistics()
-    
-    local text = "|cFFFFFF00=== Personal Statistics ===|r\n\n"
-    
-    -- Check if player has any siege experience
-    local hasExperience = (stats.siegesParticipated and stats.siegesParticipated > 0)
-    
-    if not hasExperience then
-        text = text .. "|cFFFF6600You haven't participated in any sieges yet!|r\n\n"
-        text = text .. "Start your siege career by:\n"
-        text = text .. "  - Using Commands tab to start a siege (GM/Admin)\n"
-        text = text .. "  - Joining an active siege as attacker or defender\n"
-        text = text .. "  - Helping your faction defend or attack cities\n\n"
-        text = text .. "|cFF808080Your statistics will appear here once you participate.|r\n\n"
-    end
-    
-    -- Siege Participation
-    text = text .. "|cFF00FF00=== Siege Participation ===|r\n"
-    text = text .. string.format("Total Sieges: |cFFFFFFFF%s|r\n", CitySiege_Utils:FormatNumber(stats.siegesParticipated or 0))
-    text = text .. string.format("  Victories: |cFF00FF00%s|r\n", CitySiege_Utils:FormatNumber(stats.siegesWon or 0))
-    text = text .. string.format("  Defeats: |cFFFF0000%s|r\n", CitySiege_Utils:FormatNumber(stats.siegesLost or 0))
-    text = text .. string.format("  Ongoing: |cFFFFFF00%s|r\n\n", CitySiege_Utils:FormatNumber((stats.siegesParticipated or 0) - (stats.siegesWon or 0) - (stats.siegesLost or 0)))
-    
-    -- Win Rate
-    if stats.siegesParticipated and stats.siegesParticipated > 0 then
-        local winRate = (stats.siegesWon / stats.siegesParticipated) * 100
-        local color = winRate >= 60 and "|cFF00FF00" or (winRate >= 40 and "|cFFFFFF00" or "|cFFFF0000")
-        text = text .. string.format("Win Rate: %s%.1f%%|r\n\n", color, winRate)
-    else
-        text = text .. "Win Rate: |cFF808080N/A|r\n\n"
-    end
-    
-    -- Combat Statistics
-    text = text .. "|cFF00FF00=== Combat Statistics ===|r\n"
-    text = text .. string.format("Total Kills: |cFF00FF00%s|r\n", CitySiege_Utils:FormatNumber(stats.totalKills or 0))
-    text = text .. string.format("Total Deaths: |cFFFF0000%s|r\n", CitySiege_Utils:FormatNumber(stats.totalDeaths or 0))
-    
-    -- K/D Ratio
-    if stats.totalDeaths and stats.totalDeaths > 0 then
-        local kd = (stats.totalKills or 0) / stats.totalDeaths
-        local color = kd >= 2.0 and "|cFF00FF00" or (kd >= 1.0 and "|cFFFFFF00" or "|cFFFF0000")
-        text = text .. string.format("K/D Ratio: %s%.2f|r\n\n", color, kd)
-    else
-        text = text .. "K/D Ratio: |cFF808080N/A|r\n\n"
-    end
-    
-    -- Averages
-    if stats.siegesParticipated and stats.siegesParticipated > 0 then
-        local avgKills = (stats.totalKills or 0) / stats.siegesParticipated
-        local avgDeaths = (stats.totalDeaths or 0) / stats.siegesParticipated
-        text = text .. "|cFF00FF00=== Averages Per Siege ===|r\n"
-        text = text .. string.format("Avg Kills: |cFFFFFFFF%.1f|r\n", avgKills)
-        text = text .. string.format("Avg Deaths: |cFFFFFFFF%.1f|r\n\n", avgDeaths)
-    end
-    
-    -- Role Performance (if data available)
-    if stats.attackerSieges or stats.defenderSieges then
-        text = text .. "|cFF00FF00=== Role Performance ===|r\n"
-        text = text .. string.format("As Attacker: |cFFFF0000%d|r sieges\n", stats.attackerSieges or 0)
-        text = text .. string.format("As Defender: |cFF0088FF%d|r sieges\n\n", stats.defenderSieges or 0)
-    end
-    
-    -- City-specific stats (if available)
-    if stats.citiesAttacked or stats.citiesDefended then
-        text = text .. "|cFF00FF00=== City Experience ===|r\n"
-        text = text .. string.format("Cities Attacked: %d\n", stats.citiesAttacked or 0)
-        text = text .. string.format("Cities Defended: %d\n\n", stats.citiesDefended or 0)
-    end
-    
-    -- Performance Rating
-    if hasExperience then
-        local rating = "Recruit"
-        local ratingColor = "|cFF808080"
-        
-        if stats.siegesParticipated >= 50 then
-            rating = "Veteran"
-            ratingColor = "|cFFFF6600"
-        elseif stats.siegesParticipated >= 20 then
-            rating = "Experienced"
-            ratingColor = "|cFFFFFF00"
-        elseif stats.siegesParticipated >= 10 then
-            rating = "Regular"
-            ratingColor = "|cFFFFFFFF"
-        elseif stats.siegesParticipated >= 5 then
-            rating = "Initiate"
-            ratingColor = "|cFF00FF00"
-        end
-        
-        text = text .. "|cFF00FF00====================|r\n"
-        text = text .. string.format("Rank: %s%s|r\n", ratingColor, rating)
-    end
-    
-    text = text .. "\n|cFF808080Stats update in real-time during sieges|r"
-    
-    if frame.statsContent and frame.statsContent.statsText then
-        frame.statsContent.statsText:SetText(text)
-        CitySiege_Utils:Debug("UpdateStatsText: Text set successfully")
-    else
-        CitySiege_Utils:Debug("UpdateStatsText: statsText not found")
-    end
-end
+
 
 function MainFrame:Show()
     if not frame then

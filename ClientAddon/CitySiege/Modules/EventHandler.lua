@@ -139,13 +139,13 @@ function EventHandler:ParseAddonMessage(message)
         end
         
     elseif command == "UPDATE" then
-        -- Format: UPDATE:cityId:phase:attackers:defenders:elapsed:remaining:leaderHealth:WP:count:x:y:z...:ATK:count:x:y:z...:DEF:count:x:y:z...:BATK:count:x:y:z...:BDEF:count:x:y:z...
+        -- Format: UPDATE:cityId:phase:attackers:defenders:elapsed:remaining:leaderHealth:leaderName:WP:count:x:y:z...
         local parts = {}
         for part in string.gmatch(message, "([^:]+)") do
             table.insert(parts, part)
         end
         
-        if #parts >= 8 then
+        if #parts >= 9 then
             local cityID = tonumber(parts[2])
             local phase = tonumber(parts[3])
             local attackerCount = tonumber(parts[4])
@@ -153,13 +153,18 @@ function EventHandler:ParseAddonMessage(message)
             local elapsed = tonumber(parts[6])
             local remaining = tonumber(parts[7])
             local leaderHealth = tonumber(parts[8])
+            local leaderName = parts[9] or "Unknown Leader"
             
             -- Parse waypoints, attacker positions, defender positions, bot positions
             local data = {
-                waypoints = {}
+                waypoints = {},
+                attackerPositions = {},
+                defenderPositions = {},
+                attackerBots = {},
+                defenderBots = {}
             }
             
-            local i = 9
+            local i = 12
             while i <= #parts do
                 local section = parts[i]
                 
@@ -178,12 +183,42 @@ function EventHandler:ParseAddonMessage(message)
                             i = i + 3
                         end
                     end
+                elseif section == "ATK" then
+                    -- Attacker positions
+                    i = i + 1
+                    local atkCount = tonumber(parts[i]) or 0
+                    i = i + 1
+                    for j = 1, atkCount do
+                        if i + 2 <= #parts then
+                            table.insert(data.attackerPositions, {
+                                x = tonumber(parts[i]),
+                                y = tonumber(parts[i + 1]),
+                                z = tonumber(parts[i + 2])
+                            })
+                            i = i + 3
+                        end
+                    end
+                elseif section == "DEF" then
+                    -- Defender positions
+                    i = i + 1
+                    local defCount = tonumber(parts[i]) or 0
+                    i = i + 1
+                    for j = 1, defCount do
+                        if i + 2 <= #parts then
+                            table.insert(data.defenderPositions, {
+                                x = tonumber(parts[i]),
+                                y = tonumber(parts[i + 1]),
+                                z = tonumber(parts[i + 2])
+                            })
+                            i = i + 3
+                        end
+                    end
                 else
                     i = i + 1
                 end
             end
             
-            self:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCount, elapsed, remaining, leaderHealth, data)
+            self:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCount, elapsed, remaining, leaderHealth, leaderName, data)
         end
         
     elseif command == "END" then
@@ -321,11 +356,11 @@ function EventHandler:HandleSiegeEnd(cityID, winner)
     end
 end
 
-function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCount, elapsed, remaining, leaderHealth, data)
+function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCount, elapsed, remaining, leaderHealth, leaderName, data)
     if not cityID then return end
     
-    CitySiege_Utils:Debug(string.format("Siege update: city=%d, phase=%d, atk=%d, def=%d, time=%d, remaining=%d, leaderHP=%.1f", 
-        cityID, phase or 0, attackerCount or 0, defenderCount or 0, elapsed or 0, remaining or 0, leaderHealth or 100))
+    CitySiege_Utils:Debug(string.format("Siege update: city=%d, phase=%d, atk=%d, def=%d, time=%d, remaining=%d, leaderHP=%.1f, leader=%s", 
+        cityID, phase or 0, attackerCount or 0, defenderCount or 0, elapsed or 0, remaining or 0, leaderHealth or 100, leaderName or "Unknown"))
     
     if CitySiege_SiegeTracker then
         local siegeData = CitySiege_SiegeTracker:GetSiege(cityID)
@@ -336,15 +371,17 @@ function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCo
             siegeData.elapsedTime = elapsed
             siegeData.remaining = remaining
             siegeData.leaderHealth = leaderHealth
+            siegeData.leaderName = leaderName
             
-            -- Update waypoint data if provided
+            -- Update waypoint and position data if provided
             if data then
                 siegeData.waypoints = data.waypoints or {}
+                siegeData.attackerPositions = data.attackerPositions or {}
+                siegeData.defenderPositions = data.defenderPositions or {}
+                siegeData.attackerBots = data.attackerBots or {}
+                siegeData.defenderBots = data.defenderBots or {}
             end
             
-            if not siegeData.stats then
-                siegeData.stats = {}
-            end
             CitySiege_SiegeTracker:UpdateSiege(cityID, siegeData)
         else
             -- Create new siege data if it doesn't exist
@@ -357,6 +394,7 @@ function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCo
                 elapsedTime = elapsed,
                 remaining = remaining,
                 leaderHealth = leaderHealth,
+                leaderName = leaderName,
                 status = "Active",
                 startTime = GetTime() - (elapsed or 0),
                 waypoints = data and data.waypoints or {},
@@ -365,8 +403,8 @@ function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCo
                 attackerBots = data and data.attackerBots or {},
                 defenderBots = data and data.defenderBots or {},
                 stats = {
-                    attackerKills = 0,
-                    defenderKills = 0,
+                    attackerKills = attackerKills or 0,
+                    defenderKills = defenderKills or 0,
                 },
             }
             CitySiege_SiegeTracker:AddSiege(cityID, siegeData)
