@@ -281,9 +281,6 @@ function MainFrame:CreateTabContent()
     frame.mapContent:SetPoint("BOTTOMRIGHT", -5, 5)
     frame.mapContent:Hide()
     
-    print("CitySiege MainFrame: About to create MapDisplay")
-    print("CitySiege MainFrame: CitySiege_MapDisplay exists: " .. tostring(CitySiege_MapDisplay ~= nil))
-    
     if CitySiege_MapDisplay then
         local success, result = pcall(function()
             return CitySiege_MapDisplay:Create(frame.mapContent)
@@ -292,12 +289,7 @@ function MainFrame:CreateTabContent()
         if success then
             -- Store reference to the module, not just the frame
             mapDisplay = CitySiege_MapDisplay
-            print("CitySiege MainFrame: MapDisplay created successfully, result: " .. tostring(result))
-        else
-            print("CitySiege MainFrame: ERROR creating MapDisplay: " .. tostring(result))
         end
-    else
-        print("CitySiege MainFrame: ERROR - CitySiege_MapDisplay module not loaded!")
     end
     
     -- Info tab
@@ -354,6 +346,7 @@ function MainFrame:ShowTab(tabIndex)
             tab.text:SetFont("Fonts\\FRIZQT__.TTF", 13, "OUTLINE")
             if tab.selectedTexture then
                 tab:SetNormalTexture(tab.selectedTexture)
+                tab:GetNormalTexture():SetTexCoord(0, 0.625, 0, 0.6875)
             end
         else
             -- Unselected tabs
@@ -362,18 +355,8 @@ function MainFrame:ShowTab(tabIndex)
             tab.text:SetFont("Fonts\\FRIZQT__.TTF", 12, "OUTLINE")
             if tab.normalTexture then
                 tab:SetNormalTexture(tab.normalTexture)
+                tab:GetNormalTexture():SetTexCoord(0, 0.625, 0, 0.6875)
             end
-        end
-    end
-            -- Selected tab
-            tab:SetNormalTexture(tab.selectedTexture)
-            tab:GetNormalTexture():SetTexCoord(0, 0.625, 0, 0.6875)
-            tab.text:SetTextColor(1, 1, 1) -- White
-        else
-            -- Inactive tab  
-            tab:SetNormalTexture(tab.normalTexture)
-            tab:GetNormalTexture():SetTexCoord(0, 0.625, 0, 0.6875)
-            tab.text:SetTextColor(0.8, 0.8, 0.8) -- Light grey
         end
     end
     
@@ -382,22 +365,17 @@ function MainFrame:ShowTab(tabIndex)
         frame.commandsContent:Show()
     elseif tabIndex == 2 and frame.mapContent then
         frame.mapContent:Show()
-        print("CitySiege: Showing Map tab, currentCityID: " .. tostring(currentCityID))
         if mapDisplay then
-            print("CitySiege: mapDisplay frame exists, calling CitySiege_MapDisplay:SetCity")
             CitySiege_MapDisplay:SetCity(currentCityID)
             
             -- Request map data from server if a city is selected
             if currentCityID then
-                print("CitySiege: Requesting map data for city " .. currentCityID)
                 -- Trigger local REQUEST_MAP handling which will execute the server command
                 -- This allows non-GM players to request map data
                 if CitySiege_EventHandler then
                     CitySiege_EventHandler:ParseAddonMessage("REQUEST_MAP:" .. currentCityID)
                 end
             end
-        else
-            print("CitySiege: ERROR - mapDisplay frame is nil!")
         end
     elseif tabIndex == 3 and frame.infoContent then
         frame.infoContent:Show()
@@ -406,11 +384,7 @@ function MainFrame:ShowTab(tabIndex)
 end
 
 function MainFrame:SelectCity(cityID)
-    print("CitySiege: SelectCity called with cityID: " .. tostring(cityID))
-    
     currentCityID = cityID
-    
-    print("CitySiege: currentCityID set to: " .. tostring(currentCityID))
     
     -- Update CommandPanel with the selected city
     if commandPanel then

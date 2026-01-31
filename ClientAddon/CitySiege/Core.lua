@@ -271,12 +271,20 @@ function Core:ShowHelp()
 end
 
 function Core:ToggleMainFrame()
+    print("CitySiege: ToggleMainFrame called")
+    print("CitySiege: CitySiege_MainFrame exists: " .. tostring(CitySiege_MainFrame ~= nil))
+    
     if CitySiege_MainFrame then
+        print("CitySiege: MainFrame IsShown: " .. tostring(CitySiege_MainFrame:IsShown()))
         if CitySiege_MainFrame:IsShown() then
+            print("CitySiege: Hiding MainFrame")
             CitySiege_MainFrame:Hide()
         else
+            print("CitySiege: Showing MainFrame")
             CitySiege_MainFrame:Show()
         end
+    else
+        print("CitySiege: ERROR - MainFrame is nil!")
     end
 end
 

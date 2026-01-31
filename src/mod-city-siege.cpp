@@ -4603,7 +4603,7 @@ public:
         return true;
     }
 
-    static bool HandleCitySiegeStatusCommand(ChatHandler* handler)
+    static bool HandleCitySiegeStatusCommand(ChatHandler* handler, Optional<std::string>)
     {
         handler->PSendSysMessage("=== City Siege Status ===");
         handler->PSendSysMessage(("Module Enabled: " + std::string(g_CitySiegeEnabled ? "Yes" : "No")).c_str());
