@@ -1500,7 +1500,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
         returnPos.wasPvPFlagged = bot->IsPvP(); // Store original PvP status
         
         // Check for and store RPG strategy
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
         if (botAI)
         {
             // Check for "rpg" or "new rpg" strategy
@@ -1671,7 +1671,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
         returnPos.wasPvPFlagged = bot->IsPvP(); // Store original PvP status
         
         // Check for and store RPG strategy
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
         if (botAI)
         {
             // Check for "rpg" or "new rpg" strategy
@@ -1767,7 +1767,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             if (!bot || !bot->IsInWorld())
                 continue;
                 
-            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
             if (!botAI)
                 continue;
             
@@ -1832,7 +1832,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             if (!bot || !bot->IsInWorld())
                 continue;
                 
-            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
             if (!botAI)
                 continue;
             
@@ -1951,7 +1951,7 @@ void DeactivatePlayerbotsFromSiege(SiegeEvent& event)
         // Restore RPG strategy if bot had one
         if (!returnPos.rpgStrategy.empty())
         {
-            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
             if (botAI)
             {
                 botAI->ChangeStrategy("+" + returnPos.rpgStrategy, BOT_STATE_NON_COMBAT);
@@ -2775,7 +2775,7 @@ void ProcessBotRespawns(SiegeEvent& event)
             bot->TeleportTo(city.mapId, respawnX, respawnY, desiredZ, 0.0f);
 
             // Reinitialize waypoint/travel progress depending on defender/attacker
-            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
             if (it->isDefender)
             {
                 if (!city.waypoints.empty())
@@ -2868,7 +2868,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         uint32 currentWP = wpIter->second;
         
         // Always ensure bot has an active travel target if not at final destination
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
         if (botAI)
         {
             TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
@@ -2931,7 +2931,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         uint32 currentWP = wpIter->second;
         
         // Always ensure bot has an active travel target if not at final destination
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
         if (botAI)
         {
             TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
