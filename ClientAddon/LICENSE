@@ -1,0 +1,51 @@
+
+                   GNU AFFERO GENERAL PUBLIC LICENSE
+                       Version 3, 19 November 2007
+
+This addon is part of the AzerothCore City Siege Module project.
+
+Copyright (C) 2025 AzerothCore <http://www.azerothcore.org/>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+---
+
+## Additional Information
+
+### External Libraries
+
+This addon uses the following external libraries, which have their own licenses:
+
+- **Ace3**: BSD License
+  - AceAddon-3.0, AceEvent-3.0, AceDB-3.0, AceConsole-3.0, AceGUI-3.0, AceConfig-3.0
+  - See https://www.wowace.com/projects/ace3
+
+- **LibStub**: Public Domain
+  - See https://www.curseforge.com/wow/addons/libstub
+
+- **LibDataBroker-1.1**: Public Domain
+  - See https://www.curseforge.com/wow/addons/libdatabroker-1-1
+
+- **LibDBIcon-1.0**: GPLv2 or later
+  - See https://www.curseforge.com/wow/addons/libdbicon-1-0
+
+### Contribution
+
+Contributions to this project are welcome under the terms of the AGPL-3.0 license.
+
+### Notice
+
+This software is provided "as is" without warranty of any kind, express or implied.
+Use at your own risk. The authors and contributors are not responsible for any damages
+arising from the use of this software.

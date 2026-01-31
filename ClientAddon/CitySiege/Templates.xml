@@ -1,0 +1,148 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+	<!--
+		City Siege Addon - XML Templates
+		Custom frame templates for consistent UI styling
+	-->
+	
+	<!-- Custom Button Template -->
+	<Button name="CitySiegeButtonTemplate" inherits="UIPanelButtonTemplate" virtual="true">
+		<Size x="180" y="25"/>
+		<NormalFont style="GameFontNormal"/>
+		<HighlightFont style="GameFontHighlight"/>
+		<DisabledFont style="GameFontDisable"/>
+	</Button>
+	
+	<!-- Custom Panel Template -->
+	<Frame name="CitySiegePanelTemplate" virtual="true">
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" 
+				  edgeFile="Interface\Tooltips\UI-Tooltip-Border" 
+				  tile="true">
+			<BackgroundInsets>
+				<AbsInset left="4" right="4" top="4" bottom="4"/>
+			</BackgroundInsets>
+			<TileSize>
+				<AbsValue val="16"/>
+			</TileSize>
+			<EdgeSize>
+				<AbsValue val="16"/>
+			</EdgeSize>
+		</Backdrop>
+	</Frame>
+	
+	<!-- Title Bar Template -->
+	<Frame name="CitySiegeTitleBarTemplate" virtual="true">
+		<Size x="0" y="30"/>
+		<Backdrop bgFile="Interface\DialogFrame\UI-DialogBox-Background" 
+				  edgeFile="Interface\Tooltips\UI-Tooltip-Border" 
+				  tile="true">
+			<BackgroundInsets>
+				<AbsInset left="4" right="4" top="4" bottom="4"/>
+			</BackgroundInsets>
+			<TileSize>
+				<AbsValue val="16"/>
+			</TileSize>
+			<EdgeSize>
+				<AbsValue val="16"/>
+			</EdgeSize>
+		</Backdrop>
+	</Frame>
+	
+	<!-- Info Line Template -->
+	<Frame name="CitySiegeInfoLineTemplate" virtual="true">
+		<Size x="400" y="20"/>
+		<Layers>
+			<Layer level="OVERLAY">
+				<FontString name="$parentLabel" inherits="GameFontNormal" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="LEFT"/>
+					</Anchors>
+					<Size x="150" y="20"/>
+				</FontString>
+				<FontString name="$parentValue" inherits="GameFontHighlight" justifyH="RIGHT">
+					<Anchors>
+						<Anchor point="RIGHT"/>
+					</Anchors>
+					<Size x="240" y="20"/>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+	
+	<!-- Map Icon Template -->
+	<Frame name="CitySiegeMapIconTemplate" virtual="true">
+		<Size x="8" y="8"/>
+		<Layers>
+			<Layer level="OVERLAY">
+				<Texture name="$parentTexture">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+					<Size x="8" y="8"/>
+				</Texture>
+			</Layer>
+		</Layers>
+	</Frame>
+	
+	<!-- Stat Display Template -->
+	<Frame name="CitySiegeStatTemplate" virtual="true">
+		<Size x="200" y="60"/>
+		<Layers>
+			<Layer level="BACKGROUND">
+				<Texture>
+					<Anchors>
+						<Anchor point="TOPLEFT" x="2" y="-2"/>
+						<Anchor point="BOTTOMRIGHT" x="-2" y="2"/>
+					</Anchors>
+					<Color r="0.1" g="0.1" b="0.1" a="0.8"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK">
+				<FontString name="$parentTitle" inherits="GameFontNormal">
+					<Anchors>
+						<Anchor point="TOP" y="-5"/>
+					</Anchors>
+				</FontString>
+				<FontString name="$parentValue" inherits="GameFontNormalLarge">
+					<Anchors>
+						<Anchor point="CENTER" y="-5"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+	
+	<!-- Progress Bar Template -->
+	<StatusBar name="CitySiegeProgressBarTemplate" virtual="true">
+		<Size x="300" y="20"/>
+		<BarTexture file="Interface\TargetingFrame\UI-StatusBar"/>
+		<BarColor r="0.09" g="0.76" b="0.95"/>
+		<Layers>
+			<Layer level="OVERLAY">
+				<FontString name="$parentText" inherits="GameFontHighlightSmall">
+					<Anchors>
+						<Anchor point="CENTER"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</StatusBar>
+	
+	<!-- Checkbox Template with Label -->
+	<CheckButton name="CitySiegeCheckboxTemplate" inherits="UICheckButtonTemplate" virtual="true">
+		<Size x="24" y="24"/>
+		<HitRectInsets>
+			<AbsInset left="0" right="-100" top="0" bottom="0"/>
+		</HitRectInsets>
+	</CheckButton>
+	
+	<!-- Slider Template -->
+	<Slider name="CitySiegeSliderTemplate" inherits="OptionsSliderTemplate" virtual="true">
+		<Size x="250" y="17"/>
+	</Slider>
+	
+	<!-- Dropdown Menu Template -->
+	<Frame name="CitySiegeDropdownTemplate" inherits="UIDropDownMenuTemplate" virtual="true">
+	</Frame>
+
+</Ui>

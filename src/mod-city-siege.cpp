@@ -341,6 +341,9 @@ struct SiegeEvent
     WeatherState originalWeatherType; // Store original weather type
     float originalWeatherGrade; // Store original weather grade
     bool weatherOverridden; // Track if weather was overridden for this siege
+    
+    // Addon communication tracking
+    uint32 lastAddonBroadcast; // Last time addon data was broadcast (for frequent updates)
 };
 
 // Active siege events
@@ -754,6 +757,203 @@ void AnnounceSiege(const CityData& city, bool isStart)
     if (g_DebugMode)
     {
         LOG_INFO("server.loading", "[City Siege] {}", message);
+    }
+}
+
+/**
+ * @brief Broadcasts siege data to clients via addon messages
+ * @param event The siege event to broadcast
+ * @param messageType Type of message (START, UPDATE, END, POSITION)
+ */
+void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messageType)
+{
+    const CityData& city = g_Cities[event.cityId];
+    Map* map = sMapMgr->FindMap(city.mapId, 0);
+    if (!map)
+        return;
+
+    std::ostringstream ss;
+    
+    if (messageType == "START")
+    {
+        // Format: START:cityId:faction:spawnX:spawnY:spawnZ:leaderX:leaderY:leaderZ:centerX:centerY:centerZ
+        bool isAllianceCity = (event.cityId <= CITY_EXODAR);
+        std::string attackingFaction = isAllianceCity ? "Horde" : "Alliance";
+        ss << "START:" << static_cast<uint32>(event.cityId) << ":" << attackingFaction
+           << ":" << std::fixed << std::setprecision(2)
+           << city.spawnX << ":" << city.spawnY << ":" << city.spawnZ
+           << ":" << city.leaderX << ":" << city.leaderY << ":" << city.leaderZ
+           << ":" << city.centerX << ":" << city.centerY << ":" << city.centerZ;
+    }
+    else if (messageType == "UPDATE")
+    {
+        // Get leader health if available
+        float leaderHealthPct = 0.0f;
+        if (event.cityLeaderGuid)
+        {
+            if (Creature* leader = map->GetCreature(event.cityLeaderGuid))
+            {
+                if (leader->IsAlive())
+                {
+                    leaderHealthPct = leader->GetHealthPct();
+                }
+            }
+        }
+        
+        uint32 attackerCount = event.spawnedCreatures.size();
+        uint32 defenderCount = event.spawnedDefenders.size();
+        uint32 elapsed = time(nullptr) - event.startTime;
+        uint32 remaining = event.endTime > time(nullptr) ? event.endTime - time(nullptr) : 0;
+        
+        // Determine phase
+        uint32 phase = 1;
+        if (!event.cinematicPhase)
+        {
+            uint32 duration = event.endTime - event.startTime;
+            if (elapsed > duration * 0.75f) phase = 4;
+            else if (elapsed > duration * 0.5f) phase = 3;
+            else if (elapsed > duration * 0.25f) phase = 2;
+        }
+        
+        // Format: UPDATE:cityId:phase:attackers:defenders:elapsed:remaining:leaderHealth
+        ss << "UPDATE:" << static_cast<uint32>(event.cityId) << ":" << phase 
+           << ":" << attackerCount << ":" << defenderCount 
+           << ":" << elapsed << ":" << remaining
+           << ":" << std::fixed << std::setprecision(1) << leaderHealthPct;
+        
+        // Only send waypoint data (removed NPC/player positions to reduce packet size)
+        ss << ":WP:" << city.waypoints.size();
+        for (const auto& wp : city.waypoints)
+        {
+            ss << ":" << std::fixed << std::setprecision(2) << wp.x << ":" << wp.y << ":" << wp.z;
+        }
+    }
+    else if (messageType == "END")
+    {
+        // Format: END:cityId:winner
+        ss << "END:" << static_cast<uint32>(event.cityId) << ":unknown";
+    }
+    
+    std::string message = ss.str();
+    
+    // Send SILENTLY to ALL online players (addon users will intercept it)
+    std::shared_lock<std::shared_mutex> lock(*HashMapHolder<Player>::GetLock());
+    HashMapHolder<Player>::MapType const& players = ObjectAccessor::GetPlayers();
+    
+    for (auto const& pair : players)
+    {
+        if (Player* player = pair.second)
+        {
+            if (player->IsInWorld())
+            {
+                // Send as CHAT_MSG_SYSTEM with CitySiege prefix (addon will filter it)
+                WorldPacket data(SMSG_MESSAGECHAT, 2000);
+                data << uint8(CHAT_MSG_SYSTEM);
+                data << uint32(LANG_UNIVERSAL);
+                data << uint64(0);
+                data << uint32(0);
+                data << uint64(player->GetGUID().GetRawValue());
+                
+                // Use tab separator that addon expects
+                std::string fullMessage = "CitySiege\t" + message;
+                data << uint32(fullMessage.length() + 1);
+                data << fullMessage;
+                data << uint8(0);
+                
+                player->GetSession()->SendPacket(&data);
+            }
+        }
+    }
+}
+
+/**
+ * @brief Sends map data (waypoints and leader position) to a player's addon
+ * @param player The player to send data to
+ * @param cityId The city ID
+ */
+void SendMapDataToPlayer(Player* player, CityId cityId)
+{
+    if (!player || cityId >= CITY_MAX)
+        return;
+        
+    const CityData& city = g_Cities[cityId];
+    Map* map = sMapMgr->FindMap(city.mapId, 0);
+    if (!map)
+        return;
+    
+    std::ostringstream ss;
+    
+    // Format: MAP_DATA:cityID:WP:count:x:y:z...:LEADER:x:y:z
+    ss << "MAP_DATA:" << static_cast<uint32>(cityId);
+    
+    // Add waypoint data
+    ss << ":WP:" << city.waypoints.size();
+    for (const auto& wp : city.waypoints)
+    {
+        ss << ":" << std::fixed << std::setprecision(2) << wp.x << ":" << wp.y << ":" << wp.z;
+    }
+    
+    // Add leader position
+    ss << ":LEADER:" << std::fixed << std::setprecision(2) 
+       << city.leaderX << ":" << city.leaderY << ":" << city.leaderZ;
+    
+    std::string message = ss.str();
+    
+    // Send as CHAT_MSG_SYSTEM with CitySiege prefix (addon will filter it)
+    WorldPacket data(SMSG_MESSAGECHAT, 2000);
+    data << uint8(CHAT_MSG_SYSTEM);
+    data << uint32(LANG_UNIVERSAL);
+    data << uint64(0);
+    data << uint32(0);
+    data << uint64(player->GetGUID().GetRawValue());
+    
+    // Use tab separator that addon expects
+    std::string fullMessage = "CitySiege\t" + message;
+    data << uint32(fullMessage.length() + 1);
+    data << fullMessage;
+    data << uint8(0);
+    
+    player->GetSession()->SendPacket(&data);
+}
+
+/**
+ * @brief Broadcasts position updates for siege participants
+ * @param event The siege event
+ * @param guid The GUID of the unit
+ * @param x X coordinate
+ * @param y Y coordinate  
+ * @param z Z coordinate
+ * @param unitType Type of unit (ATTACKER, DEFENDER, NPC)
+ */
+void BroadcastPositionUpdate(const SiegeEvent& event, ObjectGuid guid, float x, float y, float z, const std::string& unitType)
+{
+    const CityData& city = g_Cities[event.cityId];
+    Map* map = sMapMgr->FindMap(city.mapId, 0);
+    if (!map)
+        return;
+        
+    std::ostringstream ss;
+    ss << "POS:" << static_cast<uint32>(event.cityId) << ":" 
+       << guid.GetRawValue() << ":" 
+       << std::fixed << std::setprecision(2) << x << ":" << y << ":" << z 
+       << ":" << unitType;
+       
+    std::string message = ss.str();
+    std::string addonMessage = "CITYSIEGE_" + message;
+    
+    // Send to ALL online players with addon (no distance restriction)
+    std::shared_lock<std::shared_mutex> lock(*HashMapHolder<Player>::GetLock());
+    HashMapHolder<Player>::MapType const& players = ObjectAccessor::GetPlayers();
+    
+    for (auto const& pair : players)
+    {
+        if (Player* player = pair.second)
+        {
+            if (player->IsInWorld())
+            {
+                ChatHandler(player->GetSession()).PSendSysMessage(addonMessage.c_str());
+            }
+        }
     }
 }
 
@@ -1212,7 +1412,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
     }
     
     // Get all playerbots from RandomPlayerbotMgr
-    auto allBots = sRandomPlayerbotMgr->GetAllBots();
+    auto allBots = sRandomPlayerbotMgr.GetAllBots();
     std::vector<Player*> eligibleBots;
     
     uint32 totalBots = 0, wrongFaction = 0, tooLowLevel = 0, notAlive = 0, inCombat = 0, inInstance = 0;
@@ -1300,7 +1500,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
         returnPos.wasPvPFlagged = bot->IsPvP(); // Store original PvP status
         
         // Check for and store RPG strategy
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
         if (botAI)
         {
             // Check for "rpg" or "new rpg" strategy
@@ -1384,7 +1584,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
     }
     
     // Get all playerbots from RandomPlayerbotMgr
-    auto allBots = sRandomPlayerbotMgr->GetAllBots();
+    auto allBots = sRandomPlayerbotMgr.GetAllBots();
     std::vector<Player*> eligibleBots;
     
     uint32 totalBots = 0, wrongFaction = 0, tooLowLevel = 0, notAlive = 0, inCombat = 0, inInstance = 0;
@@ -1471,7 +1671,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
         returnPos.wasPvPFlagged = bot->IsPvP(); // Store original PvP status
         
         // Check for and store RPG strategy
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
         if (botAI)
         {
             // Check for "rpg" or "new rpg" strategy
@@ -1567,7 +1767,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             if (!bot || !bot->IsInWorld())
                 continue;
                 
-            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
             if (!botAI)
                 continue;
             
@@ -1632,7 +1832,7 @@ void ActivatePlayerbotsForSiege(SiegeEvent& event)
             if (!bot || !bot->IsInWorld())
                 continue;
                 
-            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
             if (!botAI)
                 continue;
             
@@ -1751,7 +1951,7 @@ void DeactivatePlayerbotsFromSiege(SiegeEvent& event)
         // Restore RPG strategy if bot had one
         if (!returnPos.rpgStrategy.empty())
         {
-            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
             if (botAI)
             {
                 botAI->ChangeStrategy("+" + returnPos.rpgStrategy, BOT_STATE_NON_COMBAT);
@@ -1856,6 +2056,7 @@ void StartSiegeEvent(int targetCityId = -1)
     newEvent.countdown25Announced = false;
     newEvent.rpScriptIndex = 0; // Start RP script at first line
     newEvent.weatherOverridden = false; // Initialize weather override flag
+    newEvent.lastAddonBroadcast = 0; // Initialize addon broadcast timer
     
     // First, find and store the city leader's GUID and name
     Map* map = sMapMgr->FindMap(city->mapId, 0);
@@ -1979,6 +2180,9 @@ void StartSiegeEvent(int targetCityId = -1)
     sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, preAnnounce);
 
     g_ActiveSieges.push_back(newEvent);
+
+    // Broadcast siege start to addons
+    BroadcastSiegeDataToAddon(g_ActiveSieges.back(), "START");
 
     // Set siege weather during RP phase
     SetSiegeWeather(*city, g_ActiveSieges.back());
@@ -2105,6 +2309,9 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
 
     DespawnSiegeCreatures(event);
     AnnounceSiege(city, false);
+    
+    // Broadcast siege end to addons
+    BroadcastSiegeDataToAddon(event, "END");
 
     // Restore original weather
     RestoreSiegeWeather(city, event);
@@ -2568,7 +2775,7 @@ void ProcessBotRespawns(SiegeEvent& event)
             bot->TeleportTo(city.mapId, respawnX, respawnY, desiredZ, 0.0f);
 
             // Reinitialize waypoint/travel progress depending on defender/attacker
-            PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+            PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
             if (it->isDefender)
             {
                 if (!city.waypoints.empty())
@@ -2661,7 +2868,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         uint32 currentWP = wpIter->second;
         
         // Always ensure bot has an active travel target if not at final destination
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
         if (botAI)
         {
             TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
@@ -2724,7 +2931,7 @@ void UpdateBotWaypointMovement(SiegeEvent& event)
         uint32 currentWP = wpIter->second;
         
         // Always ensure bot has an active travel target if not at final destination
-        PlayerbotAI* botAI = sPlayerbotsMgr->GetPlayerbotAI(bot);
+        PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
         if (botAI)
         {
             TravelTarget* travelTarget = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
@@ -2786,6 +2993,13 @@ void UpdateSiegeEvents(uint32 /*diff*/)
         if (!event.isActive)
         {
             continue;
+        }
+
+        // Broadcast addon updates every 30 seconds (SILENTLY in background)
+        if ((currentTime - event.lastAddonBroadcast) >= 30)
+        {
+            event.lastAddonBroadcast = currentTime;
+            BroadcastSiegeDataToAddon(event, "UPDATE");
         }
 
         // Countdown announcements during cinematic phase (percentage-based)
@@ -3912,6 +4126,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             }
             
             sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, statusMsg);
+            
+            // Broadcast siege update to addons
+            BroadcastSiegeDataToAddon(event, "UPDATE");
         }
 
         // Check if city leader is dead (attackers win)
@@ -4098,7 +4315,9 @@ public:
             { "waypoints",    HandleCitySiegeWaypointsCommand,    SEC_GAMEMASTER, Console::No },
             { "distance",     HandleCitySiegeDistanceCommand,     SEC_GAMEMASTER, Console::No },
             { "info",         HandleCitySiegeInfoCommand,         SEC_GAMEMASTER, Console::No },
-            { "reload",       HandleCitySiegeReloadCommand,       SEC_ADMINISTRATOR, Console::No }
+            { "reload",       HandleCitySiegeReloadCommand,       SEC_ADMINISTRATOR, Console::No },
+            { "sync",         HandleCitySiegeSyncCommand,         SEC_PLAYER, Console::No },
+            { "mapdata",      HandleCitySiegeMapDataCommand,      SEC_PLAYER, Console::No }
         };
 
         static ChatCommandTable commandTable =
@@ -4968,6 +5187,84 @@ public:
         {
             LOG_INFO("module", "[City Siege] Configuration reloaded by {}", handler->GetSession()->GetPlayerName());
         }
+        
+        return true;
+    }
+
+    static bool HandleCitySiegeSyncCommand(ChatHandler* handler, Optional<uint32> cityIdArg)
+    {
+        Player* player = handler->GetSession()->GetPlayer();
+        if (!player)
+        {
+            return false;
+        }
+
+        // If no city ID provided, broadcast all active sieges
+        if (!cityIdArg)
+        {
+            for (auto& event : g_ActiveSieges)
+            {
+                if (event.isActive)
+                {
+                    BroadcastSiegeDataToAddon(event, "UPDATE");
+                }
+            }
+            return true;
+        }
+
+        uint32 cityId = *cityIdArg;
+        if (cityId >= CITY_MAX)
+        {
+            return true;
+        }
+
+        // Find and broadcast data for specific city
+        for (auto& event : g_ActiveSieges)
+        {
+            if (event.isActive && event.cityId == static_cast<int>(cityId))
+            {
+                BroadcastSiegeDataToAddon(event, "UPDATE");
+                return true;
+            }
+        }
+
+        // City not under siege - send empty/end status
+        WorldPacket data(SMSG_MESSAGECHAT, 200);
+        data << uint8(CHAT_MSG_SYSTEM);
+        data << uint32(LANG_UNIVERSAL);
+        data << uint64(0);
+        data << uint32(0);
+        data << uint64(0);
+        data << uint32(0);
+        
+        return true;
+    }
+    
+    static bool HandleCitySiegeMapDataCommand(ChatHandler* handler, Optional<uint32> cityIdArg)
+    {
+        Player* player = handler->GetSession()->GetPlayer();
+        if (!player)
+        {
+            return false;
+        }
+
+        // If no city ID provided, return error
+        if (!cityIdArg)
+        {
+            handler->PSendSysMessage("Usage: .citysiege mapdata <cityID>");
+            handler->PSendSysMessage("City IDs: 0=Stormwind, 1=Ironforge, 2=Darnassus, 3=Exodar, 4=Orgrimmar, 5=Undercity, 6=ThunderBluff, 7=Silvermoon");
+            return true;
+        }
+
+        uint32 cityId = *cityIdArg;
+        if (cityId >= CITY_MAX)
+        {
+            handler->PSendSysMessage("Invalid city ID. Must be 0-7.");
+            return true;
+        }
+
+        // Send map data to the player's addon
+        SendMapDataToPlayer(player, static_cast<CityId>(cityId));
         
         return true;
     }
