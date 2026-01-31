@@ -44,9 +44,6 @@ function Core:OnInitialize()
     if CitySiege_MinimapButton then
         CitySiege_MinimapButton:Initialize()
     end
-    
-    -- Print welcome message
-    CitySiege_Utils:Print("Addon loaded! Type |cFFFFFF00/cs|r or |cFFFFFF00/citysiege|r for commands.")
 end
 
 function Core:OnEnable()
@@ -63,10 +60,18 @@ function Core:OnEnable()
         RegisterAddonMessagePrefix("CitySiege")
     end
     
-    -- Add chat filter to hide CitySiege messages
+    -- Add comprehensive chat filter to hide ALL CitySiege-related messages
     ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", function(self, event, message, ...)
-        if message and (string.find(message, "CitySiege") or string.find(message, "UPDATE:") or string.find(message, "START:") or string.find(message, "MAP_DATA:")) then
-            return true -- Filter it out (hide it)
+        if message then
+            -- Filter out any message containing CitySiege data markers
+            if string.find(message, "CitySiege") or 
+               string.find(message, "UPDATE:") or 
+               string.find(message, "START:") or 
+               string.find(message, "END:") or
+               string.find(message, "MAP_DATA:") or
+               string.find(message, "POS:") then
+                return true -- Filter it out (hide it)
+            end
         end
         return false -- Show it
     end)

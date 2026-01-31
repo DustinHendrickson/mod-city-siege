@@ -4321,9 +4321,7 @@ public:
             { "waypoints",    HandleCitySiegeWaypointsCommand,    SEC_GAMEMASTER, Console::No },
             { "distance",     HandleCitySiegeDistanceCommand,     SEC_GAMEMASTER, Console::No },
             { "info",         HandleCitySiegeInfoCommand,         SEC_GAMEMASTER, Console::No },
-            { "reload",       HandleCitySiegeReloadCommand,       SEC_ADMINISTRATOR, Console::No },
-            { "sync",         HandleCitySiegeSyncCommand,         SEC_PLAYER, Console::No },
-            { "mapdata",      HandleCitySiegeMapDataCommand,      SEC_PLAYER, Console::No }
+            { "reload",       HandleCitySiegeReloadCommand,       SEC_ADMINISTRATOR, Console::No }
         };
 
         static ChatCommandTable commandTable =

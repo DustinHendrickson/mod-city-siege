@@ -38,12 +38,12 @@ function SettingsPanel:Create()
     closeBtn:SetPoint("TOPRIGHT", -5, -5)
     closeBtn:SetScript("OnClick", function() frame:Hide() end)
     
-    -- Scroll frame for settings
-    local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+    -- Scroll frame for settings (must have a name in 3.3.5)
+    local scrollFrame = CreateFrame("ScrollFrame", "CitySiegeSettingsScrollFrame", frame, "UIPanelScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", 10, -50)
     scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
     
-    local content = CreateFrame("Frame", nil, scrollFrame)
+    local content = CreateFrame("Frame", "CitySiegeSettingsScrollChild", scrollFrame)
     content:SetSize(450, 1200)
     scrollFrame:SetScrollChild(content)
     
@@ -201,7 +201,13 @@ end
 function SettingsPanel:AddCheckbox(parent, text, yOffset, onClick)
     local checkbox = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
     checkbox:SetPoint("TOPLEFT", 20, yOffset)
-    checkbox.text:SetText(text)
+    
+    -- Get or create the text label (3.3.5 compatible)
+    local label = checkbox:GetFontString() or checkbox:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    label:SetPoint("LEFT", checkbox, "RIGHT", 5, 0)
+    label:SetText(text)
+    checkbox.text = label
+    
     checkbox:SetScript("OnClick", function(self)
         onClick(self:GetChecked())
     end)
@@ -209,23 +215,45 @@ function SettingsPanel:AddCheckbox(parent, text, yOffset, onClick)
 end
 
 function SettingsPanel:AddSlider(parent, text, yOffset, minVal, maxVal, step, onChange)
-    local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
+    -- Generate unique name for slider (required in 3.3.5)
+    local sliderName = "CitySiegeSlider" .. math.random(1, 100000)
+    local slider = CreateFrame("Slider", sliderName, parent, "OptionsSliderTemplate")
     slider:SetPoint("TOPLEFT", 20, yOffset)
     slider:SetMinMaxValues(minVal, maxVal)
     slider:SetValueStep(step)
     slider:SetWidth(400)
-    slider:SetObeyStepOnDrag(true)
     
-    slider.Text:SetText(text)
-    slider.Low:SetText(minVal)
-    slider.High:SetText(maxVal)
+    -- SetObeyStepOnDrag may not exist in 3.3.5
+    if slider.SetObeyStepOnDrag then
+        slider:SetObeyStepOnDrag(true)
+    end
     
-    slider.Value = slider:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    slider.Value:SetPoint("TOP", slider, "BOTTOM", 0, 0)
+    -- Get or create text elements (3.3.5 compatible)
+    local titleText = _G[sliderName .. "Text"] or slider:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    if not _G[sliderName .. "Text"] then
+        titleText:SetPoint("BOTTOM", slider, "TOP", 0, 2)
+    end
+    titleText:SetText(text)
+    
+    local lowText = _G[sliderName .. "Low"] or slider:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    if not _G[sliderName .. "Low"] then
+        lowText:SetPoint("TOPLEFT", slider, "BOTTOMLEFT", 0, -2)
+    end
+    lowText:SetText(minVal)
+    
+    local highText = _G[sliderName .. "High"] or slider:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    if not _G[sliderName .. "High"] then
+        highText:SetPoint("TOPRIGHT", slider, "BOTTOMRIGHT", 0, -2)
+    end
+    highText:SetText(maxVal)
+    
+    -- Create value display
+    slider.valueText = slider:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    slider.valueText:SetPoint("TOP", slider, "BOTTOM", 0, -18)
     
     slider:SetScript("OnValueChanged", function(self, value)
         value = math.floor(value * 10 + 0.5) / 10 -- Round to 1 decimal
-        self.Value:SetText(string.format("%.1f", value))
+        self.valueText:SetText(string.format("%.1f", value))
         onChange(value)
     end)
     
