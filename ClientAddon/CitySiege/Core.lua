@@ -58,8 +58,10 @@ function Core:OnEnable()
     self:RegisterEvent("PLAYER_REGEN_DISABLED") -- Enter combat
     self:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Leave combat
     
-    -- Register addon message prefix
-    RegisterAddonMessagePrefix("CitySiege")
+    -- Register addon message prefix (3.3.5 compatible)
+    if RegisterAddonMessagePrefix then
+        RegisterAddonMessagePrefix("CitySiege")
+    end
     
     -- Add chat filter to hide CitySiege messages
     ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", function(self, event, message, ...)

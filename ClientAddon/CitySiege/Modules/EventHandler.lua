@@ -7,8 +7,10 @@ CitySiege_EventHandler = {}
 local EventHandler = CitySiege_EventHandler
 
 function EventHandler:Initialize()
-    -- Register for addon communication
-    RegisterAddonMessagePrefix("CitySiege")
+    -- Register for addon communication (3.3.5 compatible)
+    if RegisterAddonMessagePrefix then
+        RegisterAddonMessagePrefix("CitySiege")
+    end
     
     -- Note: CHAT_MSG_SYSTEM is handled by Core.lua which calls EventHandler:OnChatMessage
     
@@ -408,5 +410,11 @@ function EventHandler:SendToServer(command, ...)
         message = message .. ":" .. tostring(arg)
     end
     
-    SendAddonMessage("CitySiege", message, "GUILD")
+    -- SendAddonMessage doesn't exist in 3.3.5, use chat commands instead
+    if SendAddonMessage then
+        SendAddonMessage("CitySiege", message, "GUILD")
+    else
+        -- Fallback: Use chat command (server should handle this)
+        SendChatMessage(".citysiege " .. message, "GUILD")
+    end
 end

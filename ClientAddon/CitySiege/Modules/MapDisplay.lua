@@ -65,11 +65,11 @@ function MapDisplay:Create(parent)
     overlay:Show()
     frame.overlay = overlay
     
-    -- Legend
+    -- Legend - spans across the bottom
     local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    legend:SetPoint("BOTTOMLEFT", 20, 15)
-    legend:SetJustifyH("LEFT")
-    legend:SetText("|cFF0088FFBlue|r = Defenders  |cFFFF0000Red|r = Attackers")
+    legend:SetPoint("BOTTOM", frame, "BOTTOM", 0, 15)
+    legend:SetJustifyH("CENTER")
+    legend:SetText("|TInterface\\TargetingFrame\\UI-RaidTargetingIcons:16:16:0:0:64:64:48:64:16:32|t Leader     |TInterface\\TargetingFrame\\UI-RaidTargetingIcons:14:14:0:0:64:64:0:16:16:32|t Waypoint     |TInterface\\TargetingFrame\\UI-RaidTargetingIcons:14:14:0:0:64:64:32:48:16:32|t Spawn Point")
     legend:Show()
     frame.legend = legend
     
@@ -246,11 +246,6 @@ function MapDisplay:UpdateDisplay()
     
     local mapSettings = CitySiege_Config:GetMapSettings()
     
-    -- Show/update player positions
-    if mapSettings.showPlayers then
-        self:UpdatePlayerPositions(siegeData)
-    end
-    
     -- Show/update NPC positions
     if mapSettings.showNPCs then
         self:UpdateNPCPositions(siegeData)
@@ -268,51 +263,14 @@ end
 function MapDisplay:DrawCityCenter(cityData)
     if not cityData then return end
     
-    -- Draw city center marker (skull icon - objective)
-    local centerIcon = self:GetOrCreateIcon("city_center", "CITY")
-    if centerIcon then
-        self:PositionIcon(centerIcon, cityData.centerX, cityData.centerY, cityData)
-        centerIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_8") -- Skull icon
-        centerIcon:SetSize(16, 16) -- Larger for city center
-        centerIcon:Show()
-    end
-    
     -- Draw spawn point marker (green square - attacker spawn)
     local spawnIcon = self:GetOrCreateIcon("spawn_point", "SPAWN")
     if spawnIcon then
         self:PositionIcon(spawnIcon, cityData.spawnX, cityData.spawnY, cityData)
-        spawnIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_7") -- Green square
-        spawnIcon:SetSize(14, 14)
+        spawnIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+        spawnIcon:SetTexCoord(0.5, 0.75, 0.25, 0.5) -- Green Square (icon 7)
+        spawnIcon:SetSize(16, 16)
         spawnIcon:Show()
-    end
-end
-
-function MapDisplay:UpdatePlayerPositions(siegeData)
-    if not siegeData then return end
-    
-    local cityData = CitySiege_CityData[currentCityID]
-    if not cityData then return end
-    
-    -- Show attackers
-    if siegeData.attackers then
-        for guid, playerData in pairs(siegeData.attackers) do
-            if playerData.x and playerData.y then
-                local icon = self:GetOrCreateIcon(guid, "PLAYER_ATTACKER")
-                self:PositionIcon(icon, playerData.x, playerData.y, cityData)
-                icon:SetTexture(1, 0, 0, 0.8) -- Red for attackers
-            end
-        end
-    end
-    
-    -- Show defenders
-    if siegeData.defenders then
-        for guid, playerData in pairs(siegeData.defenders) do
-            if playerData.x and playerData.y then
-                local icon = self:GetOrCreateIcon(guid, "PLAYER_DEFENDER")
-                self:PositionIcon(icon, playerData.x, playerData.y, cityData)
-                icon:SetTexture(0, 0.5, 1, 0.8) -- Blue for defenders
-            end
-        end
     end
 end
 
@@ -330,53 +288,57 @@ function MapDisplay:UpdateNPCPositions(siegeData)
         end
     end
     
-    -- Draw attacker NPC positions (red)
+    -- Draw attacker NPC positions (red circles - raid icon 3)
     if siegeData.attackerPositions then
         for i, pos in ipairs(siegeData.attackerPositions) do
             if pos.x and pos.y then
                 local icon = self:GetOrCreateIcon("npc_atk_" .. i, "NPC_ATTACKER")
                 self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetTexture(1, 0, 0, 0.9) -- Red
-                icon:SetSize(8, 8)
+                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+                icon:SetTexCoord(0, 0.25, 0, 0.25) -- Red Circle (icon 3)
+                icon:SetSize(10, 10)
                 icon:Show()
             end
         end
     end
     
-    -- Draw defender NPC positions (blue)
+    -- Draw defender NPC positions (blue circles - raid icon 2)
     if siegeData.defenderPositions then
         for i, pos in ipairs(siegeData.defenderPositions) do
             if pos.x and pos.y then
                 local icon = self:GetOrCreateIcon("npc_def_" .. i, "NPC_DEFENDER")
                 self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetTexture(0, 0.5, 1, 0.9) -- Blue
+                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+                icon:SetTexCoord(0.25, 0.5, 0, 0.25) -- Blue Circle (icon 2)
+                icon:SetSize(10, 10)
+                icon:Show()
+            end
+        end
+    end
+    
+    -- Draw attacker bot positions (orange diamonds - raid icon 4)
+    if siegeData.attackerBots then
+        for i, pos in ipairs(siegeData.attackerBots) do
+            if pos.x and pos.y then
+                local icon = self:GetOrCreateIcon("bot_atk_" .. i, "BOT_ATTACKER")
+                self:PositionIcon(icon, pos.x, pos.y, cityData)
+                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+                icon:SetTexCoord(0.5, 0.75, 0, 0.25) -- Orange Diamond (icon 4)
                 icon:SetSize(8, 8)
                 icon:Show()
             end
         end
     end
     
-    -- Draw attacker bot positions (orange)
-    if siegeData.attackerBots then
-        for i, pos in ipairs(siegeData.attackerBots) do
-            if pos.x and pos.y then
-                local icon = self:GetOrCreateIcon("bot_atk_" .. i, "BOT_ATTACKER")
-                self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetTexture(1, 0.5, 0, 0.9) -- Orange
-                icon:SetSize(6, 6)
-                icon:Show()
-            end
-        end
-    end
-    
-    -- Draw defender bot positions (cyan)
+    -- Draw defender bot positions (purple diamonds - raid icon 1)
     if siegeData.defenderBots then
         for i, pos in ipairs(siegeData.defenderBots) do
             if pos.x and pos.y then
                 local icon = self:GetOrCreateIcon("bot_def_" .. i, "BOT_DEFENDER")
                 self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetTexture(0, 1, 1, 0.9) -- Cyan
-                icon:SetSize(6, 6)
+                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+                icon:SetTexCoord(0.75, 1, 0, 0.25) -- Purple Diamond (icon 1)
+                icon:SetSize(8, 8)
                 icon:Show()
             end
         end
@@ -388,15 +350,18 @@ function MapDisplay:UpdateNPCPositions(siegeData)
             if npcData.x and npcData.y then
                 local icon = self:GetOrCreateIcon(guid, "NPC")
                 self:PositionIcon(icon, npcData.x, npcData.y, cityData)
+                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
                 
-                -- Color based on side
+                -- Use raid icons based on side
                 if npcData.side == "attacker" then
-                    icon:SetTexture(1, 0.5, 0, 0.9) -- Orange
+                    icon:SetTexCoord(0, 0.25, 0, 0.25) -- Red Circle
                 elseif npcData.side == "defender" then
-                    icon:SetTexture(0, 1, 0, 0.9) -- Green
+                    icon:SetTexCoord(0.25, 0.5, 0, 0.25) -- Blue Circle
                 else
-                    icon:SetTexture(1, 1, 0, 0.9) -- Yellow
+                    icon:SetTexCoord(0.5, 0.75, 0, 0.25) -- Orange Diamond
                 end
+                icon:SetSize(10, 10)
+                icon:Show()
             end
         end
     end
@@ -418,13 +383,14 @@ function MapDisplay:UpdateWaypoints(siegeData)
         end
     end
     
-    -- Draw waypoint markers
+    -- Draw waypoint markers (red square raid icons)
     for i, wp in ipairs(siegeData.waypoints) do
         if wp.x and wp.y then
             local icon = self:GetOrCreateIcon("waypoint_" .. i, "WAYPOINT")
             self:PositionIcon(icon, wp.x, wp.y, cityData)
-            icon:SetTexture(1, 1, 0, 0.9) -- Yellow waypoints
-            icon:SetSize(6, 6) -- Smaller for waypoints
+            icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+            icon:SetTexCoord(0, 0.25, 0.25, 0.5) -- Red Square (icon 6)
+            icon:SetSize(12, 12)
             icon:Show()
         end
     end
@@ -437,11 +403,12 @@ function MapDisplay:GetOrCreateIcon(id, iconType)
     
     local icon = frame.overlay:CreateTexture(nil, "OVERLAY")
     
-    -- Use simple colored texture instead of complex icons
-    icon:SetTexture("Interface\\Buttons\\WHITE8X8")
+    -- Icons will have their texture set by the calling code
+    -- Default to raid targeting icons
+    icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
     
     local scale = CitySiege_Config:GetMapSettings().iconScale or 1.0
-    icon:SetSize(8 * scale, 8 * scale)
+    icon:SetSize(10 * scale, 10 * scale)
     
     icons[id] = icon
     return icon
@@ -461,6 +428,7 @@ function MapDisplay:PositionIcon(icon, worldX, worldY, cityData)
         return
     end
     
+    -- Position icons on the full overlay to match WoW map scaling
     local pixelX = mapX * overlayWidth
     local pixelY = (1 - mapY) * overlayHeight
     
@@ -472,34 +440,45 @@ end
 function MapDisplay:WorldToMap(worldX, worldY, cityData)
     if not cityData then return 0.5, 0.5 end
     
-    -- Calculate map bounds based on spawn and center points
-    local centerX = cityData.centerX
-    local centerY = cityData.centerY
+    -- Get center and spawn coordinates
+    local originalCenterX = cityData.centerX
+    local originalCenterY = cityData.centerY
     local spawnX = cityData.spawnX
     local spawnY = cityData.spawnY
     
-    -- Calculate the distance from spawn to center to estimate map size
-    local dx = spawnX - centerX
-    local dy = spawnY - centerY
+    -- Calculate map range using original center (before offsets)
+    local dx = spawnX - originalCenterX
+    local dy = spawnY - originalCenterY
     local spawnDist = math.sqrt(dx * dx + dy * dy)
-    
-    -- Use 1.5x the spawn distance as the map range (gives some padding)
-    local mapRange = spawnDist * 1.5
-    
-    -- Prevent divide by zero
+    local mapRange = spawnDist * 1.75
     if mapRange < 50 then mapRange = 500 end
+    
+    -- Now apply center offsets for positioning
+    local centerX = originalCenterX
+    local centerY = originalCenterY
     
     -- Convert world coordinates to relative positions from center
     local relX = (worldX - centerX) / mapRange
     local relY = (worldY - centerY) / mapRange
     
-    -- Normalize to 0-1 range with center at 0.5
-    local mapX = 0.5 + (relX * 0.45)  -- 0.45 gives 90% of map width
-    local mapY = 0.5 + (relY * 0.45)  -- 0.45 gives 90% of map height
+    -- Rotate 90 degrees counter-clockwise:
+    -- Counter-clockwise 90°: newX = -Y, newY = X
+    -- Then apply offset adjustments for proper WoW map alignment
+    local mapX = 0.5 - (relY * 0.35) + 0.05   -- Y becomes X, inverted, shift right
+    local mapY = 0.5 - (relX * 0.35) + 0.25   -- X becomes Y, inverted, shift down
     
-    -- Clamp to map bounds
-    mapX = math.max(0.05, math.min(0.95, mapX))
-    mapY = math.max(0.05, math.min(0.95, mapY))
+    -- Display shift offsets (shift all icons on the final display)
+    -- Positive X moves right, negative X moves left
+    -- Positive Y moves up, negative Y moves down
+    local displayOffsetX = 0.12   -- Adjust this to shift all icons horizontally (0.1 = 10% of screen)
+    local displayOffsetY = 0.04   -- Adjust this to shift all icons vertically (0.1 = 10% of screen)
+    
+    mapX = mapX + displayOffsetX
+    mapY = mapY - displayOffsetY  -- Negative Y moves icons down in this inverted system
+    
+    -- Use full 0-1 range for proper positioning within cropped texture
+    mapX = math.max(0, math.min(1, mapX))
+    mapY = math.max(0, math.min(1, mapY))
     
     return mapX, mapY
 end
@@ -517,6 +496,7 @@ function MapDisplay:DrawLine(x1, y1, x2, y2, cityData)
     if not overlayWidth or overlayWidth <= 0 then return end
     if not overlayHeight or overlayHeight <= 0 then return end
     
+    -- Position lines on the full overlay to match WoW map scaling
     local pixelX1 = mapX1 * overlayWidth
     local pixelY1 = (1 - mapY1) * overlayHeight
     local pixelX2 = mapX2 * overlayWidth
@@ -556,11 +536,12 @@ function MapDisplay:UpdateStats(siegeData)
     
     local stats = siegeData.stats
     local text = string.format(
-        "Attackers: %d  Defenders: %d\nKills: %d/%d",
-        siegeData.attackerCount or 0,
-        siegeData.defenderCount or 0,
-        stats.attackerKills or 0,
-        stats.defenderKills or 0
+        "NPCs: %d  Bots: %d\nWaypoints: %d",
+        (siegeData.defenderPositions and #siegeData.defenderPositions or 0) + 
+        (siegeData.attackerPositions and #siegeData.attackerPositions or 0),
+        (siegeData.defenderBots and #siegeData.defenderBots or 0) + 
+        (siegeData.attackerBots and #siegeData.attackerBots or 0),
+        siegeData.waypoints and #siegeData.waypoints or 0
     )
     
     frame.statsText:SetText(text)
@@ -649,15 +630,17 @@ end
 
 function MapDisplay:CreateIcon(x, y, z, iconType, index)
     local icon = frame.overlay:CreateTexture(nil, "OVERLAY")
-    icon:SetSize(16, 16)
-
+    
+    -- Use raid target icons for better visibility
+    icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
+    
     -- Different icons for different types
     if iconType == "waypoint" then
-        icon:SetTexture("Interface\\MINIMAP\\POIIcons")
-        icon:SetTexCoord(0.5, 0.625, 0.5, 0.625)  -- Star icon
+        icon:SetTexCoord(0, 0.25, 0.25, 0.5) -- Red Square (icon 6)
+        icon:SetSize(12, 12)
     elseif iconType == "leader" then
-        icon:SetTexture("Interface\\MINIMAP\\POIIcons")
-        icon:SetTexCoord(0.625, 0.75, 0, 0.125)  -- Skull icon
+        icon:SetTexCoord(0.75, 1, 0.25, 0.5) -- Skull (icon 8)
+        icon:SetSize(20, 20)
     end
 
     -- Use PositionIcon helper to convert world coords to overlay pixels

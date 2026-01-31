@@ -259,8 +259,9 @@ function MainFrame:CreateTabContent()
         end)
         
         if success then
-            mapDisplay = result
-            print("CitySiege MainFrame: MapDisplay created successfully, result: " .. tostring(mapDisplay))
+            -- Store reference to the module, not just the frame
+            mapDisplay = CitySiege_MapDisplay
+            print("CitySiege MainFrame: MapDisplay created successfully, result: " .. tostring(result))
         else
             print("CitySiege MainFrame: ERROR creating MapDisplay: " .. tostring(result))
         end

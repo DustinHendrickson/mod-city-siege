@@ -1412,7 +1412,7 @@ std::vector<ObjectGuid> RecruitDefendingPlayerbots(CityData const& city, SiegeEv
     }
     
     // Get all playerbots from RandomPlayerbotMgr
-    auto allBots = sRandomPlayerbotMgr->GetAllBots();
+    auto allBots = sRandomPlayerbotMgr.GetAllBots();
     std::vector<Player*> eligibleBots;
     
     uint32 totalBots = 0, wrongFaction = 0, tooLowLevel = 0, notAlive = 0, inCombat = 0, inInstance = 0;
@@ -1584,7 +1584,7 @@ std::vector<ObjectGuid> RecruitAttackingPlayerbots(CityData const& city, SiegeEv
     }
     
     // Get all playerbots from RandomPlayerbotMgr
-    auto allBots = sRandomPlayerbotMgr->GetAllBots();
+    auto allBots = sRandomPlayerbotMgr.GetAllBots();
     std::vector<Player*> eligibleBots;
     
     uint32 totalBots = 0, wrongFaction = 0, tooLowLevel = 0, notAlive = 0, inCombat = 0, inInstance = 0;
