@@ -41,6 +41,7 @@
 #include "WeatherMgr.h"
 #include "MiscPackets.h"
 #include <vector>
+#include <array>
 #include <unordered_map>
 #include <string>
 #include <cmath>
@@ -360,6 +361,115 @@ static std::unordered_map<uint32, std::vector<ObjectGuid>> g_WaypointVisualizati
 
 // Forward declarations
 void DistributeRewards(const SiegeEvent& event, const CityData& city, int winningTeam = -1);
+void RestoreSiegeWeather(const CityData& city, SiegeEvent& event);
+void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messageType,
+    const std::string& winner = "unknown");
+void DespawnSiegeCreatures(SiegeEvent& event);
+void DeactivatePlayerbotsFromSiege(SiegeEvent& event);
+
+bool IsAllianceCity(CityId cityId)
+{
+    return cityId <= CITY_EXODAR;
+}
+
+bool IsPlayerInAnnounceScope(Player* player, const CityData& city)
+{
+    return player && (g_AnnounceRadius == 0 ||
+        player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius);
+}
+
+std::string GetTeamName(int teamId)
+{
+    switch (teamId)
+    {
+        case 0:
+            return "Alliance";
+        case 1:
+            return "Horde";
+        default:
+            return "unknown";
+    }
+}
+
+void SendAddonMessageToPlayer(Player* player, const std::string& message)
+{
+    if (!player || !player->IsInWorld())
+        return;
+
+    WorldPacket data(SMSG_MESSAGECHAT, 2000);
+    data << uint8(CHAT_MSG_SYSTEM);
+    data << uint32(LANG_UNIVERSAL);
+    data << uint64(0);
+    data << uint32(0);
+    data << uint64(player->GetGUID().GetRawValue());
+
+    std::string fullMessage = "CitySiege\t" + message;
+    data << uint32(fullMessage.length() + 1);
+    data << fullMessage;
+    data << uint8(0);
+
+    player->GetSession()->SendPacket(&data);
+}
+
+void RespawnCityLeaderIfNeeded(const CityData& city, const SiegeEvent& event)
+{
+    Map* map = sMapMgr->FindMap(city.mapId, 0);
+    if (!map)
+        return;
+
+    Creature* existingLeader = nullptr;
+    if (event.cityLeaderGuid)
+        existingLeader = map->GetCreature(event.cityLeaderGuid);
+
+    if (!existingLeader)
+    {
+        std::list<Creature*> leaderList;
+        CitySiege::CreatureEntryCheck check(city.targetLeaderEntry);
+        CitySiege::SimpleCreatureListSearcher<CitySiege::CreatureEntryCheck> searcher(leaderList, check);
+        Cell::VisitObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
+
+        for (Creature* leader : leaderList)
+        {
+            if (leader)
+            {
+                existingLeader = leader;
+                break;
+            }
+        }
+    }
+
+    if (existingLeader && !existingLeader->IsAlive())
+    {
+        existingLeader->Respawn();
+
+        if (g_DebugMode)
+        {
+            LOG_INFO("server.loading", "[City Siege] Respawned city leader {} (entry {})",
+                     existingLeader->GetName(), city.targetLeaderEntry);
+        }
+    }
+}
+
+void FinalizeSiegeCleanup(SiegeEvent& event, const std::string& winnerForAddon,
+    bool respawnLeader = true)
+{
+    const CityData& city = g_Cities[event.cityId];
+
+    event.isActive = false;
+    DespawnSiegeCreatures(event);
+    BroadcastSiegeDataToAddon(event, "END", winnerForAddon);
+    RestoreSiegeWeather(city, event);
+
+    if (respawnLeader)
+        RespawnCityLeaderIfNeeded(city, event);
+
+    DeactivatePlayerbotsFromSiege(event);
+
+    event.creatureWaypointProgress.clear();
+    event.deadCreatures.clear();
+    event.deadBots.clear();
+    event.activeRPScript.clear();
+}
 
 /**
  * @brief Sets siege weather for a city during RP phase
@@ -762,24 +872,28 @@ void AnnounceSiege(const CityData& city, bool isStart)
 }
 
 /**
- * @brief Broadcasts siege data to clients via addon messages
- * @param event The siege event to broadcast
- * @param messageType Type of message (START, UPDATE, END, POSITION)
+ * @brief Sends siege data to a specific player's addon.
+ * @param player The target player.
+ * @param event The siege event to serialize.
+ * @param messageType Type of message (START, UPDATE, END).
+ * @param winner Winner identifier for END messages.
  */
-void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messageType)
+void SendSiegeDataToPlayer(Player* player, const SiegeEvent& event,
+    const std::string& messageType, const std::string& winner = "unknown")
 {
+    if (!player)
+        return;
+
     const CityData& city = g_Cities[event.cityId];
     Map* map = sMapMgr->FindMap(city.mapId, 0);
     if (!map)
         return;
 
     std::ostringstream ss;
-    
+
     if (messageType == "START")
     {
-        // Format: START:cityId:faction:spawnX:spawnY:spawnZ:leaderX:leaderY:leaderZ:centerX:centerY:centerZ
-        bool isAllianceCity = (event.cityId <= CITY_EXODAR);
-        std::string attackingFaction = isAllianceCity ? "Horde" : "Alliance";
+        std::string attackingFaction = IsAllianceCity(event.cityId) ? "Horde" : "Alliance";
         ss << "START:" << static_cast<uint32>(event.cityId) << ":" << attackingFaction
            << ":" << std::fixed << std::setprecision(2)
            << city.spawnX << ":" << city.spawnY << ":" << city.spawnZ
@@ -788,55 +902,58 @@ void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messa
     }
     else if (messageType == "UPDATE")
     {
-        // Get leader health if available
         float leaderHealthPct = 0.0f;
         if (event.cityLeaderGuid)
         {
             if (Creature* leader = map->GetCreature(event.cityLeaderGuid))
             {
                 if (leader->IsAlive())
-                {
                     leaderHealthPct = leader->GetHealthPct();
-                }
             }
         }
-        
+
         uint32 attackerCount = event.spawnedCreatures.size();
         uint32 defenderCount = event.spawnedDefenders.size();
         uint32 elapsed = time(nullptr) - event.startTime;
         uint32 remaining = event.endTime > time(nullptr) ? event.endTime - time(nullptr) : 0;
-        
-        // Determine phase
+
         uint32 phase = 1;
         if (!event.cinematicPhase)
         {
             uint32 duration = event.endTime - event.startTime;
-            if (elapsed > duration * 0.75f) phase = 4;
-            else if (elapsed > duration * 0.5f) phase = 3;
-            else if (elapsed > duration * 0.25f) phase = 2;
+            if (elapsed > duration * 0.75f)
+                phase = 4;
+            else if (elapsed > duration * 0.5f)
+                phase = 3;
+            else if (elapsed > duration * 0.25f)
+                phase = 2;
         }
-        
-        // Format: UPDATE:cityId:phase:attackers:defenders:elapsed:remaining:leaderHealth
-        ss << "UPDATE:" << static_cast<uint32>(event.cityId) << ":" << phase 
-           << ":" << attackerCount << ":" << defenderCount 
+
+        ss << "UPDATE:" << static_cast<uint32>(event.cityId) << ":" << phase
+           << ":" << attackerCount << ":" << defenderCount
            << ":" << elapsed << ":" << remaining
            << ":" << std::fixed << std::setprecision(1) << leaderHealthPct;
-        
-        // Only send waypoint data (removed NPC/player positions to reduce packet size)
+
         ss << ":WP:" << city.waypoints.size();
         for (const auto& wp : city.waypoints)
-        {
             ss << ":" << std::fixed << std::setprecision(2) << wp.x << ":" << wp.y << ":" << wp.z;
-        }
     }
     else if (messageType == "END")
     {
-        // Format: END:cityId:winner
-        ss << "END:" << static_cast<uint32>(event.cityId) << ":unknown";
+        ss << "END:" << static_cast<uint32>(event.cityId) << ":" << winner;
     }
-    
-    std::string message = ss.str();
-    
+
+    SendAddonMessageToPlayer(player, ss.str());
+}
+
+/**
+ * @brief Broadcasts siege data to clients via addon messages
+ * @param event The siege event to broadcast
+ * @param messageType Type of message (START, UPDATE, END, POSITION)
+ */
+void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messageType,
+    const std::string& winner)
+{
     // Send SILENTLY to ALL online players (addon users will intercept it)
     std::shared_lock<std::shared_mutex> lock(*HashMapHolder<Player>::GetLock());
     HashMapHolder<Player>::MapType const& players = ObjectAccessor::GetPlayers();
@@ -846,23 +963,7 @@ void BroadcastSiegeDataToAddon(const SiegeEvent& event, const std::string& messa
         if (Player* player = pair.second)
         {
             if (player->IsInWorld())
-            {
-                // Send as CHAT_MSG_SYSTEM with CitySiege prefix (addon will filter it)
-                WorldPacket data(SMSG_MESSAGECHAT, 2000);
-                data << uint8(CHAT_MSG_SYSTEM);
-                data << uint32(LANG_UNIVERSAL);
-                data << uint64(0);
-                data << uint32(0);
-                data << uint64(player->GetGUID().GetRawValue());
-                
-                // Use tab separator that addon expects
-                std::string fullMessage = "CitySiege\t" + message;
-                data << uint32(fullMessage.length() + 1);
-                data << fullMessage;
-                data << uint8(0);
-                
-                player->GetSession()->SendPacket(&data);
-            }
+                SendSiegeDataToPlayer(player, event, messageType, winner);
         }
     }
 }
@@ -898,23 +999,7 @@ void SendMapDataToPlayer(Player* player, CityId cityId)
     ss << ":LEADER:" << std::fixed << std::setprecision(2) 
        << city.leaderX << ":" << city.leaderY << ":" << city.leaderZ;
     
-    std::string message = ss.str();
-    
-    // Send as CHAT_MSG_SYSTEM with CitySiege prefix (addon will filter it)
-    WorldPacket data(SMSG_MESSAGECHAT, 2000);
-    data << uint8(CHAT_MSG_SYSTEM);
-    data << uint32(LANG_UNIVERSAL);
-    data << uint64(0);
-    data << uint32(0);
-    data << uint64(player->GetGUID().GetRawValue());
-    
-    // Use tab separator that addon expects
-    std::string fullMessage = "CitySiege\t" + message;
-    data << uint32(fullMessage.length() + 1);
-    data << fullMessage;
-    data << uint8(0);
-    
-    player->GetSession()->SendPacket(&data);
+    SendAddonMessageToPlayer(player, ss.str());
 }
 
 /**
@@ -1910,14 +1995,15 @@ void DeactivatePlayerbotsFromSiege(SiegeEvent& event)
         if (!bot || !bot->IsInWorld())
             continue;
             
-        // Safety checks before teleporting
         if (!bot->IsAlive())
         {
+            bot->ResurrectPlayer(1.0f);
+            bot->SpawnCorpseBones();
+
             if (g_DebugMode)
             {
-                LOG_INFO("server.loading", "[City Siege] Skipping return for dead bot {}", bot->GetName());
+                LOG_INFO("server.loading", "[City Siege] Resurrected bot {} before returning it from siege", bot->GetName());
             }
-            continue;
         }
         
         // Don't teleport if bot is in a dungeon, raid, arena, or battleground
@@ -2212,7 +2298,7 @@ void StartSiegeEvent(int targetCityId = -1)
             {
                 if (Player* player = itr->GetSource())
                 {
-                    if (player->GetDistance(city->centerX, city->centerY, city->centerZ) <= g_AnnounceRadius)
+                    if (IsPlayerInAnnounceScope(player, *city))
                     {
                         player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_RPMusicId).Write());
                     }
@@ -2244,11 +2330,11 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     }
 
     const CityData& city = g_Cities[event.cityId];
-    event.isActive = false;
+    int defendingTeam = IsAllianceCity(event.cityId) ? 0 : 1;
+    int attackingTeam = IsAllianceCity(event.cityId) ? 1 : 0;
 
     // Check if defenders won (city leader still alive)
     bool defendersWon = false;
-    bool leaderKilled = false;
     Map* map = sMapMgr->FindMap(city.mapId, 0);
     
     if (map && event.cityLeaderGuid)
@@ -2268,8 +2354,6 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
         }
         else
         {
-            leaderKilled = true;
-            
             if (g_DebugMode)
             {
                 if (cityLeader)
@@ -2299,8 +2383,7 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     // If winningTeam was explicitly passed (GM command), override the result
     if (winningTeam != -1)
     {
-        defendersWon = false;
-        leaderKilled = true;
+        defendersWon = (winningTeam == defendingTeam);
         
         if (g_DebugMode)
         {
@@ -2308,32 +2391,20 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
         }
     }
 
-    DespawnSiegeCreatures(event);
+    int resolvedWinningTeam = defendersWon ? defendingTeam : attackingTeam;
+    std::string resolvedWinningFaction = GetTeamName(resolvedWinningTeam);
+
     AnnounceSiege(city, false);
-    
-    // Broadcast siege end to addons
-    BroadcastSiegeDataToAddon(event, "END");
-
-    // Restore original weather
-    RestoreSiegeWeather(city, event);
-
-    // Determine which faction owns the city
-    bool isAllianceCity = (event.cityId == CITY_STORMWIND || event.cityId == CITY_IRONFORGE || 
-                          event.cityId == CITY_DARNASSUS || event.cityId == CITY_EXODAR);
 
     // Announce the winner (using same logic as AnnounceSiege)
     std::string winnerAnnouncement;
     if (defendersWon)
     {
-        // Defenders won - announce defending faction victory
-        std::string defendingFaction = isAllianceCity ? "Alliance" : "Horde";
-        winnerAnnouncement = "|cff00ff00[City Siege]|r The " + defendingFaction + " has successfully defended " + city.name + "! Victory to the defenders!";
+        winnerAnnouncement = "|cff00ff00[City Siege]|r The " + resolvedWinningFaction + " has successfully defended " + city.name + "! Victory to the defenders!";
     }
     else
     {
-        // Attackers won (city leader killed) - announce attacking faction victory
-        std::string attackingFaction = isAllianceCity ? "Horde" : "Alliance";
-        winnerAnnouncement = "|cffff0000[City Siege]|r The " + attackingFaction + " has conquered " + city.name + "! The city has fallen!";
+        winnerAnnouncement = "|cffff0000[City Siege]|r The " + resolvedWinningFaction + " has conquered " + city.name + "! The city has fallen!";
     }
     
     // Send announcement (same logic as AnnounceSiege)
@@ -2353,7 +2424,7 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
             {
                 if (Player* player = itr->GetSource())
                 {
-                    if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                    if (IsPlayerInAnnounceScope(player, city))
                     {
                         ChatHandler(player->GetSession()).PSendSysMessage(winnerAnnouncement.c_str());
                     }
@@ -2375,13 +2446,12 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
         {
             if (defendersWon && g_VictoryMusicId > 0)
             {
-                // Send victory music to players within announce radius
                 Map::PlayerList const& players = map->GetPlayers();
                 for (auto itr = players.begin(); itr != players.end(); ++itr)
                 {
                     if (Player* player = itr->GetSource())
                     {
-                        if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                        if (IsPlayerInAnnounceScope(player, city))
                         {
                             player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_VictoryMusicId).Write());
                         }
@@ -2395,13 +2465,12 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
             }
             else if (!defendersWon && g_DefeatMusicId > 0)
             {
-                // Send defeat music to players within announce radius
                 Map::PlayerList const& players = map->GetPlayers();
                 for (auto itr = players.begin(); itr != players.end(); ++itr)
                 {
                     if (Player* player = itr->GetSource())
                     {
-                        if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                        if (IsPlayerInAnnounceScope(player, city))
                         {
                             player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_DefeatMusicId).Write());
                         }
@@ -2417,69 +2486,9 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     }
 
     if (g_RewardOnDefense)
-    {
-        if (defendersWon)
-        {
-            // Defenders won - reward defending faction (0 = Alliance, 1 = Horde)
-            int winningTeam = isAllianceCity ? 0 : 1;
-            DistributeRewards(event, city, winningTeam);
-        }
-        else
-        {
-            // Attackers won (city leader killed) - reward attacking faction
-            int winningTeam = isAllianceCity ? 1 : 0; // Opposite faction
-            DistributeRewards(event, city, winningTeam);
-        }
-    }
+        DistributeRewards(event, city, resolvedWinningTeam);
 
-    // Respawn city leader if they were killed during the siege
-    if (leaderKilled && map)
-    {
-        // Search around the leader's throne coordinates directly
-        std::list<Creature*> leaderList;
-        CitySiege::CreatureEntryCheck check(city.targetLeaderEntry);
-        CitySiege::SimpleCreatureListSearcher<CitySiege::CreatureEntryCheck> searcher(leaderList, check);
-        Cell::VisitObjects(city.leaderX, city.leaderY, map, searcher, 100.0f);
-        
-        Creature* existingLeader = nullptr;
-        
-        // Find the leader at the throne
-        for (Creature* leader : leaderList)
-        {
-            if (leader)
-            {
-                existingLeader = leader;
-                break;
-            }
-        }
-        
-        // Respawn the leader
-        if (existingLeader)
-        {
-            if (!existingLeader->IsAlive())
-            {
-                existingLeader->Respawn();
-                
-                if (g_DebugMode)
-                {
-                    LOG_INFO("server.loading", "[City Siege] Respawned city leader {} (entry {}) at {}", 
-                             city.name, city.targetLeaderEntry, existingLeader->GetName());
-                }
-            }
-        }
-        else
-        {
-            // Leader doesn't exist in world - log warning
-            if (g_DebugMode)
-            {
-                LOG_WARN("server.loading", "[City Siege] Could not find city leader {} (entry {}) to respawn!", 
-                         city.name, city.targetLeaderEntry);
-            }
-        }
-    }
-
-    // Deactivate playerbots from siege
-    DeactivatePlayerbotsFromSiege(event);
+    FinalizeSiegeCleanup(event, resolvedWinningFaction);
 
     if (g_DebugMode)
     {
@@ -2516,11 +2525,13 @@ void DistributeRewards(const SiegeEvent& /*event*/, const CityData& city, int wi
             }
             
             // Check if player is in range and appropriate level
-            if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius &&
+            if (IsPlayerInAnnounceScope(player, city) &&
                 player->GetLevel() >= g_MinimumLevel)
             {
                 uint32 honorAwarded = 0;
                 uint32 goldAwarded = 0;
+                bool defendingTeamWon = (winningTeam == (IsAllianceCity(city.id) ? 0 : 1));
+                const char* victoryAction = defendingTeamWon ? "defending" : "conquering";
                 
                 // Award honor
                 if (g_RewardHonor > 0)
@@ -2548,28 +2559,28 @@ void DistributeRewards(const SiegeEvent& /*event*/, const CityData& city, int wi
                     if (goldCoins > 0)
                     {
                         snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%u Honor|r and |cffFFD700%ug %us %uc|r",
-                            city.name.c_str(), honorAwarded, goldCoins, silverCoins, copperCoins);
+                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%u Honor|r and |cffFFD700%ug %us %uc|r",
+                            victoryAction, city.name.c_str(), honorAwarded, goldCoins, silverCoins, copperCoins);
                     }
                     else if (silverCoins > 0)
                     {
                         snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%u Honor|r and |cffFFD700%us %uc|r",
-                            city.name.c_str(), honorAwarded, silverCoins, copperCoins);
+                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%u Honor|r and |cffFFD700%us %uc|r",
+                            victoryAction, city.name.c_str(), honorAwarded, silverCoins, copperCoins);
                     }
                     else
                     {
                         snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%u Honor|r and |cffFFD700%uc|r",
-                            city.name.c_str(), honorAwarded, copperCoins);
+                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%u Honor|r and |cffFFD700%uc|r",
+                            victoryAction, city.name.c_str(), honorAwarded, copperCoins);
                     }
                 }
                 else if (honorAwarded > 0)
                 {
                     // Only honor
                     snprintf(rewardMsg, sizeof(rewardMsg), 
-                        "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%u Honor|r",
-                        city.name.c_str(), honorAwarded);
+                        "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%u Honor|r",
+                        victoryAction, city.name.c_str(), honorAwarded);
                 }
                 else if (goldAwarded > 0)
                 {
@@ -2577,28 +2588,28 @@ void DistributeRewards(const SiegeEvent& /*event*/, const CityData& city, int wi
                     if (goldCoins > 0)
                     {
                         snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%ug %us %uc|r",
-                            city.name.c_str(), goldCoins, silverCoins, copperCoins);
+                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%ug %us %uc|r",
+                            victoryAction, city.name.c_str(), goldCoins, silverCoins, copperCoins);
                     }
                     else if (silverCoins > 0)
                     {
                         snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%us %uc|r",
-                            city.name.c_str(), silverCoins, copperCoins);
+                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%us %uc|r",
+                            victoryAction, city.name.c_str(), silverCoins, copperCoins);
                     }
                     else
                     {
                         snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for defending %s! Received: |cffFFD700%uc|r",
-                            city.name.c_str(), copperCoins);
+                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%uc|r",
+                            victoryAction, city.name.c_str(), copperCoins);
                     }
                 }
                 else
                 {
                     // No rewards configured
                     snprintf(rewardMsg, sizeof(rewardMsg), 
-                        "|cff00ff00[City Siege]|r You have been rewarded for defending %s!",
-                        city.name.c_str());
+                        "|cff00ff00[City Siege]|r You have been rewarded for %s %s!",
+                        victoryAction, city.name.c_str());
                 }
                 
                 ChatHandler(player->GetSession()).PSendSysMessage(rewardMsg);
@@ -3108,7 +3119,7 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                     {
                         if (Player* player = itr->GetSource())
                         {
-                            if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
+                            if (IsPlayerInAnnounceScope(player, city))
                             {
                                 player->SendDirectMessage(WorldPackets::Misc::PlayMusic(g_CombatMusicId).Write());
                             }
@@ -4282,9 +4293,7 @@ public:
         for (auto& event : g_ActiveSieges)
         {
             if (event.isActive)
-            {
-                DespawnSiegeCreatures(event);
-            }
+                FinalizeSiegeCleanup(event, "shutdown", false);
         }
         g_ActiveSieges.clear();
 
@@ -4468,59 +4477,9 @@ public:
             {
                 found = true;
                 
-                const CityData& city = g_Cities[cityId];
-                
                 // Determine winning team (0 = Alliance, 1 = Horde)
                 int winningTeam = allianceWins ? 0 : 1;
-                
-                // Announce winner to world or in range
-                std::string winnerAnnouncement;
-                std::string winningFaction = allianceWins ? "Alliance" : "Horde";
-                bool isAllianceCity = (cityId == CITY_STORMWIND || cityId == CITY_IRONFORGE || 
-                                      cityId == CITY_DARNASSUS || cityId == CITY_EXODAR);
-                
-                // Check if winners were defenders or attackers
-                bool defendersWon = (allianceWins && isAllianceCity) || (!allianceWins && !isAllianceCity);
-                
-                if (defendersWon)
-                {
-                    winnerAnnouncement = "|cff00ff00[City Siege]|r The " + winningFaction + " has successfully defended " + city.name + "! Victory to the defenders!";
-                }
-                else
-                {
-                    winnerAnnouncement = "|cffff0000[City Siege]|r The " + winningFaction + " has conquered " + city.name + "! The city has fallen!";
-                }
-                
-                // Announce to world or in range
-                if (g_AnnounceRadius == 0)
-                {
-                    sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, winnerAnnouncement);
-                }
-                else
-                {
-                    Map* map = sMapMgr->FindMap(city.mapId, 0);
-                    if (map)
-                    {
-                        Map::PlayerList const& players = map->GetPlayers();
-                        for (auto itr = players.begin(); itr != players.end(); ++itr)
-                        {
-                            if (Player* player = itr->GetSource())
-                            {
-                                if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
-                                {
-                                    ChatHandler(player->GetSession()).PSendSysMessage(winnerAnnouncement.c_str());
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Distribute rewards to winning faction's players
-                DistributeRewards(event, city, winningTeam);
-                                
-                // Clean up
-                DespawnSiegeCreatures(event);
-                event.isActive = false;
+                EndSiegeEvent(event, winningTeam);
                 
                 break;
             }
@@ -4574,8 +4533,7 @@ public:
         {
             if (cityId == -1 || event.cityId == cityId)
             {
-                DespawnSiegeCreatures(event);
-                event.isActive = false;
+                FinalizeSiegeCleanup(event, "cleanup");
                 handler->PSendSysMessage(("Cleaned up siege creatures in " + g_Cities[event.cityId].name).c_str());
                 cleanedCount++;
 
@@ -4836,7 +4794,6 @@ public:
         // Visualize each waypoint
         handler->PSendSysMessage(("City has " + std::to_string(city.waypoints.size()) + " waypoints configured.").c_str());
         
-        int spawnedWaypoints = 0;
         int failedWaypoints = 0;
         
         for (size_t i = 0; i < city.waypoints.size(); ++i)
@@ -4863,7 +4820,6 @@ public:
                 marker->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                 marker->SetUnitFlag(UNIT_FLAG_NOT_SELECTABLE);
                 visualizations.push_back(marker->GetGUID());
-                spawnedWaypoints++;
                 
                 // Format coordinates properly
                 char waypointMsg[256];
@@ -4977,7 +4933,6 @@ public:
 
         // Find which siege this unit belongs to
         SiegeEvent* activeSiege = nullptr;
-        bool isAttacker = false;
         bool isDefender = false;
 
         for (auto& event : g_ActiveSieges)
@@ -4992,7 +4947,6 @@ public:
                 {
                     if (guid == unitGuid)
                     {
-                        isAttacker = true;
                         activeSiege = &event;
                         break;
                     }
@@ -5004,7 +4958,6 @@ public:
                 {
                     if (guid == unitGuid)
                     {
-                        isAttacker = true;
                         activeSiege = &event;
                         break;
                     }
@@ -5200,16 +5153,27 @@ public:
             return false;
         }
 
-        // If no city ID provided, broadcast all active sieges
+        // If no city ID provided, sync all cities to this player.
         if (!cityIdArg)
         {
+            std::array<bool, CITY_MAX> hasActiveSiege = {};
+
             for (auto& event : g_ActiveSieges)
             {
                 if (event.isActive)
                 {
-                    BroadcastSiegeDataToAddon(event, "UPDATE");
+                    hasActiveSiege[event.cityId] = true;
+                    SendSiegeDataToPlayer(player, event, "START");
+                    SendSiegeDataToPlayer(player, event, "UPDATE");
                 }
             }
+
+            for (uint32 cityId = 0; cityId < CITY_MAX; ++cityId)
+            {
+                if (!hasActiveSiege[cityId])
+                    SendAddonMessageToPlayer(player, "END:" + std::to_string(cityId) + ":none");
+            }
+
             return true;
         }
 
@@ -5224,19 +5188,13 @@ public:
         {
             if (event.isActive && event.cityId == static_cast<int>(cityId))
             {
-                BroadcastSiegeDataToAddon(event, "UPDATE");
+                SendSiegeDataToPlayer(player, event, "START");
+                SendSiegeDataToPlayer(player, event, "UPDATE");
                 return true;
             }
         }
 
-        // City not under siege - send empty/end status
-        WorldPacket data(SMSG_MESSAGECHAT, 200);
-        data << uint8(CHAT_MSG_SYSTEM);
-        data << uint32(LANG_UNIVERSAL);
-        data << uint64(0);
-        data << uint32(0);
-        data << uint64(0);
-        data << uint32(0);
+        SendAddonMessageToPlayer(player, "END:" + std::to_string(cityId) + ":none");
         
         return true;
     }
@@ -5321,7 +5279,7 @@ public:
         snprintf(msg, sizeof(msg), 
             "|cff00ff00[City Siege]|r Distance to %s center: %.1f yards\nCenter coords: (%.1f, %.1f, %.1f)\nAnnounce radius: %u yards\n%s",
             city.name.c_str(), distance, city.centerX, city.centerY, city.centerZ, g_AnnounceRadius,
-            distance <= g_AnnounceRadius ? "|cff00ff00You ARE in range|r" : "|cffff0000You are OUT OF RANGE|r");
+            g_AnnounceRadius == 0 || distance <= g_AnnounceRadius ? "|cff00ff00You ARE in range|r" : "|cffff0000You are OUT OF RANGE|r");
         handler->PSendSysMessage(msg);
 
         return true;

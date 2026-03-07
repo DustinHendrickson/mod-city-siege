@@ -299,7 +299,7 @@ function Core:ToggleMinimap()
 end
 
 function Core:RequestStatus()
-    SendChatMessage(".citysiege status", "GUILD")
+    SendChatMessage(".citysiege sync", "GUILD")
     -- Silent operation - no user-facing message
 end
 

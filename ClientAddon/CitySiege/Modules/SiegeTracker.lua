@@ -278,8 +278,8 @@ function Tracker:GetNPCs(cityID)
 end
 
 function Tracker:RequestStatusUpdate()
-    -- Send command to get status (silent operation)
-    SendChatMessage(".citysiege status", "GUILD")
+    -- Request authoritative addon sync instead of parsing human-readable status text.
+    SendChatMessage(".citysiege sync", "GUILD")
 end
 
 function Tracker:CheckCitySiege(cityID)
