@@ -40,6 +40,7 @@
 #include "Weather.h"
 #include "WeatherMgr.h"
 #include "MiscPackets.h"
+#include "CitySiegeAPI.h"
 #include <vector>
 #include <array>
 #include <unordered_map>
@@ -351,6 +352,39 @@ struct SiegeEvent
 // Active siege events
 static std::vector<SiegeEvent> g_ActiveSieges;
 static uint32 g_NextSiegeTime = 0;
+
+namespace CitySiegeAPI
+{
+    std::vector<ActiveSiegeSnapshot> GetActiveSieges()
+    {
+        std::vector<ActiveSiegeSnapshot> snapshots;
+        snapshots.reserve(g_ActiveSieges.size());
+
+        uint32 const currentTime = static_cast<uint32>(time(nullptr));
+        for (SiegeEvent const& event : g_ActiveSieges)
+        {
+            CityData const& city = g_Cities[event.cityId];
+
+            ActiveSiegeSnapshot snapshot;
+            snapshot.cityId = static_cast<uint32>(event.cityId);
+            snapshot.cityName = city.name;
+            snapshot.startTime = event.startTime;
+            snapshot.endTime = event.endTime;
+            snapshot.isActive = event.isActive;
+            snapshot.cinematicPhase = event.cinematicPhase;
+            snapshot.remainingSeconds = event.endTime > currentTime ?
+                event.endTime - currentTime : 0;
+            snapshot.spawnedAttackers = event.spawnedCreatures.size();
+            snapshot.spawnedDefenders = event.spawnedDefenders.size();
+            snapshot.attackerBotCount = event.attackerBots.size();
+            snapshot.defenderBotCount = event.defenderBots.size();
+
+            snapshots.push_back(std::move(snapshot));
+        }
+
+        return snapshots;
+    }
+}
 
 // Waypoint visualization tracking
 static std::unordered_map<uint32, std::vector<ObjectGuid>> g_WaypointVisualizations; // cityId -> vector of creature GUIDs
