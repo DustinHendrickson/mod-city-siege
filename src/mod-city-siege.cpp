@@ -1166,7 +1166,8 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetHover(false);
             creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(35);
+            creature->SetFaction(35); // Neutral during cinematic
+            creature->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             
             // Prevent return to home position after combat
             creature->SetWalk(false);
@@ -1232,7 +1233,8 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetHover(false);
             creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(35);
+            creature->SetFaction(35); // Neutral during cinematic
+            creature->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             
             // Prevent return to home position after combat
             creature->SetWalk(false);
@@ -1272,7 +1274,8 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetHover(false);
             creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(35);
+            creature->SetFaction(35); // Neutral during cinematic
+            creature->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             
             // Prevent return to home position after combat
             creature->SetWalk(false);
@@ -1312,7 +1315,8 @@ void SpawnSiegeCreatures(SiegeEvent& event)
             creature->SetHover(false);
             creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
             creature->SetReactState(REACT_PASSIVE);
-            creature->SetFaction(35);
+            creature->SetFaction(35); // Neutral during cinematic
+            creature->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
             
             // Prevent return to home position after combat
             creature->SetWalk(false);
@@ -1370,7 +1374,8 @@ void SpawnSiegeCreatures(SiegeEvent& event)
                 creature->SetHover(false);
                 creature->RemoveUnitMovementFlag(MOVEMENTFLAG_CAN_FLY | MOVEMENTFLAG_DISABLE_GRAVITY | MOVEMENTFLAG_FLYING | MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_HOVER);
                 creature->SetReactState(REACT_PASSIVE);
-                creature->SetFaction(35);
+                creature->SetFaction(35); // Neutral during cinematic
+                creature->SetUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
                 
                 // Prevent return to home position after combat
                 creature->SetWalk(false);
@@ -3186,6 +3191,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 {
                     if (Creature* creature = map->GetCreature(guid))
                     {
+                        // End cinematic protection.
+                        creature->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+
                         // Set proper hostile faction: Horde attacks Alliance cities, Alliance attacks Horde cities
                         creature->SetFaction(isAllianceCity ? 83 : 84); // 83 = Horde, 84 = Alliance
                         
@@ -3272,6 +3280,9 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 {
                     if (Creature* creature = map->GetCreature(guid))
                     {
+                        // End cinematic protection.
+                        creature->RemoveUnitFlag(UNIT_FLAG_NON_ATTACKABLE);
+
                         // Set proper defender faction (same as city faction)
                         creature->SetFaction(isAllianceCity ? 84 : 83); // 84 = Alliance, 83 = Horde
                         creature->SetReactState(REACT_AGGRESSIVE);
