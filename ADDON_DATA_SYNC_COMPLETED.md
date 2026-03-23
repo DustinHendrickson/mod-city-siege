@@ -1,16 +1,15 @@
 # City Siege Addon - Complete Data Synchronization Implementation
 
 ## Summary
-Implemented comprehensive server-to-addon data synchronization system for City Siege module. The system now broadcasts ALL siege data silently in the background every 30 seconds and supports on-demand data requests.
+Implemented a comprehensive server-to-addon data synchronization system for City Siege. The system broadcasts periodic siege snapshots silently in the background every 30 seconds and supports on-demand data requests.
 
 ## Changes Made
 
 ### 1. Server-Side (mod-city-siege.cpp)
 
-#### Enhanced `BroadcastSiegeDataToAddon()` Function (Line ~768)
-- **Purpose**: Sends comprehensive siege data to players within range
+#### Enhanced `BroadcastSiegeDataToAddon()` Function
+- **Purpose**: Sends comprehensive siege data to online players
 - **Frequency**: Every 30 seconds automatic broadcast
-- **Range**: 500 yards from city center
 - **Communication**: Silent (WorldPacket with SMSG_MESSAGECHAT, CHAT_MSG_SYSTEM)
 
 **Data Transmitted**:
@@ -18,8 +17,8 @@ Implemented comprehensive server-to-addon data synchronization system for City S
 2. **Time Remaining**: Calculated from event duration
 3. **Leader Health**: Percentage from leader creature HP
 4. **Waypoints**: All waypoint coordinates (x,y,z)
-5. **Attacker NPC Positions**: Up to 50 NPC positions (x,y,z)
-6. **Defender NPC Positions**: Up to 50 NPC positions (x,y,z)
+5. **Attacker NPC Positions**: Active attacker creature positions (x,y,z)
+6. **Defender NPC Positions**: Active defender creature positions (x,y,z)
 7. **Attacker Bot Positions**: All bot positions (x,y,z)
 8. **Defender Bot Positions**: All bot positions (x,y,z)
 9. **Location Data**: Spawn point, leader position, city center
@@ -102,7 +101,7 @@ CITYSIEGE_UPDATE:cityId:phase:atk:def:elapsed:remaining:leaderHP:WP:count:x:y:z.
 - **Packet Size**: Increased from 200 to 2000 bytes
 - **Position Limits**: 50 NPCs per side (prevents overflow)
 - **Update Frequency**: 30 seconds (balance between freshness and bandwidth)
-- **Range Filtering**: Only sends to players within 500 yards
+- **Delivery**: Sent to online players so the addon can sync regardless of location
 
 ### Communication Protocol
 - **Channel**: SMSG_MESSAGECHAT with CHAT_MSG_SYSTEM
@@ -193,4 +192,4 @@ Potential improvements for future versions:
 
 ## Version
 Implementation Date: 2025
-Status: Complete and Ready for Testing
+Status: Implemented and Ready for Testing

@@ -121,7 +121,7 @@ If the `AddOns` folder doesn't exist, create it.
 ### Problem: Addon loads but shows errors
 
 **Solution:**
-1. Check that all required libraries are installed
+1. Check that the bundled `Libs/` directory is present inside `CitySiege`
 2. Install BugSack addon to see detailed errors:
    ```
    /bugsack
@@ -134,7 +134,7 @@ If the `AddOns` folder doesn't exist, create it.
 **Solution:**
 1. Type `/cs minimap` to toggle it
 2. Check if it's hidden in settings
-3. Verify LibDataBroker and LibDBIcon are installed
+3. Verify the bundled LibDataBroker and LibDBIcon folders are present under `CitySiege/Libs/`
 4. Reset minimap button position in settings
 
 ### Problem: Commands don't work
@@ -144,6 +144,7 @@ If the `AddOns` folder doesn't exist, create it.
 2. Check that the server has the City Siege module enabled
 3. Try using the full command: `.citysiege status` in chat
 4. Ensure you're connected to a server with the module
+5. If you're not in a guild, the addon falls back to normal chat command handling instead of guild chat
 
 ### Problem: Map doesn't show positions
 

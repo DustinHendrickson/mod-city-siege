@@ -14,14 +14,13 @@ A comprehensive World of Warcraft 3.3.5 (WotLK) addon for the AzerothCore City S
 
 ### 📊 Siege Information & Statistics
 - View all active sieges across different cities
-- Real-time siege status updates
+- Periodic siege status updates from the server
 - Phase information and duration tracking
 - Participant counts (attackers vs defenders)
 - Personal statistics tracking:
   - Sieges participated in
   - Win/loss record
-  - Kill/death ratios
-  - Overall performance metrics
+  - Overall siege outcome summary
 
 ### 🎮 Command Interface
 - Easy-to-use button interface for all siege commands
@@ -75,7 +74,7 @@ These commands are executed through the addon but require appropriate permission
 - `/cs start [city]` - Start a siege in specified city
 - `/cs stop [city] [faction]` - Stop an active siege
 - `/cs cleanup [city]` - Clean up siege NPCs
-- `/cs info` - Display detailed siege information
+- `/cs info` - Display info for your currently selected siege NPC/playerbot
 - `/cs reload` - Reload server-side configuration
 
 ### Interface Navigation
@@ -192,16 +191,7 @@ The addon uses the following libraries (included):
 2. **Real-time Updates**: Position updates depend on server communication frequency
 3. **WoW 3.3.5 API**: Some modern addon features aren't available in this client version
 4. **Rotation**: Line rotation for waypoint paths is simplified due to API limitations
-
-## Future Enhancements
-
-Planned features for future versions:
-- 3D arrow indicators for objectives
-- Heat maps showing combat intensity
-- Replay functionality for completed sieges
-- Achievement integration
-- Cross-realm siege coordination
-- Mobile companion app data export
+5. **Statistics**: The addon currently tracks siege participation and outcomes, not full per-fight kill/death data
 
 ## Support
 

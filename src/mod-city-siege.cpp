@@ -48,6 +48,7 @@
 #include <cmath>
 #include <algorithm>
 #include <iomanip>
+#include <sstream>
 
 // Conditional include for playerbots module
 #ifdef MOD_PLAYERBOTS
@@ -196,7 +197,7 @@ static uint32 g_RewardGoldPerLevel = 5000; // 0.5 gold per level in copper
 // Announcement messages
 static std::string g_MessageSiegeStart = "|cffff0000[City Siege]|r The city of {CITYNAME} is under attack! Defenders are needed!";
 static std::string g_MessageSiegeEnd = "|cff00ff00[City Siege]|r The siege of {CITYNAME} has ended!";
-static std::string g_MessageReward = "|cff00ff00[City Siege]|r You have been rewarded for defending {CITYNAME}!";
+static std::string g_MessageReward = "|cff00ff00[City Siege]|r You have been rewarded for {ACTION} {CITYNAME}!";
 
 // Leader spawn yell
 static std::string g_YellLeaderSpawn = "This city will fall before our might!";
@@ -340,9 +341,7 @@ struct SiegeEvent
     };
     std::vector<RespawnData> deadCreatures; // Creatures waiting to respawn
 
-    // Weather storage for siege weather override
-    WeatherState originalWeatherType; // Store original weather type
-    float originalWeatherGrade; // Store original weather grade
+    // Weather override state
     bool weatherOverridden; // Track if weather was overridden for this siege
     
     // Addon communication tracking
@@ -422,6 +421,40 @@ std::string GetTeamName(int teamId)
             return "Horde";
         default:
             return "unknown";
+    }
+}
+
+std::string ReplacePlaceholder(std::string message, std::string const& placeholder,
+    std::string const& value)
+{
+    size_t pos = 0;
+    while ((pos = message.find(placeholder, pos)) != std::string::npos)
+    {
+        message.replace(pos, placeholder.length(), value);
+        pos += value.length();
+    }
+
+    return message;
+}
+
+void SendSiegeScopedMessage(CityData const& city, std::string const& message)
+{
+    if (g_AnnounceRadius == 0)
+    {
+        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, message);
+        return;
+    }
+
+    Map* map = sMapMgr->FindMap(city.mapId, 0);
+    if (!map)
+        return;
+
+    Map::PlayerList const& players = map->GetPlayers();
+    for (auto itr = players.begin(); itr != players.end(); ++itr)
+    {
+        if (Player* player = itr->GetSource())
+            if (IsPlayerInAnnounceScope(player, city))
+                ChatHandler(player->GetSession()).PSendSysMessage(message.c_str());
     }
 }
 
@@ -522,11 +555,8 @@ void SetSiegeWeather(const CityData& city, SiegeEvent& event)
     // Get the zone ID from the city center coordinates
     uint32 zoneId = map->GetZoneId(0, city.centerX, city.centerY, city.centerZ);
 
-    // Store original weather state
-    // Note: Weather::GetWeatherState() and Weather::GetGrade() are private methods
-    // Since we can't access them from a module, we'll restore to fine weather
-    event.originalWeatherType = WEATHER_STATE_FINE;
-    event.originalWeatherGrade = 0.0f;
+    // Prime the default weather cache so we can restore the zone's default weather later.
+    map->GetOrGenerateZoneDefaultWeather(zoneId);
     event.weatherOverridden = true;
 
     // Set siege weather
@@ -556,13 +586,24 @@ void RestoreSiegeWeather(const CityData& city, SiegeEvent& event)
     // Get the zone ID from the city center coordinates
     uint32 zoneId = map->GetZoneId(0, city.centerX, city.centerY, city.centerZ);
 
-    // Restore original weather
-    map->SetZoneWeather(zoneId, event.originalWeatherType, event.originalWeatherGrade);
+    // Clear the override and restore the zone's default/generated weather.
+    map->SetZoneWeather(zoneId, WEATHER_STATE_FINE, 0.0f);
+
+    if (Weather* defaultWeather = map->GetOrGenerateZoneDefaultWeather(zoneId))
+    {
+        Map::PlayerList const& players = map->GetPlayers();
+        for (auto itr = players.begin(); itr != players.end(); ++itr)
+        {
+            if (Player* player = itr->GetSource())
+                if (player->GetZoneId() == zoneId)
+                    defaultWeather->SendWeatherUpdateToPlayer(player);
+        }
+    }
 
     if (g_DebugMode)
     {
-        LOG_INFO("server.loading", "[City Siege] Restored original weather for {} (zone {}): type={}, grade={:.2f}",
-                 city.name, zoneId, static_cast<uint32>(event.originalWeatherType), event.originalWeatherGrade);
+        LOG_INFO("server.loading", "[City Siege] Restored default weather for {} (zone {})",
+                 city.name, zoneId);
     }
 
     event.weatherOverridden = false;
@@ -655,7 +696,7 @@ void LoadCitySiegeConfiguration()
     g_MessageSiegeEnd = sConfigMgr->GetOption<std::string>("CitySiege.Message.SiegeEnd", 
         "|cff00ff00[City Siege]|r The siege of {CITYNAME} has ended!");
     g_MessageReward = sConfigMgr->GetOption<std::string>("CitySiege.Message.Reward", 
-        "|cff00ff00[City Siege]|r You have been rewarded for defending {CITYNAME}!");
+        "|cff00ff00[City Siege]|r You have been rewarded for {ACTION} {CITYNAME}!");
     
     // Yells
     g_YellLeaderSpawn = sConfigMgr->GetOption<std::string>("CitySiege.Yell.LeaderSpawn", 
@@ -854,50 +895,9 @@ CityData* SelectRandomCity()
  */
 void AnnounceSiege(const CityData& city, bool isStart)
 {
-    std::string message;
-    if (isStart)
-    {
-        message = g_MessageSiegeStart;
-        size_t pos = message.find("{CITYNAME}");
-        if (pos != std::string::npos)
-        {
-            message.replace(pos, 10, city.name);
-        }
-    }
-    else
-    {
-        message = g_MessageSiegeEnd;
-        size_t pos = message.find("{CITYNAME}");
-        if (pos != std::string::npos)
-        {
-            message.replace(pos, 10, city.name);
-        }
-    }
-
-    if (g_AnnounceRadius == 0)
-    {
-        // Announce to the entire world
-        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, message);
-    }
-    else
-    {
-        // Announce to players in range
-        Map* map = sMapMgr->FindMap(city.mapId, 0);
-        if (map)
-        {
-            Map::PlayerList const& players = map->GetPlayers();
-            for (auto itr = players.begin(); itr != players.end(); ++itr)
-            {
-                if (Player* player = itr->GetSource())
-                {
-                    if (player->GetDistance(city.centerX, city.centerY, city.centerZ) <= g_AnnounceRadius)
-                    {
-                        ChatHandler(player->GetSession()).PSendSysMessage(message.c_str());
-                    }
-                }
-            }
-        }
-    }
+    std::string message = ReplacePlaceholder(isStart ? g_MessageSiegeStart : g_MessageSiegeEnd,
+        "{CITYNAME}", city.name);
+    SendSiegeScopedMessage(city, message);
 
     if (g_DebugMode)
     {
@@ -971,6 +971,63 @@ void SendSiegeDataToPlayer(Player* player, const SiegeEvent& event,
         ss << ":WP:" << city.waypoints.size();
         for (const auto& wp : city.waypoints)
             ss << ":" << std::fixed << std::setprecision(2) << wp.x << ":" << wp.y << ":" << wp.z;
+
+        auto appendCreaturePositions = [&](char const* section, std::vector<ObjectGuid> const& guids)
+        {
+            std::vector<std::array<float, 3>> positions;
+            positions.reserve(guids.size());
+
+            for (ObjectGuid const& guid : guids)
+            {
+                if (Creature* creature = map->GetCreature(guid))
+                {
+                    if (!creature->IsAlive())
+                        continue;
+
+                    positions.push_back({
+                        creature->GetPositionX(),
+                        creature->GetPositionY(),
+                        creature->GetPositionZ()
+                    });
+                }
+            }
+
+            ss << ":" << section << ":" << positions.size();
+            for (std::array<float, 3> const& position : positions)
+                ss << ":" << std::fixed << std::setprecision(2)
+                   << position[0] << ":" << position[1] << ":" << position[2];
+        };
+
+        auto appendBotPositions = [&](char const* section, std::vector<ObjectGuid> const& guids)
+        {
+            std::vector<std::array<float, 3>> positions;
+            positions.reserve(guids.size());
+
+            for (ObjectGuid const& guid : guids)
+            {
+                if (Player* bot = ObjectAccessor::FindPlayer(guid))
+                {
+                    if (!bot->IsInWorld() || !bot->IsAlive())
+                        continue;
+
+                    positions.push_back({
+                        bot->GetPositionX(),
+                        bot->GetPositionY(),
+                        bot->GetPositionZ()
+                    });
+                }
+            }
+
+            ss << ":" << section << ":" << positions.size();
+            for (std::array<float, 3> const& position : positions)
+                ss << ":" << std::fixed << std::setprecision(2)
+                   << position[0] << ":" << position[1] << ":" << position[2];
+        };
+
+        appendCreaturePositions("ATK", event.spawnedCreatures);
+        appendCreaturePositions("DEF", event.spawnedDefenders);
+        appendBotPositions("BATK", event.attackerBots);
+        appendBotPositions("BDEF", event.defenderBots);
     }
     else if (messageType == "END")
     {
@@ -2303,7 +2360,7 @@ void StartSiegeEvent(int targetCityId = -1)
 
     // Announce siege is coming (before RP phase)
     std::string preAnnounce = "|cffff0000[City Siege]|r |cffFFFF00WARNING!|r A siege force is preparing to attack " + city->name + "! The battle will begin in " + std::to_string(g_CinematicDelay) + " seconds. Defenders, prepare yourselves!";
-    sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, preAnnounce);
+    SendSiegeScopedMessage(*city, preAnnounce);
 
     g_ActiveSieges.push_back(newEvent);
 
@@ -2447,30 +2504,7 @@ void EndSiegeEvent(SiegeEvent& event, int winningTeam = -1)
     }
     
     // Send announcement (same logic as AnnounceSiege)
-    if (g_AnnounceRadius == 0)
-    {
-        // Announce to the entire world
-        sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, winnerAnnouncement);
-    }
-    else
-    {
-        // Announce to players in range
-        Map* mapForAnnounce = sMapMgr->FindMap(city.mapId, 0);
-        if (mapForAnnounce)
-        {
-            Map::PlayerList const& players = mapForAnnounce->GetPlayers();
-            for (auto itr = players.begin(); itr != players.end(); ++itr)
-            {
-                if (Player* player = itr->GetSource())
-                {
-                    if (IsPlayerInAnnounceScope(player, city))
-                    {
-                        ChatHandler(player->GetSession()).PSendSysMessage(winnerAnnouncement.c_str());
-                    }
-                }
-            }
-        }
-    }
+    SendSiegeScopedMessage(city, winnerAnnouncement);
     
     if (g_DebugMode)
     {
@@ -2587,71 +2621,35 @@ void DistributeRewards(const SiegeEvent& /*event*/, const CityData& city, int wi
                 }
                 
                 // Send detailed confirmation message with rewards
-                char rewardMsg[512];
                 uint32 goldCoins = goldAwarded / 10000;
                 uint32 silverCoins = (goldAwarded % 10000) / 100;
                 uint32 copperCoins = goldAwarded % 100;
-                
-                if (honorAwarded > 0 && goldAwarded > 0)
+
+                std::ostringstream rewardMessage;
+                rewardMessage << ReplacePlaceholder(
+                    ReplacePlaceholder(g_MessageReward, "{CITYNAME}", city.name),
+                    "{ACTION}", victoryAction);
+
+                if (honorAwarded > 0 || goldAwarded > 0)
+                    rewardMessage << " Received:";
+
+                if (honorAwarded > 0)
+                    rewardMessage << " |cffFFD700" << honorAwarded << " Honor|r";
+
+                if (goldAwarded > 0)
                 {
-                    // Both honor and gold
+                    if (honorAwarded > 0)
+                        rewardMessage << " and";
+
+                    rewardMessage << " |cffFFD700";
                     if (goldCoins > 0)
-                    {
-                        snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%u Honor|r and |cffFFD700%ug %us %uc|r",
-                            victoryAction, city.name.c_str(), honorAwarded, goldCoins, silverCoins, copperCoins);
-                    }
-                    else if (silverCoins > 0)
-                    {
-                        snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%u Honor|r and |cffFFD700%us %uc|r",
-                            victoryAction, city.name.c_str(), honorAwarded, silverCoins, copperCoins);
-                    }
-                    else
-                    {
-                        snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%u Honor|r and |cffFFD700%uc|r",
-                            victoryAction, city.name.c_str(), honorAwarded, copperCoins);
-                    }
+                        rewardMessage << goldCoins << "g ";
+                    if (silverCoins > 0 || goldCoins > 0)
+                        rewardMessage << silverCoins << "s ";
+                    rewardMessage << copperCoins << "c|r";
                 }
-                else if (honorAwarded > 0)
-                {
-                    // Only honor
-                    snprintf(rewardMsg, sizeof(rewardMsg), 
-                        "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%u Honor|r",
-                        victoryAction, city.name.c_str(), honorAwarded);
-                }
-                else if (goldAwarded > 0)
-                {
-                    // Only gold
-                    if (goldCoins > 0)
-                    {
-                        snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%ug %us %uc|r",
-                            victoryAction, city.name.c_str(), goldCoins, silverCoins, copperCoins);
-                    }
-                    else if (silverCoins > 0)
-                    {
-                        snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%us %uc|r",
-                            victoryAction, city.name.c_str(), silverCoins, copperCoins);
-                    }
-                    else
-                    {
-                        snprintf(rewardMsg, sizeof(rewardMsg), 
-                            "|cff00ff00[City Siege]|r You have been rewarded for %s %s! Received: |cffFFD700%uc|r",
-                            victoryAction, city.name.c_str(), copperCoins);
-                    }
-                }
-                else
-                {
-                    // No rewards configured
-                    snprintf(rewardMsg, sizeof(rewardMsg), 
-                        "|cff00ff00[City Siege]|r You have been rewarded for %s %s!",
-                        victoryAction, city.name.c_str());
-                }
-                
-                ChatHandler(player->GetSession()).PSendSysMessage(rewardMsg);
+
+                ChatHandler(player->GetSession()).PSendSysMessage(rewardMessage.str().c_str());
                 
                 rewardedPlayers++;
             }
@@ -3068,19 +3066,19 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             {
                 event.countdown75Announced = true;
                 std::string countdownMsg = "|cffff0000[City Siege]|r |cffFFFF00" + std::to_string(remaining) + " seconds|r until the siege of " + city.name + " begins! Defenders, prepare!";
-                sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, countdownMsg);
+                SendSiegeScopedMessage(city, countdownMsg);
             }
             else if (percentRemaining <= 50.0f && !event.countdown50Announced)
             {
                 event.countdown50Announced = true;
                 std::string countdownMsg = "|cffff0000[City Siege]|r |cffFF8800" + std::to_string(remaining) + " seconds|r until the siege of " + city.name + " begins! Defenders, to your posts!";
-                sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, countdownMsg);
+                SendSiegeScopedMessage(city, countdownMsg);
             }
             else if (percentRemaining <= 25.0f && !event.countdown25Announced)
             {
                 event.countdown25Announced = true;
                 std::string countdownMsg = "|cffff0000[City Siege]|r |cffFF0000" + std::to_string(remaining) + " seconds|r until the siege of " + city.name + " begins! FINAL WARNING!";
-                sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, countdownMsg);
+                SendSiegeScopedMessage(city, countdownMsg);
             }
             
             // RP Script execution during cinematic phase (sequential dialogue from leaders/mini-bosses)
@@ -3144,7 +3142,7 @@ void UpdateSiegeEvents(uint32 /*diff*/)
             
             // Announce battle has begun!
             std::string battleStart = "|cffff0000[City Siege]|r |cffFF0000THE BATTLE HAS BEGUN!|r The siege of " + city.name + " is now underway! Defenders, to arms!";
-            sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, battleStart);
+            SendSiegeScopedMessage(city, battleStart);
             
             // Play combat phase music if enabled
             if (g_MusicEnabled && g_CombatMusicId > 0)
@@ -4182,7 +4180,7 @@ void UpdateSiegeEvents(uint32 /*diff*/)
                 statusMsg += " |cffFFFF00FINAL MINUTES!|r";
             }
             
-            sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING, statusMsg);
+            SendSiegeScopedMessage(city, statusMsg);
             
             // Broadcast siege update to addons
             BroadcastSiegeDataToAddon(event, "UPDATE");

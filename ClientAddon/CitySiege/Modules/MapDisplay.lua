@@ -13,14 +13,9 @@ local lines = {}
 local updateThrottle = 0
 
 function MapDisplay:Create(parent)
-    print("CitySiege MapDisplay: Create() called")
-    
     if frame then 
-        print("CitySiege MapDisplay: Frame already exists, returning existing frame")
         return frame 
     end
-    
-    print("CitySiege MapDisplay: Creating new frame")
     
     frame = CreateFrame("Frame", "CitySiegeMapDisplay", parent)
     frame:SetAllPoints(parent)
@@ -89,15 +84,11 @@ function MapDisplay:Create(parent)
     noSiegeText:Show()
     frame.noSiegeText = noSiegeText
     
-    print("CitySiege: MapDisplay created successfully")
-    
     return frame
 end
 
 function MapDisplay:SetCity(cityID)
     currentCityID = cityID
-    
-    print("CitySiege MapDisplay: SetCity called with cityID: " .. tostring(cityID))
     
     if not cityID then
         -- Show placeholder when no city selected
@@ -140,8 +131,6 @@ function MapDisplay:SetCity(cityID)
     
     -- Set city map texture using our custom map files
     if frame and frame.mapTexture then
-        print("CitySiege MapDisplay: frame and mapTexture exist")
-        
         -- Map city names to file names (use actual folder names)
         local mapFiles = {
             [CitySiege_Cities.STORMWIND] = "Stormwind",
@@ -154,9 +143,7 @@ function MapDisplay:SetCity(cityID)
             [CitySiege_Cities.SILVERMOON] = "SilvermoonCity",
         }
         
-        print("CitySiege MapDisplay: Looking up map file for cityID: " .. tostring(cityID))
         local mapFile = mapFiles[cityID]
-        print("CitySiege MapDisplay: mapFile = " .. tostring(mapFile))
         if mapFile then
             -- BLP files (no extension needed, WoW adds .blp automatically)
             local texturePath = "Interface\\AddOns\\CitySiege\\Media\\Maps\\" .. mapFile
@@ -170,13 +157,9 @@ function MapDisplay:SetCity(cityID)
             if frame.noMapText then frame.noMapText:Hide() end
             if frame.noSiegeText then frame.noSiegeText:Hide() end
             
-            print("CitySiege: Texture set for " .. cityData.displayName)
         else
-            print("CitySiege: No map file found for city ID: " .. tostring(cityID))
             MapDisplay:ShowMapFallback(cityID, cityData, nil)
         end
-    else
-        print("CitySiege MapDisplay: ERROR - frame or mapTexture is nil")
     end
 end
 
@@ -581,20 +564,13 @@ function MapDisplay:Show()
 end
 
 function MapDisplay:UpdateMapData(cityID, data)
-    print("CitySiege MapDisplay: UpdateMapData called")
-    print("CitySiege MapDisplay: cityID=" .. tostring(cityID) .. ", currentCityID=" .. tostring(currentCityID))
-    print("CitySiege MapDisplay: frame=" .. tostring(frame) .. ", data=" .. tostring(data))
-    
     if not frame or not data then 
-        print("CitySiege MapDisplay: ERROR - frame or data is nil!")
         return 
     end
     if currentCityID ~= cityID then 
-        print("CitySiege MapDisplay: ERROR - cityID mismatch!")
         return 
     end
-    
-    print("CitySiege MapDisplay: Clearing existing icons")
+
     -- Clear existing icons
     if frame.mapIcons then
         for _, icon in ipairs(frame.mapIcons) do
@@ -605,27 +581,17 @@ function MapDisplay:UpdateMapData(cityID, data)
     
     -- Add waypoint icons
     if data.waypoints then
-        print("CitySiege MapDisplay: Adding " .. #data.waypoints .. " waypoint icons")
         for i, wp in ipairs(data.waypoints) do
-            print(string.format("CitySiege MapDisplay: Creating waypoint icon %d at %.2f, %.2f, %.2f", 
-                i, wp.x, wp.y, wp.z))
             local icon = MapDisplay:CreateIcon(wp.x, wp.y, wp.z, "waypoint", i)
             table.insert(frame.mapIcons, icon)
         end
-    else
-        print("CitySiege MapDisplay: No waypoints in data")
     end
     
     -- Add leader icon
     if data.leaderPos then
-        print("CitySiege MapDisplay: Adding leader icon")
         local icon = MapDisplay:CreateIcon(data.leaderPos.x, data.leaderPos.y, data.leaderPos.z, "leader")
         table.insert(frame.mapIcons, icon)
-    else
-        print("CitySiege MapDisplay: No leader position in data")
     end
-    
-    print("CitySiege MapDisplay: Total icons created: " .. #frame.mapIcons)
 end
 
 function MapDisplay:CreateIcon(x, y, z, iconType, index)

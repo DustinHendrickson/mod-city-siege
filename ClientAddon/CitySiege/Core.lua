@@ -123,8 +123,12 @@ end
 
 function Core:PLAYER_REGEN_DISABLED()
     -- Entered combat
-    if CitySiege_MainFrame and not CitySiege_Config:GetUISettings().showInCombat then
-        if CitySiege_MainFrame.Hide then
+    if CitySiege_MainFrame then
+        CitySiege_MainFrame.wasShownBeforeCombat = CitySiege_MainFrame:IsShown()
+
+        if not CitySiege_Config:GetUISettings().showInCombat and
+           CitySiege_MainFrame.wasShownBeforeCombat and
+           CitySiege_MainFrame.Hide then
             CitySiege_MainFrame:Hide()
         end
     end
@@ -132,10 +136,16 @@ end
 
 function Core:PLAYER_REGEN_ENABLED()
     -- Left combat
-    if CitySiege_MainFrame and CitySiege_Config:GetUISettings().showInCombat then
-        if CitySiege_MainFrame.wasShownBeforeCombat then
+    if CitySiege_MainFrame and
+       not CitySiege_Config:GetUISettings().showInCombat and
+       CitySiege_MainFrame.wasShownBeforeCombat then
+        if CitySiege_MainFrame.Show then
             CitySiege_MainFrame:Show()
         end
+    end
+
+    if CitySiege_MainFrame then
+        CitySiege_MainFrame.wasShownBeforeCombat = false
     end
 end
 
@@ -258,7 +268,7 @@ function Core:ShowHelp()
     CitySiege_Utils:Print("|cFFFFFF00/cs start [city]|r - Start a siege (GM only)")
     CitySiege_Utils:Print("|cFFFFFF00/cs stop [city] [faction]|r - Stop a siege (GM only)")
     CitySiege_Utils:Print("|cFFFFFF00/cs cleanup [city]|r - Clean up siege NPCs (GM only)")
-    CitySiege_Utils:Print("|cFFFFFF00/cs info|r - Show detailed info (GM only)")
+    CitySiege_Utils:Print("|cFFFFFF00/cs info|r - Show info for your selected siege NPC/playerbot (GM only)")
     CitySiege_Utils:Print("|cFFFFFF00/cs reload|r - Reload config (Admin only)")
     CitySiege_Utils:Print("|cFFFFFF00/cs reset|r - Reset addon settings")
     CitySiege_Utils:Print("|cFF00FF00/cs testmap [cityID]|r - Enable test mode with demo data")
@@ -299,7 +309,7 @@ function Core:ToggleMinimap()
 end
 
 function Core:RequestStatus()
-    SendChatMessage(".citysiege sync", "GUILD")
+    CitySiege_Utils:ExecuteServerCommand(".citysiege sync")
     -- Silent operation - no user-facing message
 end
 
@@ -308,7 +318,7 @@ function Core:SendCommand(cmd, arg1, arg2)
     if arg1 then command = command .. " " .. arg1 end
     if arg2 then command = command .. " " .. arg2 end
     
-    SendChatMessage(command, "GUILD")
+    CitySiege_Utils:ExecuteServerCommand(command)
     CitySiege_Utils:Print("Command sent: " .. command)
 end
 
