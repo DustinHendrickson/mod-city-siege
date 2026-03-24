@@ -383,6 +383,26 @@ namespace CitySiegeAPI
 
         return snapshots;
     }
+
+    SiegeParticipantRole GetActiveCreatureRole(ObjectGuid const& creatureGuid)
+    {
+        if (creatureGuid.IsEmpty())
+            return SiegeParticipantRole::None;
+
+        for (SiegeEvent const& event : g_ActiveSieges)
+        {
+            if (!event.isActive)
+                continue;
+
+            if (std::find(event.spawnedCreatures.begin(), event.spawnedCreatures.end(), creatureGuid) != event.spawnedCreatures.end())
+                return SiegeParticipantRole::Attacker;
+
+            if (std::find(event.spawnedDefenders.begin(), event.spawnedDefenders.end(), creatureGuid) != event.spawnedDefenders.end())
+                return SiegeParticipantRole::Defender;
+        }
+
+        return SiegeParticipantRole::None;
+    }
 }
 
 // Waypoint visualization tracking

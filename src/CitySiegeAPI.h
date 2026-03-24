@@ -11,11 +11,19 @@
 #define MOD_CITY_SIEGE_API_H
 
 #include "Define.h"
+#include "ObjectGuid.h"
 #include <string>
 #include <vector>
 
 namespace CitySiegeAPI
 {
+    enum class SiegeParticipantRole : uint8
+    {
+        None = 0,
+        Attacker = 1,
+        Defender = 2,
+    };
+
     struct ActiveSiegeSnapshot
     {
         uint32 cityId = 0;
@@ -32,6 +40,7 @@ namespace CitySiegeAPI
     };
 
     std::vector<ActiveSiegeSnapshot> GetActiveSieges();
+    SiegeParticipantRole GetActiveCreatureRole(ObjectGuid const& creatureGuid);
 }
 
 #endif
