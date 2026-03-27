@@ -100,6 +100,16 @@ function Utils:Print(msg, r, g, b)
     DEFAULT_CHAT_FRAME:AddMessage("|cFF16C3F2[City Siege]|r " .. msg)
 end
 
+function Utils:ExecuteServerCommand(command)
+    if not command or command == "" then
+        return false
+    end
+
+    local chatType = (IsInGuild and IsInGuild()) and "GUILD" or "SAY"
+    SendChatMessage(command, chatType)
+    return true
+end
+
 -- Print debug message (only if debug enabled)
 function Utils:Debug(msg)
     -- Debug disabled

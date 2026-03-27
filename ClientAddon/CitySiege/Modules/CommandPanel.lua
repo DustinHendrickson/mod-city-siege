@@ -43,7 +43,7 @@ function CommandPanel:Create(parent)
     -- Start Siege button
     frame.startButton = self:CreateCommandButton(buttonsFrame, "Start Siege", function()
         if frame.currentCity then
-            SendChatMessage(".citysiege start " .. frame.currentCity.name, "GUILD")
+            CitySiege_Utils:ExecuteServerCommand(".citysiege start " .. frame.currentCity.name)
             CitySiege_Utils:Print("Starting siege in " .. frame.currentCity.displayName)
         end
     end, buttonWidth, buttonHeight)
@@ -54,7 +54,7 @@ function CommandPanel:Create(parent)
     frame.stopButton = self:CreateCommandButton(buttonsFrame, "Stop Siege", function()
         if frame.currentCity then
             local faction = CitySiege_Utils:GetPlayerFaction()
-            SendChatMessage(string.format(".citysiege stop %s %s", frame.currentCity.name, faction), "GUILD")
+            CitySiege_Utils:ExecuteServerCommand(string.format(".citysiege stop %s %s", frame.currentCity.name, faction))
             CitySiege_Utils:Print("Stopping siege in " .. frame.currentCity.displayName)
         end
     end, buttonWidth, buttonHeight)
@@ -64,7 +64,7 @@ function CommandPanel:Create(parent)
     -- Cleanup button
     frame.cleanupButton = self:CreateCommandButton(buttonsFrame, "Cleanup NPCs", function()
         if frame.currentCity then
-            SendChatMessage(".citysiege cleanup " .. frame.currentCity.name, "GUILD")
+            CitySiege_Utils:ExecuteServerCommand(".citysiege cleanup " .. frame.currentCity.name)
             CitySiege_Utils:Print("Cleaning up siege NPCs in " .. frame.currentCity.displayName)
         end
     end, buttonWidth, buttonHeight)
@@ -73,28 +73,29 @@ function CommandPanel:Create(parent)
     
     -- Status button
     frame.statusButton = self:CreateCommandButton(buttonsFrame, "Show Status", function()
-        SendChatMessage(".citysiege status", "GUILD")
+        CitySiege_Utils:ExecuteServerCommand(".citysiege status")
     end, buttonWidth, buttonHeight)
     frame.statusButton:SetPoint("TOP", 0, buttonY)
     buttonY = buttonY - buttonSpacing
     
     -- Info button
-    frame.infoButton = self:CreateCommandButton(buttonsFrame, "Detailed Info", function()
-        SendChatMessage(".citysiege info", "GUILD")
+    frame.infoButton = self:CreateCommandButton(buttonsFrame, "Selected Unit Info", function()
+        CitySiege_Utils:ExecuteServerCommand(".citysiege info")
+        CitySiege_Utils:Print("Select a siege NPC or playerbot before using Selected Unit Info.")
     end, buttonWidth, buttonHeight)
     frame.infoButton:SetPoint("TOP", 0, buttonY)
     buttonY = buttonY - buttonSpacing
     
     -- Reload button
     frame.reloadButton = self:CreateCommandButton(buttonsFrame, "Reload Config", function()
-        SendChatMessage(".citysiege reload", "GUILD")
+        CitySiege_Utils:ExecuteServerCommand(".citysiege reload")
     end, buttonWidth, buttonHeight)
     frame.reloadButton:SetPoint("TOP", 0, buttonY)
     
     -- Warning text
     local warning = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     warning:SetPoint("BOTTOM", 0, 25)
-    warning:SetText("|cFFFF8800Note: GM/Admin commands only|r")
+    warning:SetText("|cFFFF8800Note: GM/Admin commands only. Unit Info requires a selected siege unit.|r")
     
     return frame
 end

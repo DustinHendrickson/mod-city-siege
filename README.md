@@ -97,6 +97,7 @@ Game Masters with `SEC_GAMEMASTER` security level have access to manual siege co
 - `.citysiege stop <cityname> <faction>` - Stop an active siege and declare a winner
 - `.citysiege cleanup [cityname]` - Force cleanup of siege creatures
 - `.citysiege status` - Display current siege events and module status
+- `.citysiege info` - Inspect the currently selected siege NPC or playerbot
 - `.citysiege testwaypoint` - Spawn a temporary test marker at your position (20 seconds)
 - `.citysiege waypoints <cityname>` - Toggle visualization of siege waypoint path
 - `.citysiege reload` - Reload configuration from file (Administrator only)
@@ -169,6 +170,19 @@ Displays the current status of the City Siege module and all active events.
   - Time remaining in the event
   - Number of creatures alive
 - Time until next automatic siege event
+
+#### `.citysiege info`
+Displays waypoint and target information for the currently selected siege NPC or playerbot.
+
+**Usage:**
+```
+.citysiege info
+```
+
+**Notes:**
+- Requires a siege NPC or siege playerbot to be selected first
+- Useful for diagnosing waypoint progress and stuck units
+- Reports the unit's current target and distance to that target
 
 #### `.citysiege testwaypoint`
 Spawns a temporary waypoint marker at your current position for 20 seconds. Use this to preview and test waypoint positions before adding them to the config file.
@@ -352,16 +366,16 @@ CitySiege.Creature.Horde.Defender      | Horde defender creature entry ID.      
 
 All creature entries are fully configurable:
 
-Setting                                      | Description                    | Default
----------------------------------------------|--------------------------------|--------
-CitySiege.Creature.Alliance.Minion           | Alliance attacker minion       | 17919
-CitySiege.Creature.Alliance.Elite            | Alliance attacker elite        | 17920
-CitySiege.Creature.Alliance.MiniBoss         | Alliance attacker mini-boss    | 17921
-CitySiege.Creature.Alliance.Leader           | Alliance attacker leader       | 17928
-CitySiege.Creature.Horde.Minion              | Horde attacker minion          | 17932
-CitySiege.Creature.Horde.Elite               | Horde attacker elite           | 17933
-CitySiege.Creature.Horde.MiniBoss            | Horde attacker mini-boss       | 17934
-CitySiege.Creature.Horde.Leader              | Horde attacker leader          | 17936
+Setting                                      | Description                                        | Default
+---------------------------------------------|----------------------------------------------------|--------
+CitySiege.Creature.Alliance.Minion           | Alliance attacker minion                           | 17919
+CitySiege.Creature.Alliance.Elite            | Alliance attacker elite                            | 17920
+CitySiege.Creature.Alliance.MiniBoss         | Alliance attacker mini-boss                        | 17921
+CitySiege.Creature.Horde.Minion              | Horde attacker minion                              | 17932
+CitySiege.Creature.Horde.Elite               | Horde attacker elite                               | 17933
+CitySiege.Creature.Horde.MiniBoss            | Horde attacker mini-boss                           | 17934
+
+Attacking leaders are chosen randomly from the opposing faction's city leader pool.
 
 ### Level Settings
 
@@ -449,9 +463,9 @@ CitySiege.RewardGoldPerLevel           | Additional gold per player level in cop
 
 Setting                                | Description                                           | Default
 ---------------------------------------|-------------------------------------------------------|--------
-CitySiege.Message.SiegeStart           | Message when siege begins (use %s for city name).     | \|cffff0000[City Siege]\|r The city of %s is under attack! Defenders are needed!
-CitySiege.Message.SiegeEnd             | Message when siege ends (use %s for city name).       | \|cff00ff00[City Siege]\|r The siege of %s has ended!
-CitySiege.Message.Reward               | Message sent to rewarded players (use %s for city).   | \|cff00ff00[City Siege]\|r You have been rewarded for defending %s!
+CitySiege.Message.SiegeStart           | Message when siege begins (use {CITYNAME}).           | \|cffff0000[City Siege]\|r The city of {CITYNAME} is under attack! Defenders are needed!
+CitySiege.Message.SiegeEnd             | Message when siege ends (use {CITYNAME}).             | \|cff00ff00[City Siege]\|r The siege of {CITYNAME} has ended!
+CitySiege.Message.Reward               | Base reward message ({CITYNAME}, {ACTION}).          | \|cff00ff00[City Siege]\|r You have been rewarded for {ACTION} {CITYNAME}!
 
 ### Creature Yells
 
@@ -475,7 +489,7 @@ To use custom creatures for siege events:
 All announcement messages and creature yells are configurable in `mod_city_siege.conf`:
 
 1. **Announcement Messages:**  
-   Edit `CitySiege.Message.SiegeStart`, `CitySiege.Message.SiegeEnd`, and `CitySiege.Message.Reward` to customize text. Use `%s` as a placeholder for the city name.
+  Edit `CitySiege.Message.SiegeStart`, `CitySiege.Message.SiegeEnd`, and `CitySiege.Message.Reward` to customize text. Use `{CITYNAME}` for the city name and `{ACTION}` in the reward message for defending/conquering.
 
 2. **Creature Yells:**  
    - `CitySiege.Yell.LeaderSpawn`: Message leaders yell when they spawn
@@ -566,7 +580,7 @@ Troubleshooting
 > Ensure that `CitySiege.Enabled = 1` and at least one city is enabled in the configuration file. Check server logs for any errors.
 
 > **No announcements appearing.**  
-> Verify `CitySiege.AnnounceRadius` is set correctly. If using a radius value, ensure players are within range of the city center. Set to 0 for world-wide announcements.
+> Verify `CitySiege.AnnounceRadius` is set correctly. This radius applies to siege start/end, countdown, battle start, and periodic status messages. Set to 0 for world-wide announcements.
 
 > **Configuration changes not taking effect.**  
 > Confirm the config file is in the correct location (`/path/to/server/etc/modules/mod_city_siege.conf`), check file permissions, and restart the worldserver after making changes.

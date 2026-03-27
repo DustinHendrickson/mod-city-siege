@@ -103,10 +103,7 @@ function EventHandler:ParseAddonMessage(message)
         
         if #parts >= 2 then
             local cityID = tonumber(parts[2])
-            print("CitySiege: Requesting map data from server for city " .. cityID)
-            -- Use SendChatMessage instead of RunMacroText to avoid permission issues
-            -- This sends the command to the server which is available to all players (SEC_PLAYER)
-            SendChatMessage(".citysiege mapdata " .. cityID, "GUILD")
+            CitySiege_Utils:ExecuteServerCommand(".citysiege mapdata " .. cityID)
         end
         return
         
@@ -156,10 +153,32 @@ function EventHandler:ParseAddonMessage(message)
             
             -- Parse waypoints, attacker positions, defender positions, bot positions
             local data = {
-                waypoints = {}
+                waypoints = {},
+                attackerPositions = {},
+                defenderPositions = {},
+                attackerBots = {},
+                defenderBots = {}
             }
-            
+
             local i = 9
+
+            local function parsePositionSection(target)
+                i = i + 1
+                local count = tonumber(parts[i]) or 0
+                i = i + 1
+
+                for j = 1, count do
+                    if i + 2 <= #parts then
+                        table.insert(target, {
+                            x = tonumber(parts[i]),
+                            y = tonumber(parts[i + 1]),
+                            z = tonumber(parts[i + 2])
+                        })
+                        i = i + 3
+                    end
+                end
+            end
+            
             while i <= #parts do
                 local section = parts[i]
                 
@@ -178,6 +197,14 @@ function EventHandler:ParseAddonMessage(message)
                             i = i + 3
                         end
                     end
+                elseif section == "ATK" then
+                    parsePositionSection(data.attackerPositions)
+                elseif section == "DEF" then
+                    parsePositionSection(data.defenderPositions)
+                elseif section == "BATK" then
+                    parsePositionSection(data.attackerBots)
+                elseif section == "BDEF" then
+                    parsePositionSection(data.defenderBots)
                 else
                     i = i + 1
                 end
@@ -195,19 +222,13 @@ function EventHandler:ParseAddonMessage(message)
         
     elseif command == "MAP_DATA" then
         -- Format: MAP_DATA:cityID:WP:count:x:y:z...:LEADER:x:y:z
-        print("CitySiege: Received MAP_DATA command")
-        print("CitySiege: Full message: " .. tostring(message))
-        
         local parts = {}
         for part in string.gmatch(message, "([^:]+)") do
             table.insert(parts, part)
         end
         
-        print("CitySiege: Parsed " .. #parts .. " parts")
-        
         if #parts >= 2 then
             local cityID = tonumber(parts[2])
-            print("CitySiege: CityID: " .. tostring(cityID))
             
             local data = {
                 waypoints = {},
@@ -222,7 +243,6 @@ function EventHandler:ParseAddonMessage(message)
                     -- Waypoints
                     i = i + 1
                     local wpCount = tonumber(parts[i]) or 0
-                    print("CitySiege: Found " .. wpCount .. " waypoints")
                     i = i + 1
                     for j = 1, wpCount do
                         if i + 2 <= #parts then
@@ -231,7 +251,6 @@ function EventHandler:ParseAddonMessage(message)
                                 y = tonumber(parts[i + 1]),
                                 z = tonumber(parts[i + 2])
                             }
-                            print(string.format("CitySiege: Waypoint %d: %.2f, %.2f, %.2f", j, wp.x, wp.y, wp.z))
                             table.insert(data.waypoints, wp)
                             i = i + 3
                         end
@@ -245,23 +264,16 @@ function EventHandler:ParseAddonMessage(message)
                             y = tonumber(parts[i + 2]),
                             z = tonumber(parts[i + 3])
                         }
-                        print(string.format("CitySiege: Leader pos: %.2f, %.2f, %.2f", 
-                            data.leaderPos.x, data.leaderPos.y, data.leaderPos.z))
                         i = i + 4
                     end
                 else
                     i = i + 1
                 end
             end
-            
-            print("CitySiege: Total waypoints parsed: " .. #data.waypoints)
-            
+
             -- Send to MapDisplay
             if CitySiege_MapDisplay then
-                print("CitySiege: Calling MapDisplay:UpdateMapData")
                 CitySiege_MapDisplay:UpdateMapData(cityID, data)
-            else
-                print("CitySiege: ERROR - CitySiege_MapDisplay is nil!")
             end
         end
     end
@@ -340,6 +352,10 @@ function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCo
             -- Update waypoint data if provided
             if data then
                 siegeData.waypoints = data.waypoints or {}
+                siegeData.attackerPositions = data.attackerPositions or {}
+                siegeData.defenderPositions = data.defenderPositions or {}
+                siegeData.attackerBots = data.attackerBots or {}
+                siegeData.defenderBots = data.defenderBots or {}
             end
             
             if not siegeData.stats then
@@ -415,6 +431,6 @@ function EventHandler:SendToServer(command, ...)
         SendAddonMessage("CitySiege", message, "GUILD")
     else
         -- Fallback: Use chat command (server should handle this)
-        SendChatMessage(".citysiege " .. message, "GUILD")
+        CitySiege_Utils:ExecuteServerCommand(".citysiege " .. message)
     end
 end

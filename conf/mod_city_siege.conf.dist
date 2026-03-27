@@ -45,6 +45,7 @@ CitySiege.AllowMultipleCities = 0
 #
 #    CitySiege.AnnounceRadius
 #        Description: Radius (in yards) for announcing siege events to nearby players.
+#                     Applies to siege start/end, countdown, battle start, and status messages.
 #                     Set to 0 to announce to the entire world.
 #        Default:     1500
 CitySiege.AnnounceRadius = 1500
@@ -482,6 +483,7 @@ CitySiege.SpawnCount.Leaders = 1
 # These define which creature entries to use for siege forces.
 # Attacking faction leaders are now randomly selected from opposing faction city leader pools for variety.
 # Each siege will feature a different opposing faction leader leading the attack.
+# There are no separate config keys for individual attacker leader entries.
 #
 # Alliance attackers spawn Footmen, Knights, Riflemen, and a random Horde city leader.
 # Horde attackers spawn Grunts, Tauren Warriors, Headhunters, and a random Alliance city leader.
@@ -811,9 +813,10 @@ CitySiege.Message.SiegeEnd = "|cff00ff00[City Siege]|r The siege of {CITYNAME} h
 
 #
 #    CitySiege.Message.Reward
-#        Description: Message sent to players when they receive rewards. Use {CITYNAME} for city name.
-#        Default:     "|cff00ff00[City Siege]|r You have been rewarded for defending {CITYNAME}!"
-CitySiege.Message.Reward = "|cff00ff00[City Siege]|r You have been rewarded for defending {CITYNAME}!"
+#        Description: Base message sent to rewarded players.
+#                     Use {CITYNAME} for the city name and {ACTION} for defending/conquering.
+#        Default:     "|cff00ff00[City Siege]|r You have been rewarded for {ACTION} {CITYNAME}!"
+CitySiege.Message.Reward = "|cff00ff00[City Siege]|r You have been rewarded for {ACTION} {CITYNAME}!"
 
 ###############################################
 # Creature Yells

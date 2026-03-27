@@ -250,9 +250,6 @@ function MainFrame:CreateTabContent()
     frame.mapContent:SetPoint("BOTTOMRIGHT", -5, 5)
     frame.mapContent:Hide()
     
-    print("CitySiege MainFrame: About to create MapDisplay")
-    print("CitySiege MainFrame: CitySiege_MapDisplay exists: " .. tostring(CitySiege_MapDisplay ~= nil))
-    
     if CitySiege_MapDisplay then
         local success, result = pcall(function()
             return CitySiege_MapDisplay:Create(frame.mapContent)
@@ -261,12 +258,7 @@ function MainFrame:CreateTabContent()
         if success then
             -- Store reference to the module, not just the frame
             mapDisplay = CitySiege_MapDisplay
-            print("CitySiege MainFrame: MapDisplay created successfully, result: " .. tostring(result))
-        else
-            print("CitySiege MainFrame: ERROR creating MapDisplay: " .. tostring(result))
         end
-    else
-        print("CitySiege MainFrame: ERROR - CitySiege_MapDisplay module not loaded!")
     end
     
     -- Info tab
@@ -364,22 +356,17 @@ function MainFrame:ShowTab(tabIndex)
         frame.commandsContent:Show()
     elseif tabIndex == 2 and frame.mapContent then
         frame.mapContent:Show()
-        print("CitySiege: Showing Map tab, currentCityID: " .. tostring(currentCityID))
         if mapDisplay then
-            print("CitySiege: mapDisplay frame exists, calling CitySiege_MapDisplay:SetCity")
             CitySiege_MapDisplay:SetCity(currentCityID)
             
             -- Request map data from server if a city is selected
             if currentCityID then
-                print("CitySiege: Requesting map data for city " .. currentCityID)
                 -- Trigger local REQUEST_MAP handling which will execute the server command
                 -- This allows non-GM players to request map data
                 if CitySiege_EventHandler then
                     CitySiege_EventHandler:ParseAddonMessage("REQUEST_MAP:" .. currentCityID)
                 end
             end
-        else
-            print("CitySiege: ERROR - mapDisplay frame is nil!")
         end
     elseif tabIndex == 3 and frame.infoContent then
         frame.infoContent:Show()
@@ -391,11 +378,7 @@ function MainFrame:ShowTab(tabIndex)
 end
 
 function MainFrame:SelectCity(cityID)
-    print("CitySiege: SelectCity called with cityID: " .. tostring(cityID))
-    
     currentCityID = cityID
-    
-    print("CitySiege: currentCityID set to: " .. tostring(currentCityID))
     
     -- Update CommandPanel with the selected city
     if commandPanel then
@@ -599,42 +582,9 @@ function MainFrame:UpdateStatsText()
         text = text .. "Win Rate: |cFF808080N/A|r\n\n"
     end
     
-    -- Combat Statistics
     text = text .. "|cFF00FF00=== Combat Statistics ===|r\n"
-    text = text .. string.format("Total Kills: |cFF00FF00%s|r\n", CitySiege_Utils:FormatNumber(stats.totalKills or 0))
-    text = text .. string.format("Total Deaths: |cFFFF0000%s|r\n", CitySiege_Utils:FormatNumber(stats.totalDeaths or 0))
-    
-    -- K/D Ratio
-    if stats.totalDeaths and stats.totalDeaths > 0 then
-        local kd = (stats.totalKills or 0) / stats.totalDeaths
-        local color = kd >= 2.0 and "|cFF00FF00" or (kd >= 1.0 and "|cFFFFFF00" or "|cFFFF0000")
-        text = text .. string.format("K/D Ratio: %s%.2f|r\n\n", color, kd)
-    else
-        text = text .. "K/D Ratio: |cFF808080N/A|r\n\n"
-    end
-    
-    -- Averages
-    if stats.siegesParticipated and stats.siegesParticipated > 0 then
-        local avgKills = (stats.totalKills or 0) / stats.siegesParticipated
-        local avgDeaths = (stats.totalDeaths or 0) / stats.siegesParticipated
-        text = text .. "|cFF00FF00=== Averages Per Siege ===|r\n"
-        text = text .. string.format("Avg Kills: |cFFFFFFFF%.1f|r\n", avgKills)
-        text = text .. string.format("Avg Deaths: |cFFFFFFFF%.1f|r\n\n", avgDeaths)
-    end
-    
-    -- Role Performance (if data available)
-    if stats.attackerSieges or stats.defenderSieges then
-        text = text .. "|cFF00FF00=== Role Performance ===|r\n"
-        text = text .. string.format("As Attacker: |cFFFF0000%d|r sieges\n", stats.attackerSieges or 0)
-        text = text .. string.format("As Defender: |cFF0088FF%d|r sieges\n\n", stats.defenderSieges or 0)
-    end
-    
-    -- City-specific stats (if available)
-    if stats.citiesAttacked or stats.citiesDefended then
-        text = text .. "|cFF00FF00=== City Experience ===|r\n"
-        text = text .. string.format("Cities Attacked: %d\n", stats.citiesAttacked or 0)
-        text = text .. string.format("Cities Defended: %d\n\n", stats.citiesDefended or 0)
-    end
+    text = text .. "Combat kills and deaths are not currently synchronized\n"
+    text = text .. "by the City Siege server addon bridge.\n\n"
     
     -- Performance Rating
     if hasExperience then
@@ -659,7 +609,7 @@ function MainFrame:UpdateStatsText()
         text = text .. string.format("Rank: %s%s|r\n", ratingColor, rating)
     end
     
-    text = text .. "\n|cFF808080Stats update in real-time during sieges|r"
+    text = text .. "\n|cFF808080Tracked stats update when completed sieges end.|r"
     
     if frame.statsContent and frame.statsContent.statsText then
         frame.statsContent.statsText:SetText(text)

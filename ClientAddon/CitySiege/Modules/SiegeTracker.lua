@@ -160,8 +160,17 @@ function Tracker:RemoveSiege(cityID, winner)
         end
     end
     
-    -- Update statistics
-    CitySiege_Config:IncrementStat("siegesParticipated", 1)
+    -- Update tracked statistics only for completed sieges with a real winner.
+    if winner == "Alliance" or winner == "Horde" then
+        CitySiege_Config:IncrementStat("siegesParticipated", 1)
+
+        local playerFaction = UnitFactionGroup("player")
+        if playerFaction == winner then
+            CitySiege_Config:IncrementStat("siegesWon", 1)
+        else
+            CitySiege_Config:IncrementStat("siegesLost", 1)
+        end
+    end
     
     -- Remove from active sieges
     activeSieges[cityID] = nil
@@ -278,8 +287,8 @@ function Tracker:GetNPCs(cityID)
 end
 
 function Tracker:RequestStatusUpdate()
-    -- Send command to get status (silent operation)
-    SendChatMessage(".citysiege status", "GUILD")
+    -- Request authoritative addon sync instead of parsing human-readable status text.
+    CitySiege_Utils:ExecuteServerCommand(".citysiege sync")
 end
 
 function Tracker:CheckCitySiege(cityID)

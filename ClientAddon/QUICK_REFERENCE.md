@@ -3,7 +3,7 @@
 ## 🚀 Quick Start
 
 1. **Install addon** → Copy `CitySiege` folder to `WoW/Interface/AddOns/`
-2. **Install libraries** → Download Ace3 from CurseForge, copy Libs to `CitySiege/Libs/`
+2. **Libraries are bundled** → Keep the included `Libs/` folder inside `CitySiege/`
 3. **Launch WoW** → Enable addon at character select
 4. **Open addon** → Click minimap button or type `/cs`
 
@@ -32,7 +32,7 @@
 | **Commands** | Execute GM siege commands with buttons |
 | **Map** | Live visualization of siege battlefield |
 | **Info** | Active siege details and status |
-| **Stats** | Your personal performance statistics |
+| **Stats** | Your tracked siege participation and outcomes |
 
 ## 🎨 Color Guide
 
@@ -86,16 +86,16 @@
 | Stop | `.citysiege stop [city] [faction]` | End a siege |
 | Cleanup | `.citysiege cleanup [city]` | Remove NPCs |
 | Status | `.citysiege status` | Show all sieges |
-| Info | `.citysiege info` | Detailed information |
+| Info | `.citysiege info` | Info for selected siege NPC/playerbot |
 | Reload | `.citysiege reload` | Refresh config |
 
 ## 🔧 Troubleshooting Quick Fixes
 
 | Problem | Solution |
 |---------|----------|
-| **Addon won't load** | Check libraries are installed; verify folder name is `CitySiege` |
+| **Addon won't load** | Check bundled libraries are present; verify folder name is `CitySiege` |
 | **No minimap button** | Type `/cs minimap` to unhide |
-| **Lua errors** | Install BugSack addon; check all Ace3 libs present |
+| **Lua errors** | Install BugSack addon; check all bundled library folders are present |
 | **Commands fail** | Need GM permissions; check server has module |
 | **Map empty** | Ensure siege is active; check map settings toggles |
 | **Settings reset** | Check SavedVariables folder wasn't deleted |
@@ -107,9 +107,7 @@
 | **Participated** | Number of sieges you've joined |
 | **Won/Lost** | Your siege victory record |
 | **Win Rate** | Percentage of sieges won |
-| **Total Kills** | Enemy players killed |
-| **Total Deaths** | Times you died |
-| **K/D Ratio** | Kills divided by deaths |
+| **Combat Kills/Deaths** | Not currently synchronized by the server addon bridge |
 
 ## 🔔 Notification Types
 
@@ -199,29 +197,13 @@ WoW/Screenshots/
 | **Solo play** | Show everything for full awareness |
 | **PvP focus** | Disable auto-hide, Lock UI |
 
-## 🎁 Hidden Features
-
-- **Double-click** title bar to minimize (planned)
-- **Shift-click** map to set personal waypoint (planned)
-- **Alt-click** player name to whisper (planned)
-- **Ctrl-click** to focus target (planned)
-
-## 🔮 Coming Soon
-
-- Heat maps for combat zones
-- Replay system
-- Guild leaderboards
-- Achievement integration
-- Custom alert sounds
-- Advanced statistics
-
 ---
 
 ## 📋 Checklist for New Users
 
 ```
 □ Addon installed in AddOns folder
-□ Ace3 libraries downloaded and placed
+□ Bundled libraries present in `CitySiege/Libs`
 □ Addon enabled at character select
 □ Welcome message appeared in chat
 □ Minimap button visible
@@ -230,7 +212,7 @@ WoW/Screenshots/
 □ All tabs accessible
 □ Map displays when siege active
 □ Notifications working
-□ Statistics tracking
+□ Siege participation tracking
 ```
 
 ---
