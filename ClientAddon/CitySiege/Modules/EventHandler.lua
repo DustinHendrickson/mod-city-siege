@@ -163,7 +163,10 @@ function EventHandler:ParseAddonMessage(message)
                 defenderBots = {}
             }
             
-            local i = 12
+            -- Section markers begin right after leaderName (part 9), so the
+            -- first one is part 10. Scanning from 12 skipped the WP block
+            -- entirely and left the map with no route to draw.
+            local i = 10
             while i <= #parts do
                 local section = parts[i]
                 
@@ -356,6 +359,8 @@ function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCo
             siegeData.remaining = remaining
             siegeData.leaderHealth = leaderHealth
             siegeData.leaderName = leaderName
+            -- Stamped so the UI can count the timer down between server packets.
+            siegeData.syncTime = GetTime()
             
             -- Update waypoint and position data if provided
             if data then
@@ -381,14 +386,15 @@ function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCo
                 leaderName = leaderName,
                 status = "Active",
                 startTime = GetTime() - (elapsed or 0),
+                syncTime = GetTime(),
                 waypoints = data and data.waypoints or {},
                 attackerPositions = data and data.attackerPositions or {},
                 defenderPositions = data and data.defenderPositions or {},
                 attackerBots = data and data.attackerBots or {},
                 defenderBots = data and data.defenderBots or {},
                 stats = {
-                    attackerKills = attackerKills or 0,
-                    defenderKills = defenderKills or 0,
+                    attackerKills = 0,
+                    defenderKills = 0,
                 },
             }
             CitySiege_SiegeTracker:AddSiege(cityID, siegeData)

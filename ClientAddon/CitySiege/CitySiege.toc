@@ -1,10 +1,10 @@
 ## Interface: 30300
-## Title: |cFF16C3F2City|r|cFFFFFFFFSiege|r
-## Notes: Adds a comprehensive UI for the City Siege server module with map display, statistics, and command interface.
+## Title: City Siege
+## Notes: Live siege tracker for the City Siege server module - battle map, status overview and GM controls.
 ## Author: AzerothCore
-## Version: 1.0.0
+## Version: 2.0.0
 ## SavedVariables: CitySiegeDB
-## OptionalDeps: Ace3, LibStub, LibDBIcon-1.0, LibDataBroker-1.1
+## OptionalDeps: Ace3, LibStub
 
 # Libraries
 Libs\LibStub\LibStub.lua
@@ -13,10 +13,6 @@ Libs\AceAddon-3.0\AceAddon-3.0.xml
 Libs\AceEvent-3.0\AceEvent-3.0.xml
 Libs\AceDB-3.0\AceDB-3.0.xml
 Libs\AceConsole-3.0\AceConsole-3.0.xml
-Libs\AceGUI-3.0\AceGUI-3.0.xml
-Libs\AceConfig-3.0\AceConfig-3.0.xml
-Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
-Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
 
 # Localization
 Locales\enUS.lua
@@ -28,18 +24,18 @@ Locales\zhCN.lua
 
 # Core Files
 Constants.lua
+Utils.lua
 Config.lua
 Core.lua
-Utils.lua
+
+# UI toolkit (must load before any module that draws)
+Modules\UI.lua
 
 # Modules
-Modules\MinimapButton.lua
 Modules\SiegeTracker.lua
 Modules\EventHandler.lua
+Modules\MapDisplay.lua
 Modules\CommandPanel.lua
 Modules\SettingsPanel.lua
-Modules\MapDisplay.lua
 Modules\MainFrame.lua
-
-# XML Templates
-Templates.xml
+Modules\MinimapButton.lua

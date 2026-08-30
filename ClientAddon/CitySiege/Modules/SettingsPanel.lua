@@ -14,37 +14,20 @@ function SettingsPanel:Create()
         return frame
     end
     
-    frame = CreateFrame("Frame", "CitySiegeSettingsPanel", UIParent)
-    frame:SetSize(500, 600)
-    frame:SetPoint("CENTER")
+    local UI = CitySiege_UI
+
+    frame = UI:CreateWindow("CitySiegeSettingsPanel", "City Siege Settings", 460, 560)
     frame:SetFrameStrata("DIALOG")
-    frame:EnableMouse(true)
-    frame:SetMovable(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:Hide()
-    
-    -- Background
-    CitySiege_Utils:SetBackdrop(frame, 0, 0, 0, 0.9)
-    
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFF16C3F2City Siege|r Settings")
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    closeBtn:SetScript("OnClick", function() frame:Hide() end)
-    
-    -- Scroll frame for settings (must have a name in 3.3.5)
-    local scrollFrame = CreateFrame("ScrollFrame", "CitySiegeSettingsScrollFrame", frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 10, -50)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
-    
+
+    -- Recessed well, then a scroll frame inside it (named, as 3.3.5 requires).
+    local inset = UI:CreateInset(frame, 16, 16, 40, 44)
+
+    local scrollFrame = CreateFrame("ScrollFrame", "CitySiegeSettingsScrollFrame", inset, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 8, -8)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -28, 8)
+
     local content = CreateFrame("Frame", "CitySiegeSettingsScrollChild", scrollFrame)
-    content:SetSize(450, 1200)
+    content:SetSize(390, 1200)
     scrollFrame:SetScrollChild(content)
     
     local yOffset = -10
@@ -170,19 +153,14 @@ function SettingsPanel:Create()
     yOffset = yOffset - 60
     
     -- Bottom buttons
-    local resetBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    resetBtn:SetSize(120, 25)
-    resetBtn:SetPoint("BOTTOMLEFT", 10, 10)
-    resetBtn:SetText("Reset All")
-    resetBtn:SetScript("OnClick", function()
+    local resetBtn = UI:CreateButton(frame, "Reset All", 120, 22, function()
         StaticPopup_Show("CITYSIEGE_RESET_SETTINGS")
     end)
-    
-    local closeBottomBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    closeBottomBtn:SetSize(120, 25)
-    closeBottomBtn:SetPoint("BOTTOMRIGHT", -10, 10)
-    closeBottomBtn:SetText("Close")
-    closeBottomBtn:SetScript("OnClick", function() frame:Hide() end)
+    resetBtn:SetPoint("BOTTOMLEFT", 18, 16)
+    UI:SetTooltip(resetBtn, "Reset All", "Restore every addon setting to its default.")
+
+    local closeBottomBtn = UI:CreateButton(frame, "Close", 120, 22, function() frame:Hide() end)
+    closeBottomBtn:SetPoint("BOTTOMRIGHT", -18, 16)
     
     -- Load current settings
     self:LoadSettings()
@@ -194,8 +172,12 @@ function SettingsPanel:AddSectionHeader(parent, text, yOffset)
     local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     header:SetPoint("TOPLEFT", 10, yOffset)
     header:SetText(text)
-    header:SetTextColor(0.09, 0.76, 0.95) -- City Siege blue
-    return yOffset - 30
+    header:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+
+    local rule = CitySiege_UI:CreateDivider(parent, 360)
+    rule:SetPoint("TOPLEFT", 10, yOffset - 20)
+
+    return yOffset - 32
 end
 
 function SettingsPanel:AddCheckbox(parent, text, yOffset, onClick)
@@ -214,14 +196,19 @@ function SettingsPanel:AddCheckbox(parent, text, yOffset, onClick)
     return checkbox
 end
 
+local sliderCount = 0
+
 function SettingsPanel:AddSlider(parent, text, yOffset, minVal, maxVal, step, onChange)
-    -- Generate unique name for slider (required in 3.3.5)
-    local sliderName = "CitySiegeSlider" .. math.random(1, 100000)
+    -- Sliders must be named in 3.3.5 so the template can find their labels.
+    -- A counter is used rather than math.random so names cannot collide.
+    sliderCount = sliderCount + 1
+    local sliderName = "CitySiegeSlider" .. sliderCount
+
     local slider = CreateFrame("Slider", sliderName, parent, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", 20, yOffset)
+    slider:SetPoint("TOPLEFT", 24, yOffset)
     slider:SetMinMaxValues(minVal, maxVal)
     slider:SetValueStep(step)
-    slider:SetWidth(400)
+    slider:SetWidth(330)
     
     -- SetObeyStepOnDrag may not exist in 3.3.5
     if slider.SetObeyStepOnDrag then

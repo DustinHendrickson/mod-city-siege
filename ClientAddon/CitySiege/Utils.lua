@@ -242,5 +242,7 @@ function Utils:FormatPercent(value, total)
     return string.format("%.1f%%", percent)
 end
 
--- Global alias for compatibility
-CopyTable = CitySiege_Utils.CopyTable
+-- Note: this file used to publish `CopyTable` as a global alias of the method
+-- above. That clobbered any existing global of the same name with a function
+-- whose first argument is `self`, breaking every other caller on the client.
+-- Call CitySiege_Utils:CopyTable(...) instead.

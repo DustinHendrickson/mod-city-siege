@@ -21,15 +21,16 @@ function MapDisplay:Create(parent)
     frame:SetAllPoints(parent)
     frame:Show()
     
-    -- Title
+    -- The tab already reads "Battle Map", so this line names the city instead.
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("City Map")
+    title:SetPoint("TOP", 0, -6)
+    title:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+    title:SetText("No city selected")
     frame.titleText = title
-    
+
     -- Map container - 4:3 aspect ratio to match the actual map
     local mapContainer = CreateFrame("Frame", nil, frame)
-    mapContainer:SetPoint("CENTER", frame, "CENTER", -15, -10)
+    mapContainer:SetPoint("CENTER", frame, "CENTER", 0, -6)
     mapContainer:SetSize(460, 345)  -- Slightly smaller, maintain 4:3
     mapContainer:Show()
     frame.mapContainer = mapContainer
@@ -70,14 +71,12 @@ function MapDisplay:Create(parent)
     
     -- Legend with professional styling
     local legendFrame = CreateFrame("Frame", nil, frame)
-    legendFrame:SetSize(450, 28)
-    legendFrame:SetPoint("BOTTOM", frame, "BOTTOM", 0, 12)
-    CitySiege_Utils:SetBackdrop(legendFrame, 0.05, 0.05, 0.08, 0.85)
+    legendFrame:SetSize(470, 26)
+    legendFrame:SetPoint("BOTTOM", frame, "BOTTOM", 0, 6)
     frame.legendFrame = legendFrame
-    
-    local legend = legendFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+
+    local legend = legendFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     legend:SetPoint("CENTER", 0, 0)
-    legend:SetFont("Fonts\\FRIZQT__.TTF", 11, "OUTLINE")
     legend:SetJustifyH("CENTER")
     legend:SetText("|TInterface\\TargetingFrame\\UI-RaidTargetingIcons:18:18:0:0:64:64:48:64:16:32|t |cFFFFD700Leader|r     |TInterface\\TargetingFrame\\UI-RaidTargetingIcons:16:16:0:0:64:64:0:16:16:32|t |cFF00FF00Waypoint|r     |TInterface\\TargetingFrame\\UI-RaidTargetingIcons:16:16:0:0:64:64:32:48:16:32|t |cFF16C3F2Spawn|r")
     legend:Show()
@@ -130,7 +129,7 @@ function MapDisplay:SetCity(cityID)
         end
         
         if frame and frame.titleText then
-            frame.titleText:SetText("City Map")
+            frame.titleText:SetText("No city selected")
         end
         return
     end
@@ -141,7 +140,7 @@ function MapDisplay:SetCity(cityID)
     -- Update title
     if frame and frame.titleText then
         local color = CitySiege_GetCityColorString(cityID)
-        frame.titleText:SetText(string.format("%s%s|r Map", color, cityData.displayName))
+        frame.titleText:SetText(string.format("%s%s|r", color, cityData.displayName))
     end
     
     -- Set city map texture using our custom map files
@@ -439,7 +438,7 @@ function MapDisplay:WorldToMap(worldX, worldY, cityData)
     
     -- Per-city calibration offsets for accurate positioning
     local cityOffsets = {
-        [0] = {x = 0.12, y = 0.04, scale = 0.35, range = 1.75},  -- Stormwind
+        [0] = {x = 0.06, y = 0.10, scale = 0.36, range = 1.70},  -- Stormwind - Adjusted for front gates spawn
         [1] = {x = 0.10, y = 0.05, scale = 0.35, range = 1.75},  -- Ironforge
         [2] = {x = 0.12, y = 0.04, scale = 0.35, range = 1.75},  -- Darnassus
         [3] = {x = 0.12, y = 0.04, scale = 0.35, range = 1.75},  -- Exodar

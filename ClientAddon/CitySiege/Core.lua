@@ -52,6 +52,7 @@ function Core:OnEnable()
     self:RegisterEvent("PLAYER_LEAVING_WORLD")
     self:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     self:RegisterEvent("CHAT_MSG_SYSTEM")
+    self:RegisterEvent("CHAT_MSG_ADDON") -- Primary transport since server 2.x
     self:RegisterEvent("PLAYER_REGEN_DISABLED") -- Enter combat
     self:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Leave combat
     
@@ -60,20 +61,15 @@ function Core:OnEnable()
         RegisterAddonMessagePrefix("CitySiege")
     end
     
-    -- Add comprehensive chat filter to hide ALL CitySiege-related messages
+    -- Hide raw protocol traffic if the server is configured to use the legacy
+    -- system-chat transport. Only the exact prefix is matched: the old filter
+    -- swallowed anything containing "UPDATE:" or "END:", which ate unrelated
+    -- messages from the server and from other addons.
     ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", function(self, event, message, ...)
-        if message then
-            -- Filter out any message containing CitySiege data markers
-            if string.find(message, "CitySiege") or 
-               string.find(message, "UPDATE:") or 
-               string.find(message, "START:") or 
-               string.find(message, "END:") or
-               string.find(message, "MAP_DATA:") or
-               string.find(message, "POS:") then
-                return true -- Filter it out (hide it)
-            end
+        if message and string.find(message, "^CitySiege\t") then
+            return true
         end
-        return false -- Show it
+        return false
     end)
     
     -- Initialize modules
@@ -141,6 +137,16 @@ function Core:PLAYER_REGEN_ENABLED()
         if CitySiege_MainFrame.wasShownBeforeCombat then
             CitySiege_MainFrame:Show()
         end
+    end
+end
+
+-- Preferred transport: the server sends siege state as a hidden addon message,
+-- so players without this addon never see the raw protocol in their chat log.
+function Core:CHAT_MSG_ADDON(event, prefix, message)
+    if prefix ~= "CitySiege" or not message then return end
+
+    if CitySiege_EventHandler then
+        CitySiege_EventHandler:ParseAddonMessage(message)
     end
 end
 
@@ -271,20 +277,8 @@ function Core:ShowHelp()
 end
 
 function Core:ToggleMainFrame()
-    print("CitySiege: ToggleMainFrame called")
-    print("CitySiege: CitySiege_MainFrame exists: " .. tostring(CitySiege_MainFrame ~= nil))
-    
     if CitySiege_MainFrame then
-        print("CitySiege: MainFrame IsShown: " .. tostring(CitySiege_MainFrame:IsShown()))
-        if CitySiege_MainFrame:IsShown() then
-            print("CitySiege: Hiding MainFrame")
-            CitySiege_MainFrame:Hide()
-        else
-            print("CitySiege: Showing MainFrame")
-            CitySiege_MainFrame:Show()
-        end
-    else
-        print("CitySiege: ERROR - MainFrame is nil!")
+        CitySiege_MainFrame:Toggle()
     end
 end
 
