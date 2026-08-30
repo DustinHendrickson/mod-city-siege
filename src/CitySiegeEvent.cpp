@@ -481,6 +481,16 @@ namespace CitySiege
 
             return counts;
         }
+
+        // Where the garrison digs in, as an index into the route.
+        uint32 DefenderHoldIndex(std::vector<Position> const& route)
+        {
+            if (route.empty())
+                return 0;
+
+            return std::min<uint32>(uint32(float(route.size()) * g_Config.defenderHoldFraction),
+                                    uint32(route.size() - 1));
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -950,10 +960,53 @@ namespace CitySiege
             }
         }
 
-        // Issues a travel order. Rate limited because the playerbots travel
-        // objects are heap allocated per call; re-issuing every world tick used
-        // to leak two allocations per bot per tick.
-        void OrderBotTo(SiegeEvent& event, Player* bot, uint32 mapId, Position const& target, uint32 now)
+        // Sentinel node key for the throne, which is not part of the route.
+        constexpr uint32 BOT_NODE_THRONE = 0xFFFFFFFFu;
+
+        struct BotWaypoint
+        {
+            TravelDestination* destination = nullptr;
+            WorldPosition*     position = nullptr;
+        };
+
+        // TravelTarget::setTarget takes no ownership and neither it nor the
+        // destructor ever frees what it was handed, so anything allocated per
+        // order leaks for the lifetime of the server. Worse, freeing it here
+        // would leave bots dereferencing a dead destination, because
+        // TravelTarget::addVisitors() does not null-check.
+        //
+        // So one destination is allocated per city node, shared by every bot,
+        // reused across sieges, and simply relocated when a route is rebuilt.
+        // The cost is bounded (a few dozen kilobytes for all eight cities) and
+        // nothing is ever freed while a bot might still point at it.
+        std::unordered_map<uint64, BotWaypoint> g_BotWaypoints;
+
+        BotWaypoint const* AcquireBotWaypoint(uint32 cityId, uint32 nodeKey, uint32 mapId, Position const& target)
+        {
+            uint64 key = (uint64(cityId) << 32) | uint64(nodeKey);
+
+            auto itr = g_BotWaypoints.find(key);
+            if (itr != g_BotWaypoints.end())
+            {
+                // Routes can be regenerated; move the shared point rather than
+                // allocating a replacement and orphaning the old one.
+                itr->second.position->Relocate(target.GetPositionX(), target.GetPositionY(), target.GetPositionZ());
+                return &itr->second;
+            }
+
+            BotWaypoint waypoint;
+            waypoint.position = new WorldPosition(mapId, target.GetPositionX(), target.GetPositionY(),
+                                                  target.GetPositionZ(), 0.0f);
+            waypoint.destination = new TravelDestination(0.0f, 12.0f);
+            waypoint.destination->addPoint(waypoint.position);
+
+            return &g_BotWaypoints.emplace(key, waypoint).first->second;
+        }
+
+        // Issues a travel order, rate limited so a bot is not retargeted every
+        // world tick while it is already walking somewhere sensible.
+        void OrderBotTo(SiegeEvent& event, Player* bot, uint32 cityId, uint32 mapId,
+                        uint32 nodeKey, Position const& target, uint32 now)
         {
             auto itr = event.botLastOrder.find(bot->GetGUID());
             if (itr != event.botLastOrder.end() && now - itr->second < g_Config.playerbotsOrderCooldown)
@@ -964,18 +1017,13 @@ namespace CitySiege
                 return;
 
             TravelTarget* travelTarget = ai->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
-            if (!travelTarget)
+            if (!travelTarget || travelTarget->isTraveling())
                 return;
 
-            if (travelTarget->isTraveling())
-                return;
+            BotWaypoint const* waypoint = AcquireBotWaypoint(cityId, nodeKey, mapId, target);
 
-            WorldPosition* destination = new WorldPosition(mapId, target.GetPositionX(), target.GetPositionY(),
-                                                           target.GetPositionZ(), 0.0f);
-            TravelDestination* siegeDestination = new TravelDestination(0.0f, 10.0f);
-            siegeDestination->addPoint(destination);
-
-            travelTarget->setTarget(siegeDestination, destination);
+            // setTarget() clears the forced flag, so it has to be set after.
+            travelTarget->setTarget(waypoint->destination, waypoint->position);
             travelTarget->setForced(true);
 
             if (!ai->HasStrategy("travel", BOT_STATE_NON_COMBAT))
@@ -1065,14 +1113,24 @@ namespace CitySiege
                         if (!ai->HasStrategy("pvp", BOT_STATE_NON_COMBAT))
                             ai->ChangeStrategy("+pvp", BOT_STATE_NON_COMBAT);
 
-                    uint32 index = attacker ? 0u : uint32(route.size());
-                    event.botRouteIndex[guid] = index;
+                    event.botRouteIndex[guid] = attacker ? 0u : uint32(route.size());
 
-                    Position target = attacker
-                        ? (route.empty() ? city.leader : route.front())
-                        : (route.empty() ? city.muster : route[route.size() / 2]);
+                    uint32 nodeKey = BOT_NODE_THRONE;
+                    Position target = city.leader;
 
-                    OrderBotTo(event, bot, city.mapId, target, now);
+                    if (attacker)
+                    {
+                        nodeKey = route.empty() ? BOT_NODE_THRONE : 0u;
+                        target = route.empty() ? city.leader : route.front();
+                    }
+                    else
+                    {
+                        // Defenders form up on the same line the NPC garrison holds.
+                        nodeKey = route.empty() ? BOT_NODE_THRONE : DefenderHoldIndex(route);
+                        target = route.empty() ? city.leader : route[DefenderHoldIndex(route)];
+                    }
+
+                    OrderBotTo(event, bot, uint32(city.id), city.mapId, nodeKey, target, now);
                 }
             };
 
@@ -1166,7 +1224,8 @@ namespace CitySiege
                         continue;
 
                     uint32& index = event.botRouteIndex[guid];
-                    Position target;
+                    uint32 nodeKey = BOT_NODE_THRONE;
+                    Position target = city.leader;
 
                     if (attacker)
                     {
@@ -1175,22 +1234,36 @@ namespace CitySiege
                             target = route[index];
                             if (bot->GetDistance(target) <= WAYPOINT_ARRIVE_DIST * 2.0f)
                                 ++index;
+
+                            nodeKey = index < route.size() ? index : BOT_NODE_THRONE;
+                            target = index < route.size() ? route[index] : city.leader;
                         }
                         else
                         {
+                            nodeKey = BOT_NODE_THRONE;
                             target = city.leader;
                         }
                     }
                     else
                     {
-                        uint32 holdIndex = route.empty() ? 0u
-                            : uint32(float(route.size()) * g_Config.defenderHoldFraction);
-                        target = route.empty() ? city.leader : route[std::min<uint32>(holdIndex, uint32(route.size() - 1))];
+                        if (route.empty())
+                        {
+                            nodeKey = BOT_NODE_THRONE;
+                            target = city.leader;
+                        }
+                        else
+                        {
+                            uint32 holdIndex = DefenderHoldIndex(route);
+                            nodeKey = holdIndex;
+                            target = route[holdIndex];
+                        }
+
+                        // Already on the line - hold it.
                         if (bot->GetDistance(target) <= WAYPOINT_ARRIVE_DIST * 2.0f)
                             continue;
                     }
 
-                    OrderBotTo(event, bot, city.mapId, target, now);
+                    OrderBotTo(event, bot, uint32(city.id), city.mapId, nodeKey, target, now);
                 }
             };
 
@@ -1894,9 +1967,7 @@ namespace CitySiege
                 }
                 else
                 {
-                    uint32 holdIndex = std::min<uint32>(
-                        uint32(float(route.size()) * g_Config.defenderHoldFraction),
-                        uint32(route.size() - 1));
+                    uint32 holdIndex = DefenderHoldIndex(route);
                     unit.routeIndex = holdIndex;
                     node = route[holdIndex];
                     // Defenders face back down the route toward the attackers.

@@ -19,9 +19,12 @@
 
 #include "Creature.h"
 #include "DatabaseEnv.h"
+#include "Field.h"
 #include "Log.h"
 #include "Map.h"
 #include "PathGenerator.h"
+// DatabaseEnv.h only forward-declares ResultSet; the definition lives here.
+#include "QueryResult.h"
 #include "StringFormat.h"
 
 #include <cmath>
