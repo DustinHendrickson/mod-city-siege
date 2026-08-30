@@ -38,7 +38,10 @@
 #include "Player.h"
 #include "Random.h"
 #include "StringFormat.h"
+// Map::SummonCreature returns TempSummon*, which Map.h only forward-declares.
+#include "TemporarySummon.h"
 #include "World.h"
+#include "WorldPacket.h"
 #include "WorldSessionMgr.h"
 
 #include <algorithm>

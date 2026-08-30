@@ -26,6 +26,8 @@
 // DatabaseEnv.h only forward-declares ResultSet; the definition lives here.
 #include "QueryResult.h"
 #include "StringFormat.h"
+// Map::SummonCreature returns TempSummon*, which Map.h only forward-declares.
+#include "TemporarySummon.h"
 
 #include <cmath>
 
