@@ -18,13 +18,10 @@
 #include "CitySiege.h"
 
 #include "Creature.h"
-#include "DatabaseEnv.h"
-#include "Field.h"
 #include "Log.h"
 #include "Map.h"
+#include "ObjectMgr.h"
 #include "PathGenerator.h"
-// DatabaseEnv.h only forward-declares ResultSet; the definition lives here.
-#include "QueryResult.h"
 #include "StringFormat.h"
 // Map::SummonCreature returns TempSummon*, which Map.h only forward-declares.
 #include "TemporarySummon.h"
@@ -135,17 +132,33 @@ namespace CitySiege
             return;
         }
 
+        // Read spawns out of ObjectMgr rather than querying the creature table
+        // directly. The column layout of that table differs between AzerothCore
+        // revisions (id vs id1), but ObjectMgr has already normalised it.
+        CreatureDataContainer const& spawns = sObjectMgr->GetAllCreatureData();
+
         for (CityData& city : g_Cities)
         {
             if (city.leaderPositionPinned || !city.leaderEntry)
                 continue;
 
-            QueryResult result = WorldDatabase.Query(
-                "SELECT position_x, position_y, position_z FROM creature "
-                "WHERE map = {} AND (id1 = {} OR id2 = {} OR id3 = {}) LIMIT 1",
-                city.mapId, city.leaderEntry, city.leaderEntry, city.leaderEntry);
+            CreatureData const* found = nullptr;
 
-            if (!result)
+            for (auto const& pair : spawns)
+            {
+                CreatureData const& data = pair.second;
+
+                if (data.mapid != city.mapId)
+                    continue;
+
+                if (data.id != city.leaderEntry && data.id2 != city.leaderEntry && data.id3 != city.leaderEntry)
+                    continue;
+
+                found = &data;
+                break;
+            }
+
+            if (!found)
             {
                 LOG_WARN("module.citysiege",
                          "[City Siege] {}: no spawn found for leader entry {} on map {}. "
@@ -154,8 +167,7 @@ namespace CitySiege
                 continue;
             }
 
-            Field* fields = result->Fetch();
-            city.leader.Relocate(fields[0].Get<float>(), fields[1].Get<float>(), fields[2].Get<float>());
+            city.leader.Relocate(found->posX, found->posY, found->posZ);
             city.leaderPositionResolved = true;
 
             LOG_INFO("module.citysiege", "[City Siege] {}: throne located at ({:.2f}, {:.2f}, {:.2f}) from creature entry {}.",

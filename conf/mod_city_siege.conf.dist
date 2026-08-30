@@ -206,44 +206,44 @@ CitySiege.Silvermoon.SpawnZ = 5.004
 ###################################################################################################
 
 CitySiege.Stormwind.LeaderEntry = 29611
-CitySiege.Stormwind.LeaderX = -8442.578
-CitySiege.Stormwind.LeaderY = 334.6064
-CitySiege.Stormwind.LeaderZ = 122.476685
+CitySiege.Stormwind.LeaderX = -8441.42
+CitySiege.Stormwind.LeaderY = 333.102
+CitySiege.Stormwind.LeaderZ = 122.679
 
 CitySiege.Ironforge.LeaderEntry = 2784
-CitySiege.Ironforge.LeaderX = -4981.25
-CitySiege.Ironforge.LeaderY = -881.542
-CitySiege.Ironforge.LeaderZ = 501.660
+CitySiege.Ironforge.LeaderX = -4865.73
+CitySiege.Ironforge.LeaderY = -1022.67
+CitySiege.Ironforge.LeaderZ = 505.798
 
 CitySiege.Darnassus.LeaderEntry = 7999
-CitySiege.Darnassus.LeaderX = 9947.52
-CitySiege.Darnassus.LeaderY = 2482.73
-CitySiege.Darnassus.LeaderZ = 1316.21
+CitySiege.Darnassus.LeaderX = 9662.52
+CitySiege.Darnassus.LeaderY = 2524.57
+CitySiege.Darnassus.LeaderZ = 1360.08
 
 CitySiege.Exodar.LeaderEntry = 17468
-CitySiege.Exodar.LeaderX = -3864.92
-CitySiege.Exodar.LeaderY = -11643.7
-CitySiege.Exodar.LeaderZ = -137.644
+CitySiege.Exodar.LeaderX = -3993.71
+CitySiege.Exodar.LeaderY = -11413.7
+CitySiege.Exodar.LeaderZ = -122.136
 
 CitySiege.Orgrimmar.LeaderEntry = 4949
-CitySiege.Orgrimmar.LeaderX = 1921.57
-CitySiege.Orgrimmar.LeaderY = -4148.41
-CitySiege.Orgrimmar.LeaderZ = 41.64
+CitySiege.Orgrimmar.LeaderX = 1919.9
+CitySiege.Orgrimmar.LeaderY = -4123.8
+CitySiege.Orgrimmar.LeaderZ = 44.3715
 
 CitySiege.Undercity.LeaderEntry = 10181
-CitySiege.Undercity.LeaderX = 1633.75
-CitySiege.Undercity.LeaderY = 240.167
-CitySiege.Undercity.LeaderZ = -43.1034
+CitySiege.Undercity.LeaderX = 1290.41
+CitySiege.Undercity.LeaderY = 316.247
+CitySiege.Undercity.LeaderZ = -57.2376
 
 CitySiege.ThunderBluff.LeaderEntry = 3057
-CitySiege.ThunderBluff.LeaderX = -1043.11
-CitySiege.ThunderBluff.LeaderY = 285.809
-CitySiege.ThunderBluff.LeaderZ = 135.165
+CitySiege.ThunderBluff.LeaderX = -1209.64
+CitySiege.ThunderBluff.LeaderY = -112.698
+CitySiege.ThunderBluff.LeaderZ = 163.882
 
 CitySiege.Silvermoon.LeaderEntry = 16802
-CitySiege.Silvermoon.LeaderX = 9338.74
-CitySiege.Silvermoon.LeaderY = -7277.27
-CitySiege.Silvermoon.LeaderZ = 13.7014
+CitySiege.Silvermoon.LeaderX = 9990.5
+CitySiege.Silvermoon.LeaderY = -7052.52
+CitySiege.Silvermoon.LeaderZ = 45.4464
 
 ###################################################################################################
 # MANUAL WAYPOINTS (LEGACY / FALLBACK)

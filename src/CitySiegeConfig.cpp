@@ -173,47 +173,50 @@ namespace CitySiege
             city.leaderEntry = leaderEntry;
         };
 
-        // Muster points sit outside each city's main gate; leader hints are the
-        // throne rooms and are refined from the creature table on startup.
+        // Muster points sit outside each city's main gate. The leader positions
+        // here are only a fallback: ResolveLeaderPositions() replaces them with
+        // the real spawn from the creature table at startup. They are taken from
+        // the stock AzerothCore spawns rather than the city centre, so that even
+        // the fallback aims at a throne room.
         define(CITY_STORMWIND, "Stormwind", "Stormwind", 0, TEAM_ALLIANCE,
                Position(-8913.23f, 554.633f, 93.7944f, 0.0f),
                Position(-9161.16f, 353.365f, 88.117f, 0.0f),
-               Position(-8442.578f, 334.6064f, 122.476685f, 0.0f), 29611);
+               Position(-8441.42f, 333.102f, 122.679f, 0.0f), 29611);
 
         define(CITY_IRONFORGE, "Ironforge", "Ironforge", 0, TEAM_ALLIANCE,
                Position(-4981.25f, -881.542f, 501.660f, 0.0f),
                Position(-5174.09f, -594.361f, 397.853f, 0.0f),
-               Position(-4981.25f, -881.542f, 501.660f, 0.0f), 2784);
+               Position(-4865.73f, -1022.67f, 505.798f, 0.0f), 2784);
 
         define(CITY_DARNASSUS, "Darnassus", "Darnassus", 1, TEAM_ALLIANCE,
                Position(9947.52f, 2482.73f, 1316.21f, 0.0f),
                Position(9887.36f, 1856.49f, 1317.14f, 0.0f),
-               Position(9947.52f, 2482.73f, 1316.21f, 0.0f), 7999);
+               Position(9662.52f, 2524.57f, 1360.08f, 0.0f), 7999);
 
         define(CITY_EXODAR, "Exodar", "the Exodar", 530, TEAM_ALLIANCE,
                Position(-3864.92f, -11643.7f, -137.644f, 0.0f),
                Position(-4080.80f, -12193.2f, 1.712f, 0.0f),
-               Position(-3864.92f, -11643.7f, -137.644f, 0.0f), 17468);
+               Position(-3993.71f, -11413.7f, -122.136f, 0.0f), 17468);
 
         define(CITY_ORGRIMMAR, "Orgrimmar", "Orgrimmar", 1, TEAM_HORDE,
                Position(1633.75f, -4439.39f, 15.4396f, 0.0f),
                Position(1250.33f, -4412.59f, 25.48f, 0.0f),
-               Position(1921.57f, -4148.41f, 41.64f, 0.0f), 4949);
+               Position(1919.90f, -4123.80f, 44.3715f, 0.0f), 4949);
 
         define(CITY_UNDERCITY, "Undercity", "the Undercity", 0, TEAM_HORDE,
                Position(1633.75f, 240.167f, -43.1034f, 0.0f),
                Position(1982.26f, 226.674f, 35.951f, 0.0f),
-               Position(1633.75f, 240.167f, -43.1034f, 0.0f), 10181);
+               Position(1290.41f, 316.247f, -57.2376f, 0.0f), 10181);
 
         define(CITY_THUNDERBLUFF, "ThunderBluff", "Thunder Bluff", 1, TEAM_HORDE,
                Position(-1043.11f, 285.809f, 135.165f, 0.0f),
                Position(-1558.61f, -5.071f, 5.384f, 0.0f),
-               Position(-1043.11f, 285.809f, 135.165f, 0.0f), 3057);
+               Position(-1209.64f, -112.698f, 163.882f, 0.0f), 3057);
 
         define(CITY_SILVERMOON, "Silvermoon", "Silvermoon City", 530, TEAM_HORDE,
                Position(9338.74f, -7277.27f, 13.7014f, 0.0f),
                Position(9230.47f, -6962.67f, 5.004f, 0.0f),
-               Position(9338.74f, -7277.27f, 13.7014f, 0.0f), 16802);
+               Position(9990.50f, -7052.52f, 45.4464f, 0.0f), 16802);
     }
 
     void LoadConfiguration()
