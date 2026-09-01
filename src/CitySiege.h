@@ -284,6 +284,7 @@ namespace CitySiege
         float     routeNodeSpacing = 28.0f;
         uint32    routeMaxNodes = 64;
         uint32    routeMaxLegs = 16;
+        float     routeMaxSlope = 45.0f;   // degrees an army will march up
         bool      autoDetectLeader = true;
 
         // Army composition

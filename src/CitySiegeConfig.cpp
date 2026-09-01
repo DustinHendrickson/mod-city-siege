@@ -252,7 +252,8 @@ namespace CitySiege
 
         c.routeNodeSpacing = std::max(8.0f, sConfigMgr->GetOption<float>("CitySiege.Route.NodeSpacing", 28.0f));
         c.routeMaxNodes = std::max<uint32>(4, sConfigMgr->GetOption<uint32>("CitySiege.Route.MaxNodes", 64));
-        c.routeMaxLegs = std::max<uint32>(1, sConfigMgr->GetOption<uint32>("CitySiege.Route.MaxLegs", 16));
+        c.routeMaxLegs = std::max<uint32>(1, sConfigMgr->GetOption<uint32>("CitySiege.Route.MaxLegs", 24));
+        c.routeMaxSlope = std::clamp(sConfigMgr->GetOption<float>("CitySiege.Route.MaxSlopeDegrees", 45.0f), 5.0f, 89.0f);
         c.autoDetectLeader = sConfigMgr->GetOption<bool>("CitySiege.Route.AutoDetectLeaderPosition", true);
 
         // --- army composition -------------------------------------------------

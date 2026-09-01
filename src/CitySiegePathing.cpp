@@ -62,6 +62,7 @@ namespace CitySiege
         constexpr uint32 WALK_STEP_GUARD      = 96;      // sub-steps toward one aim point
         constexpr float SHORTCUT_GAIN         = 6.0f;    // yards saved before a node is dropped
         constexpr uint32 SMOOTH_PASSES        = 4;       // shortcut sweeps over the route
+        constexpr uint32 ROUTE_PUSH_ATTEMPTS  = 250;     // pushes toward the throne before giving up
 
         std::vector<Position> const g_EmptyRoute;
 
@@ -187,23 +188,46 @@ namespace CitySiege
         // Pass 2: walk the corridor with smooth paths
         // ---------------------------------------------------------------------
 
-        // Applies the game's own climb rule to every step of a path.
+        // True if one step of a path is a gradient an army could march up.
         //
-        // PathGenerator::SetSlopeCheck(true) enforces this internally, but it
-        // aborts the whole path the moment one step is too steep, which made
-        // route building collapse. Checking it here instead means a leg that
-        // tries to scramble up a cliff is simply rejected, and the caller can
-        // shorten its reach and find the way round.
-        bool IsClimbable(Creature* pathOwner, Movement::PointsArray const& points)
+        // PathGenerator::IsWalkableClimb() is not usable here: it allows a rise
+        // of sourceHeight * (1 - angle/100), so for a footman on a 30 degree
+        // slope that is 1.4 yards - while smooth path steps are 4 yards apart and
+        // a 30 degree ramp rises 2.3 yards over one. Its own documentation says
+        // it is meant for short distances. Used on path steps it rejects ordinary
+        // road ramps along with the cliffs we actually want to exclude, which is
+        // what reduced route building to three corners out of ten.
+        //
+        // A plain gradient test separates the two cleanly and is tunable.
+        bool StepIsClimbable(G3D::Vector3 const& from, G3D::Vector3 const& to)
         {
-            float collisionHeight = pathOwner->GetCollisionHeight();
+            float dx = to.x - from.x;
+            float dy = to.y - from.y;
+            float run = std::sqrt(dx * dx + dy * dy);
+            float rise = std::fabs(to.z - from.z);
 
+            // Stairs and ledges: almost no horizontal travel, small step up.
+            if (run < 0.5f)
+                return rise <= 2.0f;
+
+            float degrees = std::atan2(rise, run) * 180.0f / float(M_PI);
+            return degrees <= g_Config.routeMaxSlope;
+        }
+
+        /// Index of the first point that cannot be reached from its predecessor,
+        /// or points.size() when the whole path is marchable.
+        size_t FirstUnclimbableStep(Movement::PointsArray const& points)
+        {
             for (size_t i = 1; i < points.size(); ++i)
-                if (!PathGenerator::IsWalkableClimb(points[i - 1].x, points[i - 1].y, points[i - 1].z,
-                                                    points[i].x, points[i].y, points[i].z, collisionHeight))
-                    return false;
+                if (!StepIsClimbable(points[i - 1], points[i]))
+                    return i;
 
-            return true;
+            return points.size();
+        }
+
+        bool IsClimbable(Movement::PointsArray const& points)
+        {
+            return FirstUnclimbableStep(points) == points.size();
         }
 
         // One ground-hugging leg. Atomic: nothing is appended unless the whole
@@ -227,15 +251,28 @@ namespace CitySiege
             if (points.size() < 2)
                 return false;
 
-            // Reject anything the army could not physically climb.
-            if (!IsClimbable(pathOwner, points))
+            // Truncate at the first step the army could not march up rather than
+            // discarding the leg. Everything before the cliff is perfectly good
+            // route, and keeping it means the search resumes from there instead
+            // of losing the ground it already covered.
+            size_t usable = FirstUnclimbableStep(points);
+            if (usable < 2)
                 return false;
 
-            for (size_t i = 1; i < points.size(); ++i)
+            for (size_t i = 1; i < usable; ++i)
                 out.emplace_back(points[i].x, points[i].y, points[i].z, 0.0f);
 
-            G3D::Vector3 const& end = generator.GetActualEndPosition();
-            reached = Position(end.x, end.y, end.z, 0.0f);
+            if (usable == points.size())
+            {
+                G3D::Vector3 const& end = generator.GetActualEndPosition();
+                reached = Position(end.x, end.y, end.z, 0.0f);
+            }
+            else
+            {
+                G3D::Vector3 const& last = points[usable - 1];
+                reached = Position(last.x, last.y, last.z, 0.0f);
+            }
+
             return true;
         }
 
@@ -385,7 +422,7 @@ namespace CitySiege
             if (generator.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORTCUT | PATHFIND_NOT_USING_PATH))
                 return false;
 
-            return IsClimbable(pathOwner, generator.GetPath());
+            return IsClimbable(generator.GetPath());
         }
 
         // Drops waypoints that can simply be skipped.
@@ -566,21 +603,49 @@ namespace CitySiege
         // --- pass 2: walk it on the ground -----------------------------------
         std::vector<Position> dense;
         Position cursor = city.muster;
-        bool reachedThrone = false;
         uint32 aimsReached = 0;
 
-        for (Position const& aim : corridor)
+        // Keep pushing toward the throne from wherever the walk has got to.
+        //
+        // A single sweep over the corridor gives up the moment one corner is
+        // unreachable, even though every sub-step already taken counts as
+        // progress. This retries from the new position, skipping corners that do
+        // not help, until it either arrives or genuinely stops moving.
+        size_t corner = 0;
+        for (uint32 attempt = 0; attempt < ROUTE_PUSH_ATTEMPTS; ++attempt)
         {
-            // One unreachable corner is not fatal - the corridor is only a hint,
-            // so press on toward the next one.
-            if (WalkToward(pathOwner, cursor, aim, dense))
-                ++aimsReached;
+            if (Distance2D(cursor, city.leader) <= THRONE_TRIM_RADIUS)
+                break;
+
+            Position before = cursor;
+
+            if (corner < corridor.size())
+            {
+                if (WalkToward(pathOwner, cursor, corridor[corner], dense))
+                {
+                    ++aimsReached;
+                    ++corner;
+                }
+            }
+            else
+            {
+                WalkToward(pathOwner, cursor, city.leader, dense);
+            }
+
+            // Made no headway toward this corner - drop it and aim at the next.
+            if (Distance2D(before, cursor) < LEG_MIN_PROGRESS)
+            {
+                if (corner < corridor.size())
+                {
+                    ++corner;
+                    continue;
+                }
+
+                break;
+            }
         }
 
-        if (WalkToward(pathOwner, cursor, city.leader, dense))
-            reachedThrone = true;
-        else if (Distance2D(cursor, city.leader) <= THRONE_TRIM_RADIUS * 3.0f)
-            reachedThrone = true;
+        bool reachedThrone = Distance2D(cursor, city.leader) <= THRONE_TRIM_RADIUS * 3.0f;
 
         if (!reachedThrone || dense.empty())
         {

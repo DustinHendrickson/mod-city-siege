@@ -157,7 +157,15 @@ CitySiege.Route.MaxNodes = 64
 #                     covers one navmesh corridor. Raise this if the log reports that a route
 #                     stopped short of the throne.
 #        Default:     16
-CitySiege.Route.MaxLegs = 16
+#
+#    CitySiege.Route.MaxSlopeDegrees
+#        Description: Steepest gradient the war host will march up. Roads and ramps are well under
+#                     30; raise this only if a legitimate approach is being rejected, lower it if
+#                     the army is cutting over hillsides instead of using the streets.
+#        Default:     45
+CitySiege.Route.MaxSlopeDegrees = 45
+
+CitySiege.Route.MaxLegs = 24
 
 ###################################################################################################
 # MUSTER POINTS
