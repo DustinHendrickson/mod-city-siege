@@ -54,12 +54,12 @@ namespace CitySiege
         constexpr float LEG_ARRIVAL_TOLERANCE = 6.0f;    // close enough to an aim point
         constexpr float LEG_MIN_PROGRESS      = 2.5f;    // below this a leg is stalled
         constexpr float SMOOTH_LEG_MAX        = 120.0f;  // straight-line reach per step
-        constexpr float SMOOTH_LEG_MIN        = 15.0f;   // give up shortening below this
-        constexpr uint32 SHORTEN_ATTEMPTS     = 5;       // halvings before a step is failed
+        constexpr float SMOOTH_LEG_MIN        = 6.0f;    // give up shortening below this
+        constexpr uint32 SHORTEN_ATTEMPTS     = 8;       // halvings before a step is failed
         constexpr float THRONE_TRIM_RADIUS    = 10.0f;   // final approach is a charge
         constexpr float LOOP_REMOVAL_RADIUS   = 18.0f;   // de-loop the coarse corridor
         constexpr float TURN_COSINE           = 0.94f;   // ~20 degrees counts as a turn
-        constexpr uint32 WALK_STEP_GUARD      = 32;      // sub-steps toward one aim point
+        constexpr uint32 WALK_STEP_GUARD      = 96;      // sub-steps toward one aim point
         constexpr float SHORTCUT_GAIN         = 6.0f;    // yards saved before a node is dropped
         constexpr uint32 SMOOTH_PASSES        = 4;       // shortcut sweeps over the route
 
@@ -187,6 +187,25 @@ namespace CitySiege
         // Pass 2: walk the corridor with smooth paths
         // ---------------------------------------------------------------------
 
+        // Applies the game's own climb rule to every step of a path.
+        //
+        // PathGenerator::SetSlopeCheck(true) enforces this internally, but it
+        // aborts the whole path the moment one step is too steep, which made
+        // route building collapse. Checking it here instead means a leg that
+        // tries to scramble up a cliff is simply rejected, and the caller can
+        // shorten its reach and find the way round.
+        bool IsClimbable(Creature* pathOwner, Movement::PointsArray const& points)
+        {
+            float collisionHeight = pathOwner->GetCollisionHeight();
+
+            for (size_t i = 1; i < points.size(); ++i)
+                if (!PathGenerator::IsWalkableClimb(points[i - 1].x, points[i - 1].y, points[i - 1].z,
+                                                    points[i].x, points[i].y, points[i].z, collisionHeight))
+                    return false;
+
+            return true;
+        }
+
         // One ground-hugging leg. Atomic: nothing is appended unless the whole
         // leg succeeded, so a failed attempt cannot pollute the route.
         bool SmoothLeg(Creature* pathOwner, Position const& from, Position const& to,
@@ -194,7 +213,7 @@ namespace CitySiege
         {
             PathGenerator generator(pathOwner);
             generator.SetUseStraightPath(false);
-            generator.SetSlopeCheck(true);
+            generator.SetSlopeCheck(false);   // enforced per-leg below instead
 
             if (!generator.CalculatePath(from.GetPositionX(), from.GetPositionY(), from.GetPositionZ(),
                                          to.GetPositionX(), to.GetPositionY(), to.GetPositionZ(), false))
@@ -208,12 +227,42 @@ namespace CitySiege
             if (points.size() < 2)
                 return false;
 
+            // Reject anything the army could not physically climb.
+            if (!IsClimbable(pathOwner, points))
+                return false;
+
             for (size_t i = 1; i < points.size(); ++i)
                 out.emplace_back(points[i].x, points[i].y, points[i].z, 0.0f);
 
             G3D::Vector3 const& end = generator.GetActualEndPosition();
             reached = Position(end.x, end.y, end.z, 0.0f);
             return true;
+        }
+
+        // Re-seats a point on the surface nearest the height we are actually
+        // walking at.
+        //
+        // Corridor corners carry whatever height NormalizePath() snapped them to,
+        // which beside a road is frequently the hillside above it. Feeding that
+        // height back to the pathfinder makes closestPointOnPoly pick the poly up
+        // the hill, and the smooth path then faithfully walks up the mountain.
+        // The corner's XY is the useful part; its Z has to be thrown away, which
+        // is what this does.
+        Position ReseatOnSurface(Map* map, Position const& point, float walkingZ)
+        {
+            float x = point.GetPositionX();
+            float y = point.GetPositionY();
+
+            if (!map)
+                return Position(x, y, walkingZ, 0.0f);
+
+            // Search downward from just above the height we are walking at, so a
+            // ledge overhead cannot win over the street underfoot.
+            float ground = map->GetHeight(x, y, walkingZ + 6.0f, true, 80.0f);
+            if (ground > INVALID_HEIGHT)
+                return Position(x, y, ground, 0.0f);
+
+            return Position(x, y, walkingZ, 0.0f);
         }
 
         Position Lerp(Position const& from, Position const& to, float t)
@@ -233,11 +282,17 @@ namespace CitySiege
         // as a shortcut, so an over-long step fails outright rather than
         // returning a partial result. Each step therefore halves its reach until
         // one fits.
-        bool WalkToward(Creature* pathOwner, Position& cursor, Position const& aim,
+        bool WalkToward(Creature* pathOwner, Position& cursor, Position const& rawAim,
                         std::vector<Position>& dense)
         {
+            Map* map = pathOwner->GetMap();
+
             for (uint32 guard = 0; guard < WALK_STEP_GUARD; ++guard)
             {
+                // Re-seat the aim every step: as the cursor climbs a ramp or
+                // drops into a district, the surface under the aim changes too.
+                Position aim = ReseatOnSurface(map, rawAim, cursor.GetPositionZ());
+
                 float remaining = Distance2D(cursor, aim);
                 if (remaining <= LEG_ARRIVAL_TOLERANCE)
                     return true;
@@ -247,7 +302,9 @@ namespace CitySiege
 
                 for (uint32 attempt = 0; attempt < SHORTEN_ATTEMPTS; ++attempt)
                 {
-                    Position step = (reach >= remaining) ? aim : Lerp(cursor, aim, reach / remaining);
+                    Position step = (reach >= remaining)
+                        ? aim
+                        : ReseatOnSurface(map, Lerp(cursor, aim, reach / remaining), cursor.GetPositionZ());
 
                     std::vector<Position> leg;
                     Position reached;
@@ -313,18 +370,22 @@ namespace CitySiege
             points.swap(result);
         }
 
-        // True if a unit can actually walk straight from `from` to `to`.
+        // True if a unit can actually walk from `from` to `to` - both reachable
+        // on the mesh and climbable the whole way.
         bool IsWalkable(Creature* pathOwner, Position const& from, Position const& to)
         {
             PathGenerator generator(pathOwner);
             generator.SetUseStraightPath(false);
-            generator.SetSlopeCheck(true);
+            generator.SetSlopeCheck(false);   // enforced explicitly below
 
             if (!generator.CalculatePath(from.GetPositionX(), from.GetPositionY(), from.GetPositionZ(),
                                          to.GetPositionX(), to.GetPositionY(), to.GetPositionZ(), false))
                 return false;
 
-            return !(generator.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORTCUT | PATHFIND_NOT_USING_PATH));
+            if (generator.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORTCUT | PATHFIND_NOT_USING_PATH))
+                return false;
+
+            return IsClimbable(pathOwner, generator.GetPath());
         }
 
         // Drops waypoints that can simply be skipped.
@@ -396,14 +457,8 @@ namespace CitySiege
 
             for (Position const& node : route)
             {
-                PathGenerator generator(pathOwner);
-                generator.SetUseStraightPath(false);
-                generator.SetSlopeCheck(true);
-
-                bool ok = generator.CalculatePath(previous.GetPositionX(), previous.GetPositionY(), previous.GetPositionZ(),
-                                                  node.GetPositionX(), node.GetPositionY(), node.GetPositionZ(), false);
-
-                if (!ok || (generator.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORTCUT | PATHFIND_NOT_USING_PATH)))
+                // Same test the army will face: reachable and climbable.
+                if (!IsWalkable(pathOwner, previous, node))
                     ++broken;
 
                 previous = node;
