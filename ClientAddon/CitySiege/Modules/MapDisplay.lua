@@ -346,12 +346,22 @@ function MapDisplay:UpdateDisplay()
     PlaceMarker(GetMarker("muster", ICON_MUSTER, 16), muster)
     PlaceMarker(GetMarker("leader", ICON_LEADER, 20), leader)
 
-    if siege then
-        frame.statsText:SetText(string.format("|cFFFF4040Under siege|r  -  %d waypoints", #waypoints))
-    elseif #waypoints > 0 then
-        frame.statsText:SetText(string.format("|cFF808080Planned route|r  -  %d waypoints", #waypoints))
+    -- Report what is drawable, not just what was received, so a route that
+    -- arrived without map coordinates is visible as such.
+    local drawable = 0
+    for _, wp in ipairs(waypoints) do
+        if OnMap(wp) then drawable = drawable + 1 end
+    end
+
+    if #waypoints == 0 then
+        frame.statsText:SetText(siege and "|cFFFF4040Under siege|r  -  waiting for route"
+                                       or "|cFF808080No route received yet|r")
+    elseif drawable < #waypoints then
+        frame.statsText:SetText(string.format("%s  -  %d of %d waypoints on this map",
+            siege and "|cFFFF4040Under siege|r" or "|cFF808080Planned route|r", drawable, #waypoints))
     else
-        frame.statsText:SetText("|cFF808080No route received yet|r")
+        frame.statsText:SetText(string.format("%s  -  %d waypoints",
+            siege and "|cFFFF4040Under siege|r" or "|cFF808080Planned route|r", #waypoints))
     end
 end
 
@@ -360,7 +370,13 @@ end
 function MapDisplay:UpdateMapData(cityID, data)
     if not cityID or not data then return end
 
-    routeCache[cityID] = data
+    -- MAP_DATA brings the muster and leader, ROUTE brings the waypoints;
+    -- merge so whichever arrives second does not discard the first.
+    local cached = routeCache[cityID] or {}
+    for key, value in pairs(data) do
+        cached[key] = value
+    end
+    routeCache[cityID] = cached
 
     if frame and currentCityID == cityID then
         self:UpdateDisplay()

@@ -12,8 +12,15 @@ local updateTimer = nil
 local lastUpdate = 0
 
 function Tracker:Initialize()
-    -- Load saved sieges
-    activeSieges = CitySiege_Config:GetActiveSieges()
+    -- Sieges are not carried across sessions. Their timers are GetTime()
+    -- based, which restarts with the client, so a saved siege comes back as
+    -- "under siege, 0s remaining" with a route the map cannot draw, and it
+    -- stays that way until the server happens to send an END for that city.
+    -- The server re-announces live sieges to everyone on the map, and the
+    -- map tab asks for the route when opened, so nothing is lost by starting
+    -- clean.
+    activeSieges = {}
+    CitySiege_Config:ClearActiveSieges()
     
     -- Start update timer
     self:StartUpdateTimer()

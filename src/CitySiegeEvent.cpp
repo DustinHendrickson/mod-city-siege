@@ -819,17 +819,82 @@ namespace CitySiege
                    << ':' << onMap.x << ':' << onMap.y;
         }
 
-        std::string SerialiseRoute(CityData const& city, uint32 zoneId)
+        // The client refuses any addon message longer than 255 bytes - it is
+        // dropped, not truncated - and a full route is several times that. So
+        // the route travels on its own, in pieces:
+        //
+        //   ROUTE:city:token:seq:total:count:mx:my:mx:my...
+        //
+        // Only map percentages are sent; the addon draws with nothing else.
+        // The token identifies one transmission so the addon never stitches
+        // pieces of two different sends together.
+        constexpr size_t ADDON_PAYLOAD_LIMIT = 230;   // leaves room for the "CitySiege\t" prefix
+
+        uint32 g_RouteToken = 0;
+
+        std::vector<std::string> BuildRouteChunks(CityData const& city, uint32 zoneId, uint32 token)
         {
             std::vector<Position> const& route = GetCityRoute(city);
 
-            std::ostringstream stream;
-            stream << std::fixed << std::setprecision(2);
-            stream << ":WP:" << route.size();
+            std::vector<std::string> nodes;
+            nodes.reserve(route.size());
             for (Position const& node : route)
-                StreamPosition(stream, node, zoneId);
+            {
+                MapPercent onMap = ToMapPercent(node, zoneId);
+                nodes.push_back(Acore::StringFormat("{:.1f}:{:.1f}", onMap.x, onMap.y));
+            }
 
-            return stream.str();
+            // Pack nodes greedily. The header is sized for its widest values so a
+            // chunk can never grow past the limit once seq/total are filled in.
+            std::string const widestHeader = Acore::StringFormat("ROUTE:{}:{}:999:999:999", uint32(city.id), token);
+
+            std::vector<std::string> bodies;
+            std::vector<uint32> counts;
+            std::string body;
+            uint32 count = 0;
+
+            for (std::string const& node : nodes)
+            {
+                if (count && widestHeader.size() + body.size() + node.size() + 1 > ADDON_PAYLOAD_LIMIT)
+                {
+                    bodies.push_back(body);
+                    counts.push_back(count);
+                    body.clear();
+                    count = 0;
+                }
+
+                body += ':';
+                body += node;
+                ++count;
+            }
+
+            if (count || bodies.empty())
+            {
+                bodies.push_back(body);     // an empty route still sends one chunk so the addon clears
+                counts.push_back(count);
+            }
+
+            std::vector<std::string> chunks;
+            chunks.reserve(bodies.size());
+            for (size_t i = 0; i < bodies.size(); ++i)
+                chunks.push_back(Acore::StringFormat("ROUTE:{}:{}:{}:{}:{}{}",
+                                                     uint32(city.id), token, i + 1, bodies.size(), counts[i], bodies[i]));
+
+            return chunks;
+        }
+
+        void BroadcastRoute(CityData const& city, Map* map)
+        {
+            uint32 token = ++g_RouteToken;
+            for (std::string const& chunk : BuildRouteChunks(city, CityZoneId(city, map), token))
+                BroadcastAddonPayload(city, chunk);
+        }
+
+        void SendRoute(Player* player, CityData const& city, Map* map)
+        {
+            uint32 token = ++g_RouteToken;
+            for (std::string const& chunk : BuildRouteChunks(city, CityZoneId(city, map), token))
+                SendAddonPayload(player, chunk);
         }
     }
 
@@ -876,8 +941,7 @@ namespace CitySiege
                    << ':' << counts.attackersAlive << ':' << counts.defendersAlive
                    << ':' << elapsed << ':' << remaining
                    << ':' << std::setprecision(1) << leaderHealth << std::setprecision(2)
-                   << ':' << (event.leaderName.empty() ? "Unknown" : event.leaderName)
-                   << SerialiseRoute(city, CityZoneId(city, map));
+                   << ':' << (event.leaderName.empty() ? "Unknown" : event.leaderName);
         }
         else if (messageType == "END")
         {
@@ -889,6 +953,11 @@ namespace CitySiege
         }
 
         BroadcastAddonPayload(city, stream.str());
+
+        // The route does not change during a siege, so it goes out once, with
+        // the start, rather than riding on every update.
+        if (messageType == "START")
+            BroadcastRoute(city, map);
     }
 
     void SendMapDataToPlayer(Player* player, CityId cityId)
@@ -897,17 +966,19 @@ namespace CitySiege
             return;
 
         CityData const& city = g_Cities[cityId];
-        uint32 zoneId = CityZoneId(city, GetCityMap(city));
+        Map* map = GetCityMap(city);
+        uint32 zoneId = CityZoneId(city, map);
 
         std::ostringstream stream;
         stream << std::fixed << std::setprecision(2);
-        stream << "MAP_DATA:" << uint32(cityId) << SerialiseRoute(city, zoneId);
+        stream << "MAP_DATA:" << uint32(cityId);
         stream << ":MUSTER";
         StreamPosition(stream, city.muster, zoneId);
         stream << ":LEADER";
         StreamPosition(stream, city.leader, zoneId);
 
         SendAddonPayload(player, stream.str());
+        SendRoute(player, city, map);
     }
 
     // -------------------------------------------------------------------------

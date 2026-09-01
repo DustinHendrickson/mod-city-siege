@@ -236,6 +236,37 @@ function EventHandler:ParseAddonMessage(message)
             self:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCount, elapsed, remaining, leaderHealth, leaderName, data)
         end
         
+    elseif command == "ROUTE" then
+        -- Format: ROUTE:cityID:token:seq:total:count:mx:my:mx:my...
+        -- The client refuses addon messages over 255 bytes, so the route
+        -- arrives in pieces that are reassembled in HandleRouteChunk.
+        local parts = {}
+        for part in string.gmatch(message, "([^:]+)") do
+            table.insert(parts, part)
+        end
+
+        if #parts >= 6 then
+            local cityID = tonumber(parts[2])
+            local token = tonumber(parts[3])
+            local seq = tonumber(parts[4])
+            local total = tonumber(parts[5])
+            local count = tonumber(parts[6]) or 0
+
+            local nodes = {}
+            local i = 7
+            for j = 1, count do
+                if i + 1 <= #parts then
+                    table.insert(nodes, {
+                        mx = tonumber(parts[i]),
+                        my = tonumber(parts[i + 1]),
+                    })
+                    i = i + 2
+                end
+            end
+
+            self:HandleRouteChunk(cityID, token, seq, total, nodes)
+        end
+
     elseif command == "END" then
         -- Format: END:cityId:winner
         local cityID, winner = string.match(message, "^END:(%d+):(%w+)")
@@ -352,6 +383,56 @@ function EventHandler:HandleSiegeStart(cityID, faction, coords)
     end
 end
 
+-- Partial routes, keyed by city, until every chunk of one send has arrived.
+local pendingRoutes = {}
+
+function EventHandler:HandleRouteChunk(cityID, token, seq, total, nodes)
+    if not cityID or not token or not seq or not total or total < 1 then return end
+
+    local pending = pendingRoutes[cityID]
+    if not pending or pending.token ~= token then
+        -- A new send supersedes whatever was half-assembled before.
+        pending = { token = token, total = total, chunks = {}, received = 0 }
+        pendingRoutes[cityID] = pending
+    end
+
+    if not pending.chunks[seq] then
+        pending.chunks[seq] = nodes
+        pending.received = pending.received + 1
+    end
+
+    if pending.received < pending.total then
+        return
+    end
+
+    local waypoints = {}
+    for index = 1, pending.total do
+        for _, node in ipairs(pending.chunks[index] or {}) do
+            table.insert(waypoints, node)
+        end
+    end
+    pendingRoutes[cityID] = nil
+
+    CitySiege_Utils:Debug(string.format("Route for city %d assembled: %d waypoints in %d chunk(s)",
+        cityID, #waypoints, total))
+
+    if CitySiege_SiegeTracker then
+        local siegeData = CitySiege_SiegeTracker:GetSiege(cityID)
+        if siegeData then
+            siegeData.waypoints = waypoints
+            CitySiege_SiegeTracker:UpdateSiege(cityID, siegeData)
+        end
+    end
+
+    if CitySiege_MapDisplay then
+        CitySiege_MapDisplay:UpdateMapData(cityID, { waypoints = waypoints })
+    end
+
+    if CitySiege_MainFrame and CitySiege_MainFrame.UpdateSiegeDisplay then
+        CitySiege_MainFrame:UpdateSiegeDisplay()
+    end
+end
+
 function EventHandler:HandleSiegeEnd(cityID, winner)
     if not cityID then return end
     
@@ -386,9 +467,12 @@ function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCo
             -- Stamped so the UI can count the timer down between server packets.
             siegeData.syncTime = GetTime()
             
-            -- Update waypoint and position data if provided
+            -- Update position data if provided. The route arrives separately
+            -- (ROUTE chunks), so an update without one must not wipe it.
             if data then
-                siegeData.waypoints = data.waypoints or {}
+                if data.waypoints and #data.waypoints > 0 then
+                    siegeData.waypoints = data.waypoints
+                end
                 siegeData.attackerPositions = data.attackerPositions or {}
                 siegeData.defenderPositions = data.defenderPositions or {}
                 siegeData.attackerBots = data.attackerBots or {}

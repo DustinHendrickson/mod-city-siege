@@ -238,6 +238,11 @@ game itself uses for the player's dot. The server derives the zone from the thro
 runtime, so there is no per-city calibration on either side and no bundled map images; a waypoint is
 drawn exactly where the game would draw it.
 
+The client silently drops any addon message over 255 bytes, and a full route is several times that.
+The route is therefore sent on its own as numbered `ROUTE` chunks (map percentages only) which the
+addon reassembles — once at siege start, and again whenever the map tab asks for it. `UPDATE` carries
+only the live numbers and stays well under the limit.
+
 The server sends state over a hidden addon message, so **players without the addon see nothing**. If
 your client build does not deliver addon messages, set `CitySiege.Addon.UseSystemChannel = 1` to fall
 back to the old visible-system-chat transport.
