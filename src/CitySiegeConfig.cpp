@@ -293,8 +293,6 @@ namespace CitySiege
         c.defenderHoldFraction = std::clamp(sConfigMgr->GetOption<float>("CitySiege.Defenders.HoldLineFraction", 0.5f), 0.0f, 1.0f);
 
         c.formationSpacing = std::max(2.0f, sConfigMgr->GetOption<float>("CitySiege.Formation.Spacing", 6.0f));
-        c.formationRowDepth = std::max(2.0f, sConfigMgr->GetOption<float>("CitySiege.Formation.RowDepth", 6.0f));
-        c.formationWidth = std::max<uint32>(1, sConfigMgr->GetOption<uint32>("CitySiege.Formation.Width", 5));
         c.formationDepthMinion = sConfigMgr->GetOption<float>("CitySiege.Formation.MinionDepth", 0.0f);
         c.formationDepthElite = sConfigMgr->GetOption<float>("CitySiege.Formation.EliteDepth", 14.0f);
         c.formationDepthMiniBoss = sConfigMgr->GetOption<float>("CitySiege.Formation.MiniBossDepth", 26.0f);

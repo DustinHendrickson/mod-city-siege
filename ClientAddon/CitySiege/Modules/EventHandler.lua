@@ -133,6 +133,15 @@ function EventHandler:ParseAddonMessage(message)
                 coords.centerY = tonumber(parts[11])
                 coords.centerZ = tonumber(parts[12])
             end
+
+            -- Map percentages for the muster point and the throne, so the
+            -- map can mark both before the first route update arrives.
+            if #parts >= 17 and parts[13] == "MAP" then
+                coords.spawnMX = tonumber(parts[14])
+                coords.spawnMY = tonumber(parts[15])
+                coords.leaderMX = tonumber(parts[16])
+                coords.leaderMY = tonumber(parts[17])
+            end
             
             self:HandleSiegeStart(cityID, faction, coords)
         end
@@ -175,14 +184,18 @@ function EventHandler:ParseAddonMessage(message)
                     i = i + 1
                     local wpCount = tonumber(parts[i]) or 0
                     i = i + 1
+                    -- Each waypoint is x:y:z:mx:my - world position followed
+                    -- by the server's map percentage for it.
                     for j = 1, wpCount do
-                        if i + 2 <= #parts then
+                        if i + 4 <= #parts then
                             table.insert(data.waypoints, {
                                 x = tonumber(parts[i]),
                                 y = tonumber(parts[i + 1]),
-                                z = tonumber(parts[i + 2])
+                                z = tonumber(parts[i + 2]),
+                                mx = tonumber(parts[i + 3]),
+                                my = tonumber(parts[i + 4]),
                             })
-                            i = i + 3
+                            i = i + 5
                         end
                     end
                 elseif section == "ATK" then
@@ -242,7 +255,8 @@ function EventHandler:ParseAddonMessage(message)
             
             local data = {
                 waypoints = {},
-                leaderPos = nil
+                muster = nil,
+                leaderPos = nil,
             }
             
             local i = 3
@@ -255,26 +269,36 @@ function EventHandler:ParseAddonMessage(message)
                     local wpCount = tonumber(parts[i]) or 0
                     i = i + 1
                     for j = 1, wpCount do
-                        if i + 2 <= #parts then
-                            local wp = {
+                        if i + 4 <= #parts then
+                            table.insert(data.waypoints, {
                                 x = tonumber(parts[i]),
                                 y = tonumber(parts[i + 1]),
-                                z = tonumber(parts[i + 2])
-                            }
-                            table.insert(data.waypoints, wp)
-                            i = i + 3
+                                z = tonumber(parts[i + 2]),
+                                mx = tonumber(parts[i + 3]),
+                                my = tonumber(parts[i + 4]),
+                            })
+                            i = i + 5
                         end
                     end
                     
-                elseif section == "LEADER" then
-                    -- Leader position
-                    if i + 3 <= #parts then
-                        data.leaderPos = {
+                elseif section == "LEADER" or section == "MUSTER" then
+                    -- x:y:z:mx:my, same shape as a waypoint
+                    if i + 5 <= #parts then
+                        local pos = {
                             x = tonumber(parts[i + 1]),
                             y = tonumber(parts[i + 2]),
-                            z = tonumber(parts[i + 3])
+                            z = tonumber(parts[i + 3]),
+                            mx = tonumber(parts[i + 4]),
+                            my = tonumber(parts[i + 5]),
                         }
-                        i = i + 4
+                        if section == "LEADER" then
+                            data.leaderPos = pos
+                        else
+                            data.muster = pos
+                        end
+                        i = i + 6
+                    else
+                        i = i + 1
                     end
                 else
                     i = i + 1

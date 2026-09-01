@@ -391,39 +391,32 @@ CitySiege.Defenders.HoldLineFraction = 0.5
 CitySiege.Defenders.RespawnTime = 45
 
 ###################################################################################################
-# MARCHING FORMATION
+# MARCHING SPREAD
 #
-# Every unit is given a fixed slot relative to the line of march and keeps it for the whole siege,
-# including after it respawns. Without this the entire host walks at the same waypoint and collapses
-# into one pile of overlapping models.
+# Every unit is given its own patch of ground relative to the line of march and keeps it for the
+# whole siege, including after it respawns. Without this the entire host walks at the same waypoint
+# and collapses into one pile of overlapping models.
 #
-# The host forms up facing the first leg of its route: minions in front, then elites, then the
-# mini-bosses, with the warlord bringing up the rear. The garrison forms a single line facing back
-# down the route.
+# This is a scatter, not a parade formation. Ranked rows look sharp on open ground and jam the
+# moment the route turns a corner or narrows into a street, because a rigid line has no choice but
+# to put somebody inside a wall - and a unit standing in a wall is a unit standing still. Offsets
+# are spread on a golden-angle spiral instead, so no two units share a spot and each one is free to
+# swing around its waypoint or close in on it when the ground beside it is blocked.
 ###################################################################################################
 
 #
 #    CitySiege.Formation.Spacing
-#        Description: Yards between neighbouring units in the same row.
+#        Description: Controls how far the host spreads. This is the radius, in yards, of the patch
+#                     the first unit gets; the crowd grows outward from there at constant density,
+#                     so raising it spreads the whole army proportionally. Lower it for cities with
+#                     narrow streets.
 #        Default:     6
 CitySiege.Formation.Spacing = 6
 
 #
-#    CitySiege.Formation.Width
-#        Description: Units per row before a new row starts behind it. Lower this for cities with
-#                     narrow streets so ranks are not pushed into the walls.
-#        Default:     5
-CitySiege.Formation.Width = 5
-
-#
-#    CitySiege.Formation.RowDepth
-#        Description: Yards between successive rows of the same rank.
-#        Default:     6
-CitySiege.Formation.RowDepth = 6
-
-#
 #    CitySiege.Formation.*Depth
-#        Description: Yards each rank marches behind the vanguard.
+#        Description: Yards each rank drifts toward the back of the crowd. Flavour rather than
+#                     structure - it biases where a unit sits in the scatter and constrains nothing.
 CitySiege.Formation.MinionDepth   = 0
 CitySiege.Formation.EliteDepth    = 14
 CitySiege.Formation.MiniBossDepth = 26
@@ -431,8 +424,8 @@ CitySiege.Formation.WarlordDepth  = 34
 
 #
 #    CitySiege.Formation.Jitter
-#        Description: Random wobble in yards applied to each slot, so ranks look like troops rather
-#                     than a parade grid. 0 gives perfectly rigid formations.
+#        Description: Random wobble in yards applied to each spot, so the host looks like troops
+#                     rather than a pattern. 0 makes the spread perfectly regular.
 #        Default:     1.5
 CitySiege.Formation.Jitter = 1.5
 

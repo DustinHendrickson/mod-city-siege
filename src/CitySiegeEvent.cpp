@@ -24,6 +24,7 @@
 #include "Containers.h"
 #include "Creature.h"
 #include "CreatureAI.h"
+#include "DBCStores.h"
 #include "GameTime.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
@@ -31,6 +32,8 @@
 #include "Map.h"
 #include "MapMgr.h"
 #include "MiscPackets.h"
+// Map.h only forward-declares VMAP::ModelIgnoreFlags; isInLineOfSight needs it.
+#include "ModelIgnoreFlags.h"
 #include "MotionMaster.h"
 #include "MoveSpline.h"
 #include "MoveSplineInit.h"
@@ -384,37 +387,38 @@ namespace CitySiege
             }
         }
 
-        // Lays a rank out in rows, centred on the line of march. Every unit keeps
-        // this slot for the whole siege, which is what keeps the army looking
-        // like ranked troops instead of a single heap of overlapping models.
-        FormationSlot MakeSlot(uint8 rank, uint32 index, uint32 total, bool attacker)
+        // Gives a unit its own patch of ground near the line of march, and keeps
+        // it for the whole siege so the army stays spread instead of collapsing
+        // into one heap of overlapping models.
+        //
+        // This is a scatter, not a formation. Ranked rows look sharp on open
+        // ground and jam the moment the route turns a corner or narrows into a
+        // street, because a rigid line has no choice but to put somebody inside
+        // a wall - and a unit standing in a wall is a unit standing still. A
+        // scatter has no line to hold, so every offset is free to shrink or
+        // swing around the node on its own when the ground beside it is blocked.
+        //
+        // The offsets come from a golden-angle spiral: the radius grows as
+        // sqrt(index) so the crowd keeps a constant density however many units
+        // there are, and the angle keeps consecutive units off the same spoke,
+        // so no two slots land on top of each other.
+        FormationSlot MakeSlot(uint8 rank, uint32 index, uint32 /*total*/, bool attacker)
         {
+            constexpr float GOLDEN_ANGLE = 2.39996323f;   // radians
+
             FormationSlot slot;
 
-            if (!attacker)
-            {
-                // The garrison forms a single wide line across the street.
-                float centre = (float(total) - 1.0f) * 0.5f;
-                slot.side = (float(index) - centre) * g_Config.formationSpacing;
-                slot.depth = (index % 2) ? g_Config.formationRowDepth * 0.5f : 0.0f;
-                return slot;
-            }
+            float angle = float(index) * GOLDEN_ANGLE;
+            float radius = g_Config.formationSpacing * std::sqrt(float(index) + 0.5f);
 
-            uint32 width = std::min<uint32>(std::max<uint32>(1, g_Config.formationWidth),
-                                            std::max<uint32>(1, total));
-            uint32 row = index / width;
-            uint32 column = index % width;
+            slot.side = std::cos(angle) * radius;
+            slot.depth = std::sin(angle) * radius;
 
-            // A partly filled last row is centred on its own width rather than
-            // on the full row width, so it does not sit lopsided.
-            uint32 consumed = row * width;
-            uint32 unitsInRow = (total > consumed) ? std::min<uint32>(width, total - consumed) : 1u;
-            if (!unitsInRow)
-                unitsInRow = 1;
-
-            float centre = (float(unitsInRow) - 1.0f) * 0.5f;
-            slot.side = (float(column) - centre) * g_Config.formationSpacing;
-            slot.depth = RankDepth(rank) + float(row) * g_Config.formationRowDepth;
+            // Heavier troops drift toward the back of the crowd. This is flavour
+            // rather than structure - it biases where a unit sits in the scatter
+            // and constrains nothing.
+            if (attacker)
+                slot.depth += RankDepth(rank);
 
             return slot;
         }
@@ -451,6 +455,10 @@ namespace CitySiege
         // therefore shrunk until the ground beneath it lines up with the node,
         // and collapses onto the node itself if nothing beside it is walkable -
         // the node came out of the navmesh corridor, so it is always valid.
+        // How many directions a blocked slot is swung through before it is
+        // brought closer to the node.
+        constexpr uint32 SLOT_ROTATIONS = 8;
+
         Position PlaceSlot(Map* map, Position const& anchor, float fx, float fy,
                            FormationSlot const& slot, float jitter)
         {
@@ -460,21 +468,53 @@ namespace CitySiege
             float orientation = std::atan2(fy, fx);
             float anchorZ = anchor.GetPositionZ();
 
-            for (float factor : { 1.0f, 0.6f, 0.3f })
+            // The slot as asked for, in world axes.
+            float baseX = rx * slot.side - fx * slot.depth;
+            float baseY = ry * slot.side - fy * slot.depth;
+
+            if (!map)
+                return Position(anchor.GetPositionX() + baseX, anchor.GetPositionY() + baseY,
+                                anchorZ, orientation);
+
+            // Swing the offset around the node before shortening it. Beside a
+            // wall the ground a unit wants is usually still there, just in a
+            // different direction, so rotating finds open ground while keeping
+            // the army spread out; shrinking is the fallback that pulls units
+            // back together, so it is tried last.
+            for (float factor : { 1.0f, 0.75f, 0.5f, 0.25f })
             {
-                float x = anchor.GetPositionX() + (rx * slot.side - fx * slot.depth) * factor
-                        + frand(-jitter, jitter);
-                float y = anchor.GetPositionY() + (ry * slot.side - fy * slot.depth) * factor
-                        + frand(-jitter, jitter);
+                for (uint32 turn = 0; turn < SLOT_ROTATIONS; ++turn)
+                {
+                    float angle = float(turn) * (6.28318531f / float(SLOT_ROTATIONS));
+                    float ca = std::cos(angle);
+                    float sa = std::sin(angle);
 
-                if (!map)
-                    return Position(x, y, anchorZ, orientation);
+                    float x = anchor.GetPositionX() + (baseX * ca - baseY * sa) * factor
+                            + frand(-jitter, jitter);
+                    float y = anchor.GetPositionY() + (baseX * sa + baseY * ca) * factor
+                            + frand(-jitter, jitter);
 
-                float ground = map->GetHeight(x, y, anchorZ + 4.0f, true, 25.0f);
-                if (ground > INVALID_HEIGHT && std::fabs(ground - anchorZ) <= FORMATION_GROUND_TOLERANCE)
+                    float ground = map->GetHeight(x, y, anchorZ + 4.0f, true, 25.0f);
+                    if (ground <= INVALID_HEIGHT || std::fabs(ground - anchorZ) > FORMATION_GROUND_TOLERANCE)
+                        continue;
+
+                    // Height alone happily accepts a spot inside a building -
+                    // the floor under a wall is still floor, and the unit then
+                    // spends the siege walking into that wall. Requiring a clear
+                    // line from the node it is marching to rejects anything
+                    // behind a wall or around a corner before a unit is sent
+                    // there, which is what keeps them off the geometry.
+                    if (!map->isInLineOfSight(anchor.GetPositionX(), anchor.GetPositionY(), anchorZ + 2.0f,
+                                              x, y, ground + 2.0f, PHASEMASK_NORMAL,
+                                              LINEOFSIGHT_ALL_CHECKS, VMAP::ModelIgnoreFlags::Nothing))
+                        continue;
+
                     return Position(x, y, ground + 0.5f, orientation);
+                }
             }
 
+            // Nothing beside the node is usable - stand on the node itself. It
+            // came out of the navmesh corridor, so it is always valid.
             return Position(anchor.GetPositionX(), anchor.GetPositionY(), anchorZ, orientation);
         }
 
@@ -729,15 +769,65 @@ namespace CitySiege
                 SendAddonPayload(itr->GetSource(), payload);
         }
 
-        std::string SerialiseRoute(CityData const& city)
+        // Client map coordinates for a world position: percent across the
+        // city's zone map, origin top-left, which is what the world map frame
+        // works in. Map2ZoneCoordinates is the same WorldMapArea.dbc lookup the
+        // client uses to place the player's own dot, so a marker sent this way
+        // lands exactly where the game would draw it. The addon used to derive
+        // this itself from hand-tuned per-city offsets, and never lined up.
+        struct MapPercent
+        {
+            float x = -1.0f;    // negative means "not on this map"
+            float y = -1.0f;
+        };
+
+        uint32 CityZoneId(CityData const& city, Map* map)
+        {
+            if (!map)
+                return 0;
+
+            return map->GetZoneId(PHASEMASK_NORMAL, city.leader.GetPositionX(),
+                                  city.leader.GetPositionY(), city.leader.GetPositionZ());
+        }
+
+        MapPercent ToMapPercent(Position const& pos, uint32 zoneId)
+        {
+            MapPercent result;
+            if (!zoneId)
+                return result;
+
+            float x = pos.GetPositionX();
+            float y = pos.GetPositionY();
+            Map2ZoneCoordinates(x, y, zoneId);
+
+            // A zone with no WorldMapArea entry leaves the inputs untouched,
+            // which would put a raw world coordinate on the map. Nothing that
+            // belongs on a zone map is hundreds of percent off it.
+            if (x < -100.0f || x > 200.0f || y < -100.0f || y > 200.0f)
+                return result;
+
+            result.x = x;
+            result.y = y;
+            return result;
+        }
+
+        // World position followed by its map position: x:y:z:mx:my
+        void StreamPosition(std::ostringstream& stream, Position const& pos, uint32 zoneId)
+        {
+            MapPercent onMap = ToMapPercent(pos, zoneId);
+            stream << ':' << pos.GetPositionX() << ':' << pos.GetPositionY() << ':' << pos.GetPositionZ()
+                   << ':' << onMap.x << ':' << onMap.y;
+        }
+
+        std::string SerialiseRoute(CityData const& city, uint32 zoneId)
         {
             std::vector<Position> const& route = GetCityRoute(city);
 
             std::ostringstream stream;
-            stream << ":WP:" << route.size();
             stream << std::fixed << std::setprecision(2);
+            stream << ":WP:" << route.size();
             for (Position const& node : route)
-                stream << ':' << node.GetPositionX() << ':' << node.GetPositionY() << ':' << node.GetPositionZ();
+                StreamPosition(stream, node, zoneId);
 
             return stream.str();
         }
@@ -758,10 +848,15 @@ namespace CitySiege
 
         if (messageType == "START")
         {
+            uint32 zoneId = CityZoneId(city, map);
+            MapPercent muster = ToMapPercent(city.muster, zoneId);
+            MapPercent leader = ToMapPercent(city.leader, zoneId);
+
             stream << "START:" << uint32(event.cityId) << ':' << TeamName(AttackingTeam(city))
                    << ':' << city.muster.GetPositionX() << ':' << city.muster.GetPositionY() << ':' << city.muster.GetPositionZ()
                    << ':' << city.leader.GetPositionX() << ':' << city.leader.GetPositionY() << ':' << city.leader.GetPositionZ()
-                   << ':' << city.center.GetPositionX() << ':' << city.center.GetPositionY() << ':' << city.center.GetPositionZ();
+                   << ':' << city.center.GetPositionX() << ':' << city.center.GetPositionY() << ':' << city.center.GetPositionZ()
+                   << ":MAP:" << muster.x << ':' << muster.y << ':' << leader.x << ':' << leader.y;
         }
         else if (messageType == "UPDATE")
         {
@@ -782,7 +877,7 @@ namespace CitySiege
                    << ':' << elapsed << ':' << remaining
                    << ':' << std::setprecision(1) << leaderHealth << std::setprecision(2)
                    << ':' << (event.leaderName.empty() ? "Unknown" : event.leaderName)
-                   << SerialiseRoute(city);
+                   << SerialiseRoute(city, CityZoneId(city, map));
         }
         else if (messageType == "END")
         {
@@ -802,12 +897,15 @@ namespace CitySiege
             return;
 
         CityData const& city = g_Cities[cityId];
+        uint32 zoneId = CityZoneId(city, GetCityMap(city));
 
         std::ostringstream stream;
-        stream << "MAP_DATA:" << uint32(cityId) << SerialiseRoute(city)
-               << std::fixed << std::setprecision(2)
-               << ":LEADER:" << city.leader.GetPositionX() << ':' << city.leader.GetPositionY()
-               << ':' << city.leader.GetPositionZ();
+        stream << std::fixed << std::setprecision(2);
+        stream << "MAP_DATA:" << uint32(cityId) << SerialiseRoute(city, zoneId);
+        stream << ":MUSTER";
+        StreamPosition(stream, city.muster, zoneId);
+        stream << ":LEADER";
+        StreamPosition(stream, city.leader, zoneId);
 
         SendAddonPayload(player, stream.str());
     }

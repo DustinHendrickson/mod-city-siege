@@ -63,6 +63,9 @@ namespace CitySiege
         /// Works out where this unit should be standing and orders it there.
         void IssueOrder();
 
+        /// Called when a unit has not moved since the last watchdog tick.
+        void OnStalled();
+
         CityId        _cityId;
         bool          _attacker;
         uint8         _rank;
@@ -70,6 +73,15 @@ namespace CitySiege
         uint32        _routeIndex;
         bool          _marching = false;
         uint32        _watchdog = 0;
+
+        // Stuck detection. A unit wedged on a wall or a corner reports its
+        // spline as finalised and never arrives, so re-issuing the same order
+        // achieves nothing; these track how long it has genuinely not moved so
+        // the order can be escalated instead of repeated.
+        uint32        _stalls = 0;
+        bool          _ignoreSlot = false;   // head for the bare route node
+        Position      _lastPosition;
+        bool          _haveLastPosition = false;
     };
 
     /// Returns the siege AI attached to a creature, or nullptr.

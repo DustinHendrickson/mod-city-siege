@@ -24,9 +24,9 @@ to whoever answers the call.
 
 - **No hand-placed waypoints.** Marching routes are generated from the server navmesh at runtime,
   for every city, and cached. See [Routing](#routing).
-- **The host marches in ranks.** Every unit holds a fixed slot relative to the line of march, so the
-  army arrives as ordered files rather than one pile of overlapping models. See
-  [Formation](#formation).
+- **The host stays spread out.** Every unit holds its own patch of ground beside the line of march, so the
+  army arrives spread across the street rather than as one pile of overlapping models. See
+  [Spread](#spread).
 - **Real leader targeting.** The throne position is read out of the `creature` table, so the siege
   always aims at where your city leader actually stands.
 - **Scales to the players present.** The army's level is derived from who is near the city when the
@@ -107,24 +107,38 @@ CitySiege.Route.MaxLegs."*
 
 ---
 
-## Formation
+## Spread
 
-Sending every unit to the same waypoint makes an army walk as a single clump. Instead, each unit is
-assigned a **formation slot** when it spawns — a lateral offset and a depth, both measured relative
-to the direction of march — and keeps it for the whole siege, including after it respawns.
+Sending every unit to the same waypoint makes an army walk as a single clump. Instead each unit gets
+its own patch of ground beside the line of march when it spawns, and keeps it for the whole siege,
+including after it respawns. When the army moves, a unit aims at *its own spot* projected onto the
+current leg rather than at the waypoint itself.
 
-The host forms up facing the first leg of its route: minions in front, elites behind them, then the
-mini-bosses, with the warlord bringing up the rear. Each rank is laid out in rows
-`CitySiege.Formation.Width` wide. When the army moves, a unit aims at *its own slot* projected onto
-the current leg, not at the waypoint itself, so a rank arrives as a line. The garrison forms a single
-wide line facing back down the route.
+This is a **scatter, not a parade formation**, and that is deliberate. Ranked rows look sharp on open
+ground and jam the moment the route turns a corner or narrows into a street: a rigid line has no
+choice but to put somebody inside a wall, and a unit standing in a wall is a unit standing still.
+Offsets are spread on a golden-angle spiral instead — radius growing as `sqrt(index)` so the crowd
+holds constant density at any army size, and the angle keeping consecutive units off the same spoke —
+so no two units share a spot and nothing depends on holding a line.
 
-The formation collapses to half width for the final push at the throne, so nobody is shoved into a
-wall in a tight room. Units that cannot reach their slot simply path as close as the navmesh allows —
-`forceDestination` is off — and a stuck unit skips to the next node after 20 seconds.
+Three things keep units off the geometry:
 
-Narrow-street cities look better with a smaller `CitySiege.Formation.Width` (3 rather than 5) and a
-tighter `CitySiege.Formation.Spacing`.
+- **Line-of-sight validation.** A spot is only accepted if there is a clear line to it from the
+  waypoint. Ground height alone is not enough — the floor under a wall is still floor, so a
+  height-only check happily places a unit inside a building.
+- **Rotate before closing in.** A blocked spot is swung around the waypoint through eight directions
+  at full radius before the radius is reduced. Beside a wall the open ground is usually still there,
+  just in another direction, so the host stays spread rather than bunching up at the first obstacle.
+- **Escalation when stuck.** A unit that has not moved for two watchdog ticks abandons its spot and
+  heads for the bare waypoint; after four it gives up on that waypoint and takes the next one. Both
+  reset as soon as it moves again. This is what clears a unit wedged on a corner, which reports its
+  movement as finished and would otherwise be re-sent into the same wall forever.
+
+The spread also halves for the final push at the throne so nobody is shoved into a wall in a tight
+room, and `forceDestination` is off throughout, so a unit that cannot reach its spot simply paths as
+close as the navmesh allows.
+
+Cities with narrow streets look better with a tighter `CitySiege.Formation.Spacing`.
 
 ---
 
@@ -218,6 +232,12 @@ a live **Overview** (stage, countdown, leader health, force counts), a **Battle 
 generated route, and a GM **Commands** panel. Copy the `CitySiege` folder into
 `World of Warcraft/Interface/AddOns/` — see [ClientAddon/README.md](ClientAddon/README.md).
 
+The battle map draws the city on the client's own world-map tiles and places markers with map
+coordinates the server computes through `Map2ZoneCoordinates` — the `WorldMapArea.dbc` lookup the
+game itself uses for the player's dot. The server derives the zone from the throne position at
+runtime, so there is no per-city calibration on either side and no bundled map images; a waypoint is
+drawn exactly where the game would draw it.
+
 The server sends state over a hidden addon message, so **players without the addon see nothing**. If
 your client build does not deliver addon messages, set `CitySiege.Addon.UseSystemChannel = 1` to fall
 back to the old visible-system-chat transport.
@@ -259,10 +279,14 @@ The city leader could not be found. Check the startup log; either the leader has
 simply runs to the timer.
 
 **The army bunches up into a single blob.**
-Formation slots are what prevent this, so check they are not disabled: `CitySiege.Formation.Spacing`
-and `CitySiege.Formation.Width` must be above zero. In very tight interiors the navmesh may not have
-room for the configured width, and units collapse onto the nearest reachable ground — lower
-`CitySiege.Formation.Width` to 3 for those cities.
+`CitySiege.Formation.Spacing` is what spreads it, so check it is above zero. Some bunching is
+expected and correct in tight interiors: when nothing beside a waypoint passes the line-of-sight
+check, units collapse onto the waypoint itself rather than being sent into a wall.
+
+**Units stand still against a wall or corner.**
+They should free themselves within about eight seconds — a unit that stops moving drops its spot
+after two watchdog ticks and skips the waypoint after four. If one is stuck for longer than that,
+the waypoint itself is likely unreachable; check `.citysiege route <city>` for unwalkable hops.
 
 **Low level players get flattened.**
 Raise `CitySiege.Bracket.MinDamageTaken`, or lower `CitySiege.Scaling.MaxLevel`.

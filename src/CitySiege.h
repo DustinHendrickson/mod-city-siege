@@ -111,12 +111,10 @@ namespace CitySiege
         bool        leaderPositionPinned = false;   // admin supplied explicit coords
         bool        leaderPositionResolved = false; // read back from creature table
 
-        // Anchors the march is required to pass through, in order, between the
-        // muster point and the throne. The navmesh finds the *shortest* walkable
-        // line, and open hillsides around a city are walkable, so without these
-        // the army cuts over the terrain instead of using the gate and streets.
-        // One anchor just inside the main gate is usually enough; interior
-        // anchors shape which districts the host marches through.
+        // Optional anchors the march must pass through, in order, between the
+        // muster point and the throne. Empty by default: keeping the host on the
+        // roads is the query filter's job (Config::routeSteepCost), which needs
+        // no per-city knowledge. These exist only to force a particular way in.
         std::vector<Position> approach;
 
         std::vector<Position> manualRoute;      // legacy waypoints from the config
@@ -130,9 +128,14 @@ namespace CitySiege
     // Per-unit and per-player siege state
     // -------------------------------------------------------------------------
 
-    // A unit's fixed place in the marching formation, in yards relative to the
-    // route line: side is lateral (signed, right of travel is positive), depth
-    // is how far back from the vanguard it marches.
+    // A unit's own patch of ground relative to the line of march, in yards:
+    // side is lateral (signed, right of travel is positive), depth is how far
+    // back it walks. Held for the whole siege so the host stays spread out
+    // rather than collapsing into one pile of overlapping models.
+    //
+    // Deliberately a scatter and not a formation - see MakeSlot(). Ranked rows
+    // have to put somebody inside a wall the moment a street narrows, and a unit
+    // standing in a wall is a unit standing still.
     struct FormationSlot
     {
         float side = 0.0f;
@@ -365,8 +368,6 @@ namespace CitySiege
         // instead of all walking at the same point, which is what stops a war
         // host from collapsing into one pile of overlapping models.
         float  formationSpacing = 6.0f;     // yards between neighbours in a rank
-        float  formationRowDepth = 6.0f;    // yards between rows of the same rank
-        uint32 formationWidth = 5;          // units per row
         float  formationDepthMinion = 0.0f; // yards behind the vanguard, per rank
         float  formationDepthElite = 14.0f;
         float  formationDepthMiniBoss = 26.0f;

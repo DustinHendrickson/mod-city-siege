@@ -30,6 +30,11 @@ namespace CitySiege
     {
         constexpr uint32 WATCHDOG_INTERVAL = 2000;   // ms between idle re-checks
         constexpr uint32 SKIP_GUARD        = 4;      // waypoints skipped in one pass
+
+        // Escalation thresholds, in consecutive watchdog ticks without moving.
+        constexpr uint32 STALLS_BEFORE_NODE = 2;   // give up on the unit's own spot
+        constexpr uint32 STALLS_BEFORE_SKIP = 4;   // give up on the waypoint
+        constexpr float  STALL_MOVE_EPSILON = 1.5f;  // yards that count as progress
     }
 
     SiegeUnitAI::SiegeUnitAI(Creature* creature, CityId cityId, bool attacker, uint8 rank,
@@ -45,6 +50,9 @@ namespace CitySiege
     {
         _marching = true;
         _watchdog = 0;
+        _stalls = 0;
+        _ignoreSlot = false;
+        _haveLastPosition = false;
         IssueOrder();
     }
 
@@ -73,6 +81,10 @@ namespace CitySiege
 
         if (_attacker && _routeIndex < route.size())
             ++_routeIndex;
+
+        // Arrived under its own power, so whatever it was caught on is behind it.
+        _stalls = 0;
+        _ignoreSlot = false;
 
         IssueOrder();
     }
@@ -112,8 +124,55 @@ namespace CitySiege
 
         _watchdog = 0;
 
-        if (me->movespline->Finalized())
-            IssueOrder();
+        // Has it actually got anywhere since the last tick?
+        Position const current(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), 0.0f);
+        bool moved = !_haveLastPosition || current.GetExactDist(&_lastPosition) > STALL_MOVE_EPSILON;
+
+        _lastPosition = current;
+        _haveLastPosition = true;
+
+        if (moved)
+        {
+            // Making progress: forget any escalation and let it use its slot again.
+            _stalls = 0;
+            _ignoreSlot = false;
+
+            if (me->movespline->Finalized())
+                IssueOrder();
+
+            return;
+        }
+
+        OnStalled();
+    }
+
+    // Standing still. Re-issuing the same order would only send the unit back
+    // into whatever it is wedged against, so widen the target instead: first
+    // abandon the formation slot and head for the bare route node, then give up
+    // on the node altogether and aim at the next one. Between them these clear
+    // both failure modes seen in practice - a slot that turned out to be inside
+    // geometry, and a waypoint tucked behind a corner the unit cannot round.
+    void SiegeUnitAI::OnStalled()
+    {
+        ++_stalls;
+
+        if (_stalls == STALLS_BEFORE_NODE)
+        {
+            _ignoreSlot = true;
+        }
+        else if (_stalls >= STALLS_BEFORE_SKIP)
+        {
+            std::vector<Position> const& route = GetCityRoute(g_Cities[_cityId]);
+
+            if (_attacker && _routeIndex < route.size())
+                ++_routeIndex;
+
+            // Next waypoint, and a fresh chance at a slot beside it.
+            _ignoreSlot = false;
+            _stalls = 0;
+        }
+
+        IssueOrder();
     }
 
     // -------------------------------------------------------------------------
@@ -168,8 +227,8 @@ namespace CitySiege
             float fx = 0.0f, fy = 0.0f;
             HeadingBetween(previous, node, fx, fy);
 
-            // Tighten the formation for the final push so nobody is shoved into
-            // a wall in the throne room.
+            // Tighten the scatter for the final push so nobody is shoved into a
+            // wall in the throne room.
             FormationSlot slot = _slot;
             if (chargeThrone)
             {
@@ -177,7 +236,16 @@ namespace CitySiege
                 slot.depth *= 0.5f;
             }
 
-            target = PlaceFormationSlot(map, node, fx, fy, slot, g_Config.formationJitter);
+            // A unit that stalled on its way to a slot heads for the bare node
+            // instead. The node came out of the navmesh, so it is reachable
+            // even when nothing around it is.
+            if (_ignoreSlot)
+            {
+                slot.side = 0.0f;
+                slot.depth = 0.0f;
+            }
+
+            target = PlaceFormationSlot(map, node, fx, fy, slot, _ignoreSlot ? 0.0f : g_Config.formationJitter);
 
             bool arrived = me->GetDistance(target) <= SIEGE_ARRIVE_DIST;
             if (arrived && _attacker && _routeIndex < route.size())
