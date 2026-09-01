@@ -131,17 +131,17 @@ namespace CitySiege
         float depth = 0.0f;
     };
 
+    // Bookkeeping the siege event keeps per unit. Live marching state (which
+    // waypoint it is walking to, whether it is stuck) belongs to the unit's
+    // SiegeUnitAI, not here.
     struct SiegeUnit
     {
         ObjectGuid    guid;
-        uint32        entry = 0;        // kept so a unit can respawn after its corpse decays
+        uint32        entry = 0;    // kept so a unit can respawn after its corpse decays
         uint8         rank = RANK_MINION;
         bool          attacker = true;
         FormationSlot slot;
-        uint32        routeIndex = 0;      // next route node to walk to
-        uint32        lastOrderTime = 0;   // server time of the last MovePoint order
-        uint32        stuckSince = 0;      // server time we first noticed no progress
-        float         lastDistance = 0.0f; // distance to target at the last check
+        uint32        routeIndex = 0;   // waypoint the unit starts its march from
     };
 
     struct Contribution
@@ -463,6 +463,30 @@ namespace CitySiege
     void ScaleBracketDamage(Unit* attacker, Unit* victim, float& damage);
 
     void DespawnSiegeUnits(SiegeEvent& event);
+
+    // -------------------------------------------------------------------------
+    // Movement contract shared between the siege event and the unit AI
+    // -------------------------------------------------------------------------
+
+    // Base id for MovePoint orders. The route index is added to it, so
+    // MovementInform can tell which waypoint a unit just reached.
+    constexpr uint32 SIEGE_POINT_ID_BASE = 41000;
+
+    constexpr float SIEGE_ARRIVE_DIST   = 10.0f;   // close enough to a waypoint
+    constexpr float SIEGE_ENGAGE_DIST   = 45.0f;   // charge the leader from here
+
+    // Lays a rank out in rows centred on the line of march.
+    FormationSlot MakeFormationSlot(uint8 rank, uint32 index, uint32 total, bool attacker);
+
+    // Projects a formation slot onto walkable ground beside `anchor`.
+    Position PlaceFormationSlot(Map* map, Position const& anchor, float fx, float fy,
+                                FormationSlot const& slot, float jitter);
+
+    // Unit vector from `from` toward `to`, defaulting to due east when they coincide.
+    void HeadingBetween(Position const& from, Position const& to, float& fx, float& fy);
+
+    // Where the garrison digs in, as an index into the route.
+    uint32 DefenderHoldIndex(std::vector<Position> const& route);
 
     // Helpers shared with the command script
     CityData* FindCityByName(std::string const& name);

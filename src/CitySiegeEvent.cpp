@@ -16,6 +16,7 @@
  */
 
 #include "CitySiege.h"
+#include "CitySiegeUnitAI.h"
 
 #include "Cell.h"
 #include "CellImpl.h"
@@ -67,12 +68,10 @@ namespace CitySiege
         constexpr uint32 MOVEMENT_TICK_SECONDS  = 1;
         constexpr uint32 RESPAWN_TICK_SECONDS   = 2;
         constexpr uint32 STATUS_ANNOUNCE_PERIOD = 300;
-        constexpr uint32 ORDER_COOLDOWN_SECONDS = 2;
-        constexpr uint32 STUCK_GRACE_SECONDS    = 20;
+        // Waypoint arrival tolerance for playerbots, which are steered by the
+        // playerbots travel system rather than by SiegeUnitAI.
         constexpr float  WAYPOINT_ARRIVE_DIST   = 10.0f;
-        constexpr float  THRONE_ENGAGE_DIST     = 45.0f;
         constexpr float  LEADER_SEARCH_RADIUS   = 120.0f;
-        constexpr uint32 MOVE_POINT_ID_BASE     = 41000;
 
         uint32 Now() { return uint32(GameTime::GetGameTime().count()); }
 
@@ -368,6 +367,10 @@ namespace CitySiege
                                       creature->GetPositionZ(), creature->GetOrientation());
             creature->GetMotionMaster()->Clear(false);
             creature->GetMotionMaster()->MoveIdle();
+
+            // Hand control to the unit's own AI.
+            if (SiegeUnitAI* ai = GetSiegeUnitAI(creature))
+                ai->BeginMarch();
         }
 
         float RankDepth(uint8 rank)
@@ -418,7 +421,7 @@ namespace CitySiege
 
         // Unit vector pointing from `from` toward `to`, defaulting to due east
         // when the two coincide.
-        void HeadingBetween(Position const& from, Position const& to, float& fx, float& fy)
+        void ComputeHeading(Position const& from, Position const& to, float& fx, float& fy)
         {
             float dx = to.GetPositionX() - from.GetPositionX();
             float dy = to.GetPositionY() - from.GetPositionY();
@@ -435,27 +438,44 @@ namespace CitySiege
             fy = dy / length;
         }
 
-        // Places a formation slot on the ground around `anchor`, given the
-        // direction the formation is facing.
+        // How far the ground under a formation slot may differ from the route
+        // node before the slot is considered unusable.
+        constexpr float FORMATION_GROUND_TOLERANCE = 4.0f;
+
+        // Projects a formation slot onto walkable ground beside `anchor`.
+        //
+        // This matters more than it looks: PointMovementGenerator only follows a
+        // generated path when it produced more than two points, and otherwise
+        // straight-lines to the destination. A slot hanging over a canal or off a
+        // ledge is not on the navmesh, so the unit flies at it. The offset is
+        // therefore shrunk until the ground beneath it lines up with the node,
+        // and collapses onto the node itself if nothing beside it is walkable -
+        // the node came out of the navmesh corridor, so it is always valid.
         Position PlaceSlot(Map* map, Position const& anchor, float fx, float fy,
                            FormationSlot const& slot, float jitter)
         {
             // Right-hand normal of the heading.
             float rx = fy;
             float ry = -fx;
+            float orientation = std::atan2(fy, fx);
+            float anchorZ = anchor.GetPositionZ();
 
-            float x = anchor.GetPositionX() + rx * slot.side - fx * slot.depth + frand(-jitter, jitter);
-            float y = anchor.GetPositionY() + ry * slot.side - fy * slot.depth + frand(-jitter, jitter);
-            float z = anchor.GetPositionZ();
-
-            if (map)
+            for (float factor : { 1.0f, 0.6f, 0.3f })
             {
-                float ground = map->GetHeight(x, y, z + 6.0f, true, 30.0f);
-                if (ground > INVALID_HEIGHT && std::fabs(ground - z) < 25.0f)
-                    z = ground + 0.5f;
+                float x = anchor.GetPositionX() + (rx * slot.side - fx * slot.depth) * factor
+                        + frand(-jitter, jitter);
+                float y = anchor.GetPositionY() + (ry * slot.side - fy * slot.depth) * factor
+                        + frand(-jitter, jitter);
+
+                if (!map)
+                    return Position(x, y, anchorZ, orientation);
+
+                float ground = map->GetHeight(x, y, anchorZ + 4.0f, true, 25.0f);
+                if (ground > INVALID_HEIGHT && std::fabs(ground - anchorZ) <= FORMATION_GROUND_TOLERANCE)
+                    return Position(x, y, ground + 0.5f, orientation);
             }
 
-            return Position(x, y, z, std::atan2(fy, fx));
+            return Position(anchor.GetPositionX(), anchor.GetPositionY(), anchorZ, orientation);
         }
 
         struct SideCounts
@@ -486,7 +506,7 @@ namespace CitySiege
         }
 
         // Where the garrison digs in, as an index into the route.
-        uint32 DefenderHoldIndex(std::vector<Position> const& route)
+        uint32 HoldIndexFor(std::vector<Position> const& route)
         {
             if (route.empty())
                 return 0;
@@ -494,6 +514,31 @@ namespace CitySiege
             return std::min<uint32>(uint32(float(route.size()) * g_Config.defenderHoldFraction),
                                     uint32(route.size() - 1));
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Movement contract shared with SiegeUnitAI
+    // -------------------------------------------------------------------------
+
+    FormationSlot MakeFormationSlot(uint8 rank, uint32 index, uint32 total, bool attacker)
+    {
+        return MakeSlot(rank, index, total, attacker);
+    }
+
+    Position PlaceFormationSlot(Map* map, Position const& anchor, float fx, float fy,
+                                FormationSlot const& slot, float jitter)
+    {
+        return PlaceSlot(map, anchor, fx, fy, slot, jitter);
+    }
+
+    void HeadingBetween(Position const& from, Position const& to, float& fx, float& fy)
+    {
+        ComputeHeading(from, to, fx, fy);
+    }
+
+    uint32 DefenderHoldIndex(std::vector<Position> const& route)
+    {
+        return HoldIndexFor(route);
     }
 
     // -------------------------------------------------------------------------
@@ -809,6 +854,12 @@ namespace CitySiege
             creature->SetCorpseDelay(60);
             PrepareForMuster(creature);
 
+            // Give the unit its own marching AI. Movement is then driven by
+            // MovementInform rather than by an external poll, which is what stops
+            // units from stalling in the street when the motion master ends up in
+            // a state the poll did not recognise.
+            creature->AIM_Initialize(new SiegeUnitAI(creature, city.id, attacker, rank, slot, routeIndex));
+
             SiegeUnit unit;
             unit.guid = creature->GetGUID();
             unit.entry = entry;
@@ -837,7 +888,7 @@ namespace CitySiege
             // ranks rather than stacked on the muster point.
             std::vector<Position> const& route = GetCityRoute(city);
             float fx = 0.0f, fy = 0.0f;
-            HeadingBetween(city.muster, route.empty() ? city.leader : route.front(), fx, fy);
+            ComputeHeading(city.muster, route.empty() ? city.leader : route.front(), fx, fy);
 
             struct Wave { uint32 entry; uint8 rank; uint32 count; };
             Wave const waves[] =
@@ -886,7 +937,7 @@ namespace CitySiege
 
             // The garrison faces back down the route, toward the incoming host.
             float fx = 0.0f, fy = 0.0f;
-            HeadingBetween(city.leader, route.empty() ? city.muster : route.back(), fx, fy);
+            ComputeHeading(city.leader, route.empty() ? city.muster : route.back(), fx, fy);
 
             uint32 spawned = 0;
             for (uint32 i = 0; i < g_Config.defendersCount; ++i)
@@ -1129,8 +1180,8 @@ namespace CitySiege
                     else
                     {
                         // Defenders form up on the same line the NPC garrison holds.
-                        nodeKey = route.empty() ? BOT_NODE_THRONE : DefenderHoldIndex(route);
-                        target = route.empty() ? city.leader : route[DefenderHoldIndex(route)];
+                        nodeKey = route.empty() ? BOT_NODE_THRONE : HoldIndexFor(route);
+                        target = route.empty() ? city.leader : route[HoldIndexFor(route)];
                     }
 
                     OrderBotTo(event, bot, uint32(city.id), city.mapId, nodeKey, target, now);
@@ -1256,7 +1307,7 @@ namespace CitySiege
                         }
                         else
                         {
-                            uint32 holdIndex = DefenderHoldIndex(route);
+                            uint32 holdIndex = HoldIndexFor(route);
                             nodeKey = holdIndex;
                             target = route[holdIndex];
                         }
@@ -1925,163 +1976,30 @@ namespace CitySiege
             LOG_INFO("module.citysiege", "[City Siege] {}: muster over, the army is marching.", city.name);
         }
 
-        // Advances a single unit along the route and keeps it from drifting home.
-        void DriveUnit(CityData const& city, Creature* creature, SiegeUnit& unit,
-                       std::vector<Position> const& route, Creature* leader, uint32 now)
-        {
-            // Combat takes priority; the motion master restores the point
-            // movement once the fight is over.
-            if (creature->IsInCombat())
-            {
-                unit.stuckSince = 0;
-                creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(),
-                                          creature->GetPositionZ(), creature->GetOrientation());
-                return;
-            }
-
-            // Work out the node this unit is heading for, and the node it is
-            // coming from, so the formation can be oriented along the march.
-            Position node;
-            Position previous;
-            bool chargeLeader = false;
-
-            if (unit.attacker)
-            {
-                if (unit.routeIndex < route.size())
-                {
-                    node = route[unit.routeIndex];
-                    previous = unit.routeIndex ? route[unit.routeIndex - 1] : city.muster;
-                }
-                else
-                {
-                    node = city.leader;
-                    previous = route.empty() ? city.muster : route.back();
-                    chargeLeader = true;
-                }
-            }
-            else
-            {
-                // The garrison marches out to meet the assault and then holds a
-                // line rather than chasing all the way to the muster point.
-                if (route.empty())
-                {
-                    node = city.leader;
-                    previous = city.muster;
-                }
-                else
-                {
-                    uint32 holdIndex = DefenderHoldIndex(route);
-                    unit.routeIndex = holdIndex;
-                    node = route[holdIndex];
-                    // Defenders face back down the route toward the attackers.
-                    previous = (holdIndex + 1 < route.size()) ? route[holdIndex + 1] : city.leader;
-                }
-            }
-
-            // Each unit aims at its own slot in the formation rather than at the
-            // node itself, so a rank arrives as a line instead of a pile.
-            float fx = 0.0f, fy = 0.0f;
-            HeadingBetween(previous, node, fx, fy);
-
-            float rx = fy;
-            float ry = -fx;
-
-            // Close to the throne the streets are tight; collapse the formation
-            // so nobody is shoved into a wall during the final push.
-            float squeeze = chargeLeader ? 0.5f : 1.0f;
-
-            Position target(node.GetPositionX() + (rx * unit.slot.side - fx * unit.slot.depth) * squeeze,
-                            node.GetPositionY() + (ry * unit.slot.side - fy * unit.slot.depth) * squeeze,
-                            node.GetPositionZ(), std::atan2(fy, fx));
-
-            float distance = creature->GetDistance(target);
-
-            if (chargeLeader && leader && leader->IsAlive() &&
-                creature->GetDistance(leader) <= THRONE_ENGAGE_DIST)
-            {
-                if (creature->AI())
-                    creature->AI()->AttackStart(leader);
-                unit.stuckSince = 0;
-                return;
-            }
-
-            if (distance <= WAYPOINT_ARRIVE_DIST)
-            {
-                // Arrived. Advance the marker and let the next tick pick the new
-                // target - ordering here would just send the unit back to the
-                // node it is already standing on.
-                if (unit.attacker && unit.routeIndex < route.size())
-                {
-                    ++unit.routeIndex;
-                    unit.stuckSince = 0;
-                    unit.lastDistance = 0.0f;
-                    unit.lastOrderTime = 0;   // clears the cooldown for the next leg
-                }
-
-                // Defenders hold their line; attackers at the throne wait for a
-                // target rather than shuffling around.
-                return;
-            }
-
-            // Only re-issue when the previous order has run its course.
-            bool idle = creature->movespline->Finalized() ||
-                        creature->GetMotionMaster()->GetCurrentMovementGeneratorType() == IDLE_MOTION_TYPE;
-
-            // Stuck detection: no meaningful progress for a while means the node
-            // is unreachable (a closed door, a ledge). Skip it and press on.
-            if (!idle)
-            {
-                if (unit.lastDistance > 0.0f && distance > unit.lastDistance - 2.0f)
-                {
-                    if (!unit.stuckSince)
-                        unit.stuckSince = now;
-                    else if (now - unit.stuckSince >= STUCK_GRACE_SECONDS)
-                    {
-                        unit.stuckSince = 0;
-                        if (unit.attacker && unit.routeIndex < route.size())
-                            ++unit.routeIndex;
-                        idle = true;
-                    }
-                }
-                else
-                {
-                    unit.stuckSince = 0;
-                }
-            }
-
-            unit.lastDistance = distance;
-
-            if (!idle || now - unit.lastOrderTime < ORDER_COOLDOWN_SECONDS)
-                return;
-
-            unit.lastOrderTime = now;
-            creature->SetHomePosition(creature->GetPositionX(), creature->GetPositionY(),
-                                      creature->GetPositionZ(), creature->GetOrientation());
-
-            // The formation slot already spreads the rank out; a little wobble on
-            // top just stops reinforcements from retracing an identical line.
-            float jitter = g_Config.formationJitter;
-
-            creature->GetMotionMaster()->MovePoint(MOVE_POINT_ID_BASE + unit.routeIndex,
-                                                   target.GetPositionX() + frand(-jitter, jitter),
-                                                   target.GetPositionY() + frand(-jitter, jitter),
-                                                   target.GetPositionZ(), FORCED_MOVEMENT_NONE, 0.0f, 0.0f,
-                                                   /*generatePath*/ true, /*forceDestination*/ false);
-        }
 
         void AdvanceStage(SiegeEvent& event, CityData const& city, std::vector<Position> const& route)
         {
             if (event.stage != STAGE_ASSAULT && event.stage != STAGE_BREACH)
                 return;
 
-            // The vanguard is the attacker furthest along the route.
-            uint32 vanguard = 0;
-            for (auto const& pair : event.units)
-                if (pair.second.attacker)
-                    vanguard = std::max(vanguard, pair.second.routeIndex);
-
             if (route.empty())
                 return;
+
+            Map* map = sMapMgr->FindMap(city.mapId, 0);
+            if (!map)
+                return;
+
+            // The vanguard is the attacker furthest along the route. Progress
+            // lives in each unit's AI now, so read it from there.
+            uint32 vanguard = 0;
+            for (auto const& pair : event.units)
+            {
+                if (!pair.second.attacker)
+                    continue;
+
+                if (SiegeUnitAI* ai = GetSiegeUnitAI(map->GetCreature(pair.first)))
+                    vanguard = std::max(vanguard, ai->GetRouteIndex());
+            }
 
             float progress = float(vanguard) / float(route.size());
 
@@ -2106,20 +2024,12 @@ namespace CitySiege
             std::vector<Position> const& route = GetCityRoute(city);
             Creature* leader = event.leaderGuid ? map->GetCreature(event.leaderGuid) : nullptr;
 
-            // --- movement ----------------------------------------------------
+            // --- stage progress ------------------------------------------------
+            // Movement itself is handled by each unit's SiegeUnitAI; all this
+            // tick has to do is watch how far the vanguard has pushed.
             if (now - event.lastMovementTick >= MOVEMENT_TICK_SECONDS)
             {
                 event.lastMovementTick = now;
-
-                for (auto& pair : event.units)
-                {
-                    Creature* creature = map->GetCreature(pair.first);
-                    if (!creature || !creature->IsInWorld() || !creature->IsAlive())
-                        continue;
-
-                    DriveUnit(city, creature, pair.second, route, leader, now);
-                }
-
                 AdvanceStage(event, city, route);
             }
 
@@ -2171,7 +2081,7 @@ namespace CitySiege
                             : (route.empty() ? city.muster : route.back());
 
                         float fx = 0.0f, fy = 0.0f;
-                        HeadingBetween(anchor, facing, fx, fy);
+                        ComputeHeading(anchor, facing, fx, fy);
                         Position spot = PlaceSlot(map, anchor, fx, fy, itr->slot, g_Config.formationJitter);
 
                         // Clear the corpse before the replacement walks in.
