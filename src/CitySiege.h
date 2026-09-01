@@ -111,6 +111,14 @@ namespace CitySiege
         bool        leaderPositionPinned = false;   // admin supplied explicit coords
         bool        leaderPositionResolved = false; // read back from creature table
 
+        // Anchors the march is required to pass through, in order, between the
+        // muster point and the throne. The navmesh finds the *shortest* walkable
+        // line, and open hillsides around a city are walkable, so without these
+        // the army cuts over the terrain instead of using the gate and streets.
+        // One anchor just inside the main gate is usually enough; interior
+        // anchors shape which districts the host marches through.
+        std::vector<Position> approach;
+
         std::vector<Position> manualRoute;      // legacy waypoints from the config
         std::vector<Position> autoRoute;        // navmesh generated route
         RouteSource           routeSource = ROUTE_SRC_NONE;
@@ -283,8 +291,15 @@ namespace CitySiege
         RouteMode routeMode = ROUTE_AUTO;
         float     routeNodeSpacing = 28.0f;
         uint32    routeMaxNodes = 64;
-        uint32    routeMaxLegs = 16;
-        float     routeMaxSlope = 45.0f;   // degrees an army will march up
+        uint32    routeMaxLegs = 24;
+
+        // Navmesh query weights. Detour scores a polygon as its traversal
+        // distance times the cost of its terrain type, so these do not forbid
+        // anything - they make the pathfinder pay more to use that ground and
+        // pick it only when there is no cheaper way through.
+        float     routeSteepCost = 25.0f;   // NAV_GROUND_STEEP: hillsides, embankments
+        float     routeWaterCost = 8.0f;    // NAV_WATER: canals, moats, lakes
+
         bool      autoDetectLeader = true;
 
         // Army composition

@@ -76,11 +76,33 @@ march at the throne.
 - **`manual`** — use only the `CitySiege.<City>.WaypointN` entries in the config.
 - **`direct`** — no waypoints; walk straight at the leader. Fine for open cities, poor for walls.
 
+### Keeping the host on the roads
+
+Left alone, the navmesh will march an army over the hillside next to a city gate. That is not a bug
+in the mesh — it is asked for the shortest walkable line, open ground outside a capital *is*
+walkable, and it has no concept of a road. Worse, `PathGenerator::CreateFilter()` grants every
+walking creature both `NAV_GROUND` and `NAV_GROUND_STEEP`, so a grassy embankment looks exactly as
+good as a paved street and the shorter one wins.
+
+The mmap extractor already tags steep triangles as `NAV_GROUND_STEEP`; nothing was asking for it.
+`CitySiege.Route.SteepCost` weights that terrain in the query filter, so the pathfinder pays more to
+use it and takes the streets on its own — no per-city waypoints and no hand-drawn routes.
+
+It is a cost rather than an exclusion on purpose. Banning steep ground outright would make any city
+whose approach is a ramp — Thunder Bluff's rises, the climb to Ironforge's gate — fail to route at
+all instead of taking the ramp. A high cost means *go around if there is a reasonable way around*,
+which is what a marching column does, while still allowing the climb when it is the only way in.
+`CitySiege.Route.WaterCost` does the same for canals and moats.
+
+If a particular city should be entered a particular way, `CitySiege.<City>.Approach` lists points the
+march must pass through. It is an override, not a requirement — the navmesh still finds the way
+between consecutive anchors, so rough coordinates are enough.
+
 Routes are built the first time a city is besieged and then cached for the lifetime of the server.
 `.citysiege reload` and `.citysiege repath` clear the cache.
 
 If routing fails, the reason is logged and shown by `.citysiege route <city>` — for example
-*"Server has no mmaps for this area"* or *"Hit the 16-leg limit 240 yards short of the throne; raise
+*"Server has no mmaps for this area"* or *"Hit the 24-leg limit 240 yards short of the throne; raise
 CitySiege.Route.MaxLegs."*
 
 ---
@@ -141,7 +163,7 @@ Every option is documented inline in `mod_city_siege.conf.dist`. The sections ar
 |---|---|
 | General | Master switch, siege timers, duration, muster length, announcement radius. |
 | City selection | Which of the eight capitals can be besieged. All are enabled by default. |
-| Route generation | `Route.Mode`, leader auto-detection, node spacing and budgets. |
+| Route generation | `Route.Mode`, leader auto-detection, node spacing, budgets, terrain costs. |
 | Muster points | Where each army forms up. |
 | City leaders | Leader creature entry per city, plus fallback coordinates. |
 | Manual waypoints | Legacy fallback, off by default. |
@@ -219,8 +241,17 @@ instances are never recruited.
 Check `.citysiege route <city>`. If the source says *direct* or *manual*, automatic routing failed —
 the diagnostic line explains why. The usual cause is missing mmaps.
 
+**The army climbs a hillside or crosses a wall instead of using the streets.**
+Raise `CitySiege.Route.SteepCost`, then `.citysiege repath <city>`. The mesh treats a walkable slope
+as an ordinary shortcut; that setting is what makes it pay for the privilege. Try 50, then 100. If
+the route is cutting a canal rather than a hill, raise `CitySiege.Route.WaterCost` instead.
+
 **Routing stops short of the throne.**
-Raise `CitySiege.Route.MaxLegs`, then `.citysiege repath <city>`.
+Read the diagnostic before changing anything — it reports how many approach segments completed and
+how many corridor corners were reached. If the corner count does not change when you raise
+`CitySiege.Route.MaxLegs`, the leg budget was never the limit and raising it further will not help;
+the obstacle is terrain the filter is refusing. Lower `CitySiege.Route.SteepCost` in that case, or
+set `CitySiege.<City>.Approach` to route the host in a way that exists.
 
 **The siege never ends early.**
 The city leader could not be found. Check the startup log; either the leader has no spawn in the

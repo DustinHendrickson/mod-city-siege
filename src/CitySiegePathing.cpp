@@ -66,6 +66,32 @@ namespace CitySiege
 
         std::vector<Position> const g_EmptyRoute;
 
+        // Weights every query this module makes so the pathfinder prefers the
+        // ground an army would actually march on.
+        //
+        // This is the whole reason a route follows streets rather than cutting
+        // over the hill beside the gate. PathGenerator::CreateFilter() gives any
+        // walking creature `NAV_GROUND | NAV_GROUND_STEEP`, so by default a
+        // hillside is exactly as attractive to Detour as a road, and it takes
+        // whichever is shorter - which outside a capital is the hillside. The
+        // mmap extractor already tags steep triangles as NAV_GROUND_STEEP, so
+        // the information is there; nothing was asking for it.
+        //
+        // Cost rather than exclusion is deliberate. Excluding steep ground would
+        // make cities whose only approach is a ramp - Thunder Bluff's rises, the
+        // climb to Ironforge's gate - unroutable, and the query would fail
+        // outright instead of taking the ramp. A high cost means "go around if
+        // there is any reasonable way around", which is what a marching column
+        // does, while still allowing the climb when it is the only way in.
+        void ConfigureFilter(PathGenerator& generator)
+        {
+            generator.SetNavTerrainCost(NAV_GROUND_STEEP, g_Config.routeSteepCost);
+            generator.SetNavTerrainCost(NAV_WATER, g_Config.routeWaterCost);
+
+            // An army does not wade through lava to reach a throne.
+            generator.SetExcludeFlags(uint16(NAV_MAGMA | NAV_SLIME));
+        }
+
         float Distance2D(Position const& a, Position const& b)
         {
             float dx = a.GetPositionX() - b.GetPositionX();
@@ -112,7 +138,7 @@ namespace CitySiege
             {
                 PathGenerator generator(pathOwner);
                 generator.SetUseStraightPath(true);
-                generator.SetSlopeCheck(false);   // no-op with straight paths
+                ConfigureFilter(generator);
 
                 if (!generator.CalculatePath(cursor.GetPositionX(), cursor.GetPositionY(), cursor.GetPositionZ(),
                                              destination.GetPositionX(), destination.GetPositionY(),
@@ -188,56 +214,24 @@ namespace CitySiege
         // Pass 2: walk the corridor with smooth paths
         // ---------------------------------------------------------------------
 
-        // True if one step of a path is a gradient an army could march up.
-        //
-        // PathGenerator::IsWalkableClimb() is not usable here: it allows a rise
-        // of sourceHeight * (1 - angle/100), so for a footman on a 30 degree
-        // slope that is 1.4 yards - while smooth path steps are 4 yards apart and
-        // a 30 degree ramp rises 2.3 yards over one. Its own documentation says
-        // it is meant for short distances. Used on path steps it rejects ordinary
-        // road ramps along with the cliffs we actually want to exclude, which is
-        // what reduced route building to three corners out of ten.
-        //
-        // A plain gradient test separates the two cleanly and is tunable.
-        bool StepIsClimbable(G3D::Vector3 const& from, G3D::Vector3 const& to)
-        {
-            float dx = to.x - from.x;
-            float dy = to.y - from.y;
-            float run = std::sqrt(dx * dx + dy * dy);
-            float rise = std::fabs(to.z - from.z);
-
-            // Stairs and ledges: almost no horizontal travel, small step up.
-            if (run < 0.5f)
-                return rise <= 2.0f;
-
-            float degrees = std::atan2(rise, run) * 180.0f / float(M_PI);
-            return degrees <= g_Config.routeMaxSlope;
-        }
-
-        /// Index of the first point that cannot be reached from its predecessor,
-        /// or points.size() when the whole path is marchable.
-        size_t FirstUnclimbableStep(Movement::PointsArray const& points)
-        {
-            for (size_t i = 1; i < points.size(); ++i)
-                if (!StepIsClimbable(points[i - 1], points[i]))
-                    return i;
-
-            return points.size();
-        }
-
-        bool IsClimbable(Movement::PointsArray const& points)
-        {
-            return FirstUnclimbableStep(points) == points.size();
-        }
-
         // One ground-hugging leg. Atomic: nothing is appended unless the whole
         // leg succeeded, so a failed attempt cannot pollute the route.
+        //
+        // Walkability is left entirely to Detour. An earlier version second
+        // guessed it with a gradient test over the path's own Z values and that
+        // was a mistake twice over: the mesh is already the authority on what a
+        // creature can traverse - it is the same query MotionMaster will run at
+        // runtime - and the Z values are not reliable input for a slope test
+        // anyway, because NormalizePath() snaps every point to the nearest
+        // surface, which beside a building flips between the street and the roof
+        // above it. The test threw away legs that were perfectly walkable and
+        // routes ended hundreds of yards short of the throne.
         bool SmoothLeg(Creature* pathOwner, Position const& from, Position const& to,
                        std::vector<Position>& out, Position& reached)
         {
             PathGenerator generator(pathOwner);
             generator.SetUseStraightPath(false);
-            generator.SetSlopeCheck(false);   // enforced per-leg below instead
+            ConfigureFilter(generator);
 
             if (!generator.CalculatePath(from.GetPositionX(), from.GetPositionY(), from.GetPositionZ(),
                                          to.GetPositionX(), to.GetPositionY(), to.GetPositionZ(), false))
@@ -251,27 +245,11 @@ namespace CitySiege
             if (points.size() < 2)
                 return false;
 
-            // Truncate at the first step the army could not march up rather than
-            // discarding the leg. Everything before the cliff is perfectly good
-            // route, and keeping it means the search resumes from there instead
-            // of losing the ground it already covered.
-            size_t usable = FirstUnclimbableStep(points);
-            if (usable < 2)
-                return false;
-
-            for (size_t i = 1; i < usable; ++i)
+            for (size_t i = 1; i < points.size(); ++i)
                 out.emplace_back(points[i].x, points[i].y, points[i].z, 0.0f);
 
-            if (usable == points.size())
-            {
-                G3D::Vector3 const& end = generator.GetActualEndPosition();
-                reached = Position(end.x, end.y, end.z, 0.0f);
-            }
-            else
-            {
-                G3D::Vector3 const& last = points[usable - 1];
-                reached = Position(last.x, last.y, last.z, 0.0f);
-            }
+            G3D::Vector3 const& end = generator.GetActualEndPosition();
+            reached = Position(end.x, end.y, end.z, 0.0f);
 
             return true;
         }
@@ -407,22 +385,20 @@ namespace CitySiege
             points.swap(result);
         }
 
-        // True if a unit can actually walk from `from` to `to` - both reachable
-        // on the mesh and climbable the whole way.
+        // True if a unit can actually walk from `from` to `to`. A hop that fails
+        // this is one the movement generator would give up on and turn into a
+        // straight line through the terrain.
         bool IsWalkable(Creature* pathOwner, Position const& from, Position const& to)
         {
             PathGenerator generator(pathOwner);
             generator.SetUseStraightPath(false);
-            generator.SetSlopeCheck(false);   // enforced explicitly below
+            ConfigureFilter(generator);
 
             if (!generator.CalculatePath(from.GetPositionX(), from.GetPositionY(), from.GetPositionZ(),
                                          to.GetPositionX(), to.GetPositionY(), to.GetPositionZ(), false))
                 return false;
 
-            if (generator.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORTCUT | PATHFIND_NOT_USING_PATH))
-                return false;
-
-            return IsClimbable(generator.GetPath());
+            return !(generator.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORTCUT | PATHFIND_NOT_USING_PATH));
         }
 
         // Drops waypoints that can simply be skipped.
@@ -494,7 +470,6 @@ namespace CitySiege
 
             for (Position const& node : route)
             {
-                // Same test the army will face: reachable and climbable.
                 if (!IsWalkable(pathOwner, previous, node))
                     ++broken;
 
@@ -502,6 +477,61 @@ namespace CitySiege
             }
 
             return broken;
+        }
+
+        // Marches from `cursor` to `target`, appending ground points to `dense`
+        // and leaving `cursor` wherever it got to. Returns true on arrival.
+        //
+        // This is one segment of the approach chain. Keeping segments short is
+        // what makes the whole thing reliable: a single muster-to-throne query
+        // has to be answered in one navmesh corridor, while a chain of anchored
+        // segments is a sequence of short, individually solvable ones - and each
+        // anchor pins the route to ground we chose rather than ground Detour
+        // found to be marginally shorter.
+        bool MarchSegment(Creature* pathOwner, Position& cursor, Position const& target,
+                          std::vector<Position>& dense, size_t& cornersOut, size_t& reachedOut,
+                          std::string& diagnostic)
+        {
+            std::vector<Position> corridor = BuildCorridor(pathOwner, cursor, target, diagnostic);
+            RemoveLoops(corridor);
+
+            cornersOut += corridor.size();
+
+            size_t corner = 0;
+            for (uint32 attempt = 0; attempt < ROUTE_PUSH_ATTEMPTS; ++attempt)
+            {
+                if (Distance2D(cursor, target) <= THRONE_TRIM_RADIUS)
+                    return true;
+
+                Position before = cursor;
+
+                if (corner < corridor.size())
+                {
+                    if (WalkToward(pathOwner, cursor, corridor[corner], dense))
+                    {
+                        ++reachedOut;
+                        ++corner;
+                    }
+                }
+                else
+                {
+                    WalkToward(pathOwner, cursor, target, dense);
+                }
+
+                // Made no headway toward this corner - drop it and aim at the next.
+                if (Distance2D(before, cursor) < LEG_MIN_PROGRESS)
+                {
+                    if (corner < corridor.size())
+                    {
+                        ++corner;
+                        continue;
+                    }
+
+                    break;
+                }
+            }
+
+            return Distance2D(cursor, target) <= THRONE_TRIM_RADIUS * 3.0f;
         }
     }
 
@@ -596,53 +626,55 @@ namespace CitySiege
 
         std::string diagnostic;
 
-        // --- pass 1: corridor shape ------------------------------------------
-        std::vector<Position> corridor = BuildCorridor(pathOwner, city.muster, city.leader, diagnostic);
-        RemoveLoops(corridor);
+        // Walk the approach chain: muster -> each configured anchor -> throne.
+        //
+        // Normally there are no anchors and this is a single segment, because
+        // keeping the host on the roads is the query filter's job (see
+        // ConfigureFilter) and that needs no per-city knowledge. Anchors are an
+        // override for a city an admin wants entered a specific way; each one
+        // pins the march to ground of their choosing, and the navmesh still
+        // finds its own way between them.
+        std::vector<Position> waypoints = city.approach;
+        waypoints.push_back(city.leader);
 
-        // --- pass 2: walk it on the ground -----------------------------------
         std::vector<Position> dense;
         Position cursor = city.muster;
-        uint32 aimsReached = 0;
 
-        // Keep pushing toward the throne from wherever the walk has got to.
-        //
-        // A single sweep over the corridor gives up the moment one corner is
-        // unreachable, even though every sub-step already taken counts as
-        // progress. This retries from the new position, skipping corners that do
-        // not help, until it either arrives or genuinely stops moving.
-        size_t corner = 0;
-        for (uint32 attempt = 0; attempt < ROUTE_PUSH_ATTEMPTS; ++attempt)
+        size_t corners = 0;
+        size_t aimsReached = 0;
+        size_t segmentsDone = 0;
+
+        for (Position const& target : waypoints)
         {
-            if (Distance2D(cursor, city.leader) <= THRONE_TRIM_RADIUS)
-                break;
+            std::string segmentDiagnostic;
+            Position segmentStart = cursor;
 
-            Position before = cursor;
+            std::vector<Position> segment;
+            bool arrived = MarchSegment(pathOwner, cursor, target, segment, corners, aimsReached,
+                                        segmentDiagnostic);
 
-            if (corner < corridor.size())
+            // Thin each segment on its own so the anchors survive as hard
+            // boundaries. Run over the whole route instead, the shortcut pass
+            // would notice that skipping an anchor is shorter and delete it -
+            // putting the march straight back on the hillside the anchor exists
+            // to avoid.
+            Simplify(segment, segmentStart, g_Config.routeNodeSpacing);
+            ShortcutSmooth(pathOwner, segment, segmentStart);
+            RemoveLoops(segment);
+
+            dense.insert(dense.end(), segment.begin(), segment.end());
+
+            if (!arrived)
             {
-                if (WalkToward(pathOwner, cursor, corridor[corner], dense))
-                {
-                    ++aimsReached;
-                    ++corner;
-                }
-            }
-            else
-            {
-                WalkToward(pathOwner, cursor, city.leader, dense);
+                // Losing an intermediate anchor is survivable - the walk carries
+                // on from wherever it stopped and aims at the next one. Only the
+                // throne has to be reached.
+                if (diagnostic.empty())
+                    diagnostic = segmentDiagnostic;
+                continue;
             }
 
-            // Made no headway toward this corner - drop it and aim at the next.
-            if (Distance2D(before, cursor) < LEG_MIN_PROGRESS)
-            {
-                if (corner < corridor.size())
-                {
-                    ++corner;
-                    continue;
-                }
-
-                break;
-            }
+            ++segmentsDone;
         }
 
         bool reachedThrone = Distance2D(cursor, city.leader) <= THRONE_TRIM_RADIUS * 3.0f;
@@ -651,12 +683,12 @@ namespace CitySiege
         {
             city.routeSource = city.manualRoute.empty() ? ROUTE_SRC_DIRECT : ROUTE_SRC_MANUAL;
 
-            std::string message = diagnostic.empty()
-                ? Acore::StringFormat(
-                      "Could not walk a ground path to the throne; stopped {:.0f} yards short "
-                      "(corridor gave {} corner(s), {} reached, {} path point(s) collected).",
-                      Distance2D(cursor, city.leader), corridor.size(), aimsReached, dense.size())
-                : diagnostic;
+            std::string message = Acore::StringFormat(
+                "Could not walk a ground path to the throne; stopped {:.0f} yards short "
+                "({}/{} approach segment(s) completed, {} corridor corner(s), {} reached, "
+                "{} path point(s) collected).{}{}",
+                Distance2D(cursor, city.leader), segmentsDone, waypoints.size(), corners,
+                aimsReached, dense.size(), diagnostic.empty() ? "" : " ", diagnostic);
 
             message += city.manualRoute.empty()
                 ? " Falling back to a direct march."
@@ -667,14 +699,13 @@ namespace CitySiege
         }
 
         // Trim the tail so the army stops fighting the pathfinder once it is on
-        // top of the throne, then thin the dense path into marching waypoints.
+        // top of the throne. Thinning already happened per segment; doing it
+        // again over the whole route would let the shortcut pass reach across an
+        // anchor and drop it.
         while (!dense.empty() && Distance3D(dense.back(), city.leader) < THRONE_TRIM_RADIUS)
             dense.pop_back();
         dense.push_back(city.leader);
 
-        Simplify(dense, city.muster, g_Config.routeNodeSpacing);
-        ShortcutSmooth(pathOwner, dense, city.muster);
-        RemoveLoops(dense);
         EnforceNodeBudget(dense, g_Config.routeMaxNodes);
 
         city.autoRoute = std::move(dense);

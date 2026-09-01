@@ -156,16 +156,40 @@ CitySiege.Route.MaxNodes = 64
 #        Description: How many chained pathfinder calls may be used to reach the throne. Each leg
 #                     covers one navmesh corridor. Raise this if the log reports that a route
 #                     stopped short of the throne.
-#        Default:     16
-#
-#    CitySiege.Route.MaxSlopeDegrees
-#        Description: Steepest gradient the war host will march up. Roads and ramps are well under
-#                     30; raise this only if a legitimate approach is being rejected, lower it if
-#                     the army is cutting over hillsides instead of using the streets.
-#        Default:     45
-CitySiege.Route.MaxSlopeDegrees = 45
-
+#        Default:     24
 CitySiege.Route.MaxLegs = 24
+
+#
+#    CitySiege.Route.SteepCost
+#        Description: How much more a stretch of steep ground costs the pathfinder than flat ground.
+#
+#                     This is the knob for "the army is climbing the hillside instead of using the
+#                     street". The mmap extractor already tags steep triangles as NAV_GROUND_STEEP,
+#                     but the core hands every walking creature both NAV_GROUND and NAV_GROUND_STEEP,
+#                     so by default a hillside looks exactly as good to the pathfinder as a road and
+#                     it simply takes whichever is shorter - which outside a city is the hillside.
+#                     Weighting steep ground makes the roads win on their own.
+#
+#                     Detour scores each stretch as its length times this cost, so a value of 25
+#                     means the host will detour up to roughly 25 yards along flat ground to avoid
+#                     one yard of hillside.
+#
+#                       1    off; steep ground is as good as a road
+#                       25   keeps the host on roads and streets (recommended)
+#                       100+ steep ground is nearly a last resort
+#
+#                     This is a cost, not a ban, so a city whose only approach is a ramp - Thunder
+#                     Bluff's rises, the climb to Ironforge's gate - still routes correctly.
+#        Default:     25
+CitySiege.Route.SteepCost = 25
+
+#
+#    CitySiege.Route.WaterCost
+#        Description: Same idea for water: how much more it costs than dry land. Keeps a column from
+#                     swimming a canal or moat when a bridge is available, without making cities
+#                     unreachable if wading really is the only way in.
+#        Default:     8
+CitySiege.Route.WaterCost = 8
 
 ###################################################################################################
 # MUSTER POINTS
@@ -252,6 +276,24 @@ CitySiege.Silvermoon.LeaderEntry = 16802
 CitySiege.Silvermoon.LeaderX = 9990.5
 CitySiege.Silvermoon.LeaderY = -7052.52
 CitySiege.Silvermoon.LeaderZ = 45.4464
+
+###################################################################################################
+# APPROACH ANCHORS (OPTIONAL)
+#
+# Points the march must pass through, in order, between the muster point and the throne. Automatic
+# routing does not need these - Route.SteepCost already keeps the host on roads - so leave them
+# unset unless you want a particular city entered a particular way, for example to send the army in
+# through a side gate or make it parade through a specific district.
+#
+# Unlike manual waypoints these do not replace pathfinding: the navmesh still finds the way between
+# consecutive anchors, so a couple of rough coordinates are enough. Each anchor must be somewhere a
+# unit could stand.
+#
+# Format, per city, as a comma separated list of "x y z":
+#   CitySiege.<City>.Approach = -8835.7 620.5 93.2, -8452.0 346.9 120.9
+#
+# Setting the value to an empty string clears any anchors for that city.
+#
 
 ###################################################################################################
 # MANUAL WAYPOINTS (LEGACY / FALLBACK)

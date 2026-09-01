@@ -173,6 +173,7 @@ namespace CitySiege
             city.leaderEntry = leaderEntry;
         };
 
+
         // Muster points sit outside each city's main gate. The leader positions
         // here are only a fallback: ResolveLeaderPositions() replaces them with
         // the real spawn from the creature table at startup. They are taken from
@@ -217,6 +218,11 @@ namespace CitySiege
                Position(9338.74f, -7277.27f, 13.7014f, 0.0f),
                Position(9230.47f, -6962.67f, 5.004f, 0.0f),
                Position(9990.50f, -7052.52f, 45.4464f, 0.0f), 16802);
+
+        // No approach anchors by default. Routing is done by weighting the
+        // navmesh query (see CitySiege.Route.SteepCost), which needs no per-city
+        // knowledge; CitySiege.<City>.Approach exists only as a manual override
+        // for a city where an admin wants the host to take a specific way in.
     }
 
     void LoadConfiguration()
@@ -253,7 +259,8 @@ namespace CitySiege
         c.routeNodeSpacing = std::max(8.0f, sConfigMgr->GetOption<float>("CitySiege.Route.NodeSpacing", 28.0f));
         c.routeMaxNodes = std::max<uint32>(4, sConfigMgr->GetOption<uint32>("CitySiege.Route.MaxNodes", 64));
         c.routeMaxLegs = std::max<uint32>(1, sConfigMgr->GetOption<uint32>("CitySiege.Route.MaxLegs", 24));
-        c.routeMaxSlope = std::clamp(sConfigMgr->GetOption<float>("CitySiege.Route.MaxSlopeDegrees", 45.0f), 5.0f, 89.0f);
+        c.routeSteepCost = std::clamp(sConfigMgr->GetOption<float>("CitySiege.Route.SteepCost", 25.0f), 1.0f, 1000.0f);
+        c.routeWaterCost = std::clamp(sConfigMgr->GetOption<float>("CitySiege.Route.WaterCost", 8.0f), 1.0f, 1000.0f);
         c.autoDetectLeader = sConfigMgr->GetOption<bool>("CitySiege.Route.AutoDetectLeaderPosition", true);
 
         // --- army composition -------------------------------------------------
@@ -425,6 +432,37 @@ namespace CitySiege
 
                 if (x != 0.0f || y != 0.0f || z != 0.0f)
                     city.manualRoute.emplace_back(x, y, z, 0.0f);
+            }
+
+            // Approach anchors, as "x y z, x y z, ...". Absent, the built-in
+            // chain for the city is kept; an empty value clears it and lets the
+            // navmesh pick its own way in.
+            std::string const anchorKey = prefix + "Approach";
+            std::string const anchors = sConfigMgr->GetOption<std::string>(anchorKey, "@keep@");
+            if (anchors != "@keep@")
+            {
+                city.approach.clear();
+
+                for (std::string const& triplet : SplitString(anchors, ','))
+                {
+                    std::vector<std::string> parts = SplitString(triplet, ' ');
+                    if (parts.size() != 3)
+                    {
+                        LOG_ERROR("module.citysiege", "[City Siege] {}: ignoring malformed approach anchor '{}' "
+                                  "(expected 'x y z').", city.name, triplet);
+                        continue;
+                    }
+
+                    try
+                    {
+                        city.approach.emplace_back(std::stof(parts[0]), std::stof(parts[1]), std::stof(parts[2]), 0.0f);
+                    }
+                    catch (std::exception const&)
+                    {
+                        LOG_ERROR("module.citysiege", "[City Siege] {}: ignoring approach anchor '{}' - "
+                                  "coordinates are not numbers.", city.name, triplet);
+                    }
+                }
             }
         }
 
