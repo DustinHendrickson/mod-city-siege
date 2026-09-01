@@ -53,11 +53,13 @@ namespace CitySiege
 
         constexpr float LEG_ARRIVAL_TOLERANCE = 6.0f;    // close enough to an aim point
         constexpr float LEG_MIN_PROGRESS      = 2.5f;    // below this a leg is stalled
-        constexpr float SMOOTH_LEG_MAX        = 220.0f;  // one smooth path covers ~296y
+        constexpr float SMOOTH_LEG_MAX        = 120.0f;  // straight-line reach per step
+        constexpr float SMOOTH_LEG_MIN        = 15.0f;   // give up shortening below this
+        constexpr uint32 SHORTEN_ATTEMPTS     = 5;       // halvings before a step is failed
         constexpr float THRONE_TRIM_RADIUS    = 10.0f;   // final approach is a charge
         constexpr float LOOP_REMOVAL_RADIUS   = 18.0f;   // de-loop the coarse corridor
         constexpr float TURN_COSINE           = 0.94f;   // ~20 degrees counts as a turn
-        constexpr uint32 WALK_STEP_GUARD      = 10;      // sub-steps toward one aim point
+        constexpr uint32 WALK_STEP_GUARD      = 32;      // sub-steps toward one aim point
 
         std::vector<Position> const g_EmptyRoute;
 
@@ -183,8 +185,8 @@ namespace CitySiege
         // Pass 2: walk the corridor with smooth paths
         // ---------------------------------------------------------------------
 
-        // One ground-hugging leg. Appends its points (excluding the start) and
-        // reports where the mesh actually got to.
+        // One ground-hugging leg. Atomic: nothing is appended unless the whole
+        // leg succeeded, so a failed attempt cannot pollute the route.
         bool SmoothLeg(Creature* pathOwner, Position const& from, Position const& to,
                        std::vector<Position>& out, Position& reached)
         {
@@ -212,8 +214,23 @@ namespace CitySiege
             return true;
         }
 
-        // Walks from `cursor` to `aim`, stepping so no single smooth path exceeds
-        // what the pathfinder can produce in one call.
+        Position Lerp(Position const& from, Position const& to, float t)
+        {
+            return Position(
+                from.GetPositionX() + (to.GetPositionX() - from.GetPositionX()) * t,
+                from.GetPositionY() + (to.GetPositionY() - from.GetPositionY()) * t,
+                from.GetPositionZ() + (to.GetPositionZ() - from.GetPositionZ()) * t,
+                0.0f);
+        }
+
+        // Walks from `cursor` to `aim` in smooth-path steps.
+        //
+        // The step length is a *straight-line* distance, but the walk it implies
+        // can be far longer - around a wall, through a gate. A smooth path that
+        // overruns the pathfinder's budget is discarded wholesale and comes back
+        // as a shortcut, so an over-long step fails outright rather than
+        // returning a partial result. Each step therefore halves its reach until
+        // one fits.
         bool WalkToward(Creature* pathOwner, Position& cursor, Position const& aim,
                         std::vector<Position>& dense)
         {
@@ -223,25 +240,32 @@ namespace CitySiege
                 if (remaining <= LEG_ARRIVAL_TOLERANCE)
                     return true;
 
-                Position step = aim;
-                if (remaining > SMOOTH_LEG_MAX)
+                float reach = std::min(remaining, SMOOTH_LEG_MAX);
+                bool advanced = false;
+
+                for (uint32 attempt = 0; attempt < SHORTEN_ATTEMPTS; ++attempt)
                 {
-                    float t = SMOOTH_LEG_MAX / remaining;
-                    step = Position(
-                        cursor.GetPositionX() + (aim.GetPositionX() - cursor.GetPositionX()) * t,
-                        cursor.GetPositionY() + (aim.GetPositionY() - cursor.GetPositionY()) * t,
-                        cursor.GetPositionZ() + (aim.GetPositionZ() - cursor.GetPositionZ()) * t,
-                        0.0f);
+                    Position step = (reach >= remaining) ? aim : Lerp(cursor, aim, reach / remaining);
+
+                    std::vector<Position> leg;
+                    Position reached;
+
+                    if (SmoothLeg(pathOwner, cursor, step, leg, reached) &&
+                        Distance2D(cursor, reached) >= LEG_MIN_PROGRESS)
+                    {
+                        dense.insert(dense.end(), leg.begin(), leg.end());
+                        cursor = reached;
+                        advanced = true;
+                        break;
+                    }
+
+                    reach *= 0.5f;
+                    if (reach < SMOOTH_LEG_MIN)
+                        break;
                 }
 
-                Position reached;
-                if (!SmoothLeg(pathOwner, cursor, step, dense, reached))
+                if (!advanced)
                     return false;
-
-                if (Distance2D(cursor, reached) < LEG_MIN_PROGRESS)
-                    return false;
-
-                cursor = reached;
             }
 
             return false;
@@ -432,15 +456,14 @@ namespace CitySiege
         std::vector<Position> dense;
         Position cursor = city.muster;
         bool reachedThrone = false;
+        uint32 aimsReached = 0;
 
         for (Position const& aim : corridor)
         {
-            if (!WalkToward(pathOwner, cursor, aim, dense))
-            {
-                // One unreachable corner is not fatal - the corridor is only a
-                // hint, so try to press on toward the next one.
-                continue;
-            }
+            // One unreachable corner is not fatal - the corridor is only a hint,
+            // so press on toward the next one.
+            if (WalkToward(pathOwner, cursor, aim, dense))
+                ++aimsReached;
         }
 
         if (WalkToward(pathOwner, cursor, city.leader, dense))
@@ -453,8 +476,10 @@ namespace CitySiege
             city.routeSource = city.manualRoute.empty() ? ROUTE_SRC_DIRECT : ROUTE_SRC_MANUAL;
 
             std::string message = diagnostic.empty()
-                ? Acore::StringFormat("Could not walk a ground path to the throne; stopped {:.0f} yards short.",
-                                      Distance2D(cursor, city.leader))
+                ? Acore::StringFormat(
+                      "Could not walk a ground path to the throne; stopped {:.0f} yards short "
+                      "(corridor gave {} corner(s), {} reached, {} path point(s) collected).",
+                      Distance2D(cursor, city.leader), corridor.size(), aimsReached, dense.size())
                 : diagnostic;
 
             message += city.manualRoute.empty()
