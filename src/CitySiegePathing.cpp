@@ -60,6 +60,8 @@ namespace CitySiege
         constexpr float LOOP_REMOVAL_RADIUS   = 18.0f;   // de-loop the coarse corridor
         constexpr float TURN_COSINE           = 0.94f;   // ~20 degrees counts as a turn
         constexpr uint32 WALK_STEP_GUARD      = 32;      // sub-steps toward one aim point
+        constexpr float SHORTCUT_GAIN         = 6.0f;    // yards saved before a node is dropped
+        constexpr uint32 SMOOTH_PASSES        = 4;       // shortcut sweeps over the route
 
         std::vector<Position> const g_EmptyRoute;
 
@@ -109,7 +111,7 @@ namespace CitySiege
             {
                 PathGenerator generator(pathOwner);
                 generator.SetUseStraightPath(true);
-                generator.SetSlopeCheck(false);
+                generator.SetSlopeCheck(false);   // no-op with straight paths
 
                 if (!generator.CalculatePath(cursor.GetPositionX(), cursor.GetPositionY(), cursor.GetPositionZ(),
                                              destination.GetPositionX(), destination.GetPositionY(),
@@ -192,7 +194,7 @@ namespace CitySiege
         {
             PathGenerator generator(pathOwner);
             generator.SetUseStraightPath(false);
-            generator.SetSlopeCheck(false);
+            generator.SetSlopeCheck(true);
 
             if (!generator.CalculatePath(from.GetPositionX(), from.GetPositionY(), from.GetPositionZ(),
                                          to.GetPositionX(), to.GetPositionY(), to.GetPositionZ(), false))
@@ -311,6 +313,60 @@ namespace CitySiege
             points.swap(result);
         }
 
+        // True if a unit can actually walk straight from `from` to `to`.
+        bool IsWalkable(Creature* pathOwner, Position const& from, Position const& to)
+        {
+            PathGenerator generator(pathOwner);
+            generator.SetUseStraightPath(false);
+            generator.SetSlopeCheck(true);
+
+            if (!generator.CalculatePath(from.GetPositionX(), from.GetPositionY(), from.GetPositionZ(),
+                                         to.GetPositionX(), to.GetPositionY(), to.GetPositionZ(), false))
+                return false;
+
+            return !(generator.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORTCUT | PATHFIND_NOT_USING_PATH));
+        }
+
+        // Drops waypoints that can simply be skipped.
+        //
+        // A raw navmesh path zigzags around the mesh triangulation, and the
+        // simplify pass above deliberately keeps direction changes - so it
+        // preserves those zigzags instead of removing them. Here, whenever going
+        // straight from the previous node to the next one is both walkable and
+        // meaningfully shorter, the node in between was only a detour and goes.
+        // This is what turns a jagged mesh path into a marching route.
+        void ShortcutSmooth(Creature* pathOwner, std::vector<Position>& nodes, Position const& start)
+        {
+            if (nodes.size() < 3)
+                return;
+
+            for (uint32 pass = 0; pass < SMOOTH_PASSES; ++pass)
+            {
+                bool changed = false;
+
+                for (size_t i = 0; i + 1 < nodes.size() && nodes.size() > 2; )
+                {
+                    Position const& previous = (i == 0) ? start : nodes[i - 1];
+                    Position const& next = nodes[i + 1];
+
+                    float viaNode = Distance3D(previous, nodes[i]) + Distance3D(nodes[i], next);
+                    float direct = Distance3D(previous, next);
+
+                    if (viaNode - direct > SHORTCUT_GAIN && IsWalkable(pathOwner, previous, next))
+                    {
+                        nodes.erase(nodes.begin() + i);
+                        changed = true;
+                        continue;
+                    }
+
+                    ++i;
+                }
+
+                if (!changed)
+                    break;
+            }
+        }
+
         void EnforceNodeBudget(std::vector<Position>& nodes, uint32 budget)
         {
             if (budget < 2 || nodes.size() <= budget)
@@ -342,7 +398,7 @@ namespace CitySiege
             {
                 PathGenerator generator(pathOwner);
                 generator.SetUseStraightPath(false);
-                generator.SetSlopeCheck(false);
+                generator.SetSlopeCheck(true);
 
                 bool ok = generator.CalculatePath(previous.GetPositionX(), previous.GetPositionY(), previous.GetPositionZ(),
                                                   node.GetPositionX(), node.GetPositionY(), node.GetPositionZ(), false);
@@ -497,6 +553,8 @@ namespace CitySiege
         dense.push_back(city.leader);
 
         Simplify(dense, city.muster, g_Config.routeNodeSpacing);
+        ShortcutSmooth(pathOwner, dense, city.muster);
+        RemoveLoops(dense);
         EnforceNodeBudget(dense, g_Config.routeMaxNodes);
 
         city.autoRoute = std::move(dense);
@@ -507,17 +565,28 @@ namespace CitySiege
 
         float length = 0.0f;
         float worstClimb = 0.0f;
+        size_t worstHop = 0;
         Position previous = city.muster;
-        for (Position const& node : city.autoRoute)
+
+        for (size_t i = 0; i < city.autoRoute.size(); ++i)
         {
+            Position const& node = city.autoRoute[i];
             length += Distance3D(previous, node);
-            worstClimb = std::max(worstClimb, std::fabs(node.GetPositionZ() - previous.GetPositionZ()));
+
+            float climb = std::fabs(node.GetPositionZ() - previous.GetPositionZ());
+            if (climb > worstClimb)
+            {
+                worstClimb = climb;
+                worstHop = i + 1;
+            }
+
             previous = node;
         }
 
         std::string message = Acore::StringFormat(
-            "Generated {} waypoint(s) covering {:.0f} yards, largest vertical step {:.1f}y, {} unwalkable hop(s).",
-            city.autoRoute.size(), length, worstClimb, broken);
+            "Generated {} waypoint(s) covering {:.0f} yards, {} unwalkable hop(s); "
+            "steepest climb {:.1f}y into WP{}.",
+            city.autoRoute.size(), length, broken, worstClimb, worstHop);
 
         if (broken)
             LOG_WARN("module.citysiege", "[City Siege] {}: {}", city.name, message);
