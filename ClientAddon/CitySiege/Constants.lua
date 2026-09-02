@@ -233,6 +233,14 @@ function CitySiege_GetCityColorString(cityID)
     return string.format("|cFF%02X%02X%02X", r, g, b)
 end
 
+-- Faction colour as an escape sequence, for use in concatenated strings.
+-- CitySiege_GetFactionColor below returns the raw {r,g,b} table instead.
+function CitySiege_GetFactionColorString(faction)
+    local color = CitySiege_GetFactionColor(faction)
+    return string.format("|cFF%02X%02X%02X",
+        math.floor(color.r * 255), math.floor(color.g * 255), math.floor(color.b * 255))
+end
+
 -- Helper function to format faction color
 function CitySiege_GetFactionColor(faction)
     if faction == "Alliance" then

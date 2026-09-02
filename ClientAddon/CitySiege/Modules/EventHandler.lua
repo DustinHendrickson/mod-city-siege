@@ -103,7 +103,9 @@ function EventHandler:ParseAddonMessage(message)
         
         if #parts >= 2 then
             local cityID = tonumber(parts[2])
-            CitySiege_Utils:ExecuteServerCommand(".citysiege mapdata " .. cityID)
+            -- Use SendChatMessage instead of RunMacroText to avoid permission issues
+            -- This sends the command to the server which is available to all players (SEC_PLAYER)
+            SendChatMessage(".citysiege mapdata " .. cityID, "GUILD")
         end
         return
         
@@ -131,18 +133,27 @@ function EventHandler:ParseAddonMessage(message)
                 coords.centerY = tonumber(parts[11])
                 coords.centerZ = tonumber(parts[12])
             end
+
+            -- Map percentages for the muster point and the throne, so the
+            -- map can mark both before the first route update arrives.
+            if #parts >= 17 and parts[13] == "MAP" then
+                coords.spawnMX = tonumber(parts[14])
+                coords.spawnMY = tonumber(parts[15])
+                coords.leaderMX = tonumber(parts[16])
+                coords.leaderMY = tonumber(parts[17])
+            end
             
             self:HandleSiegeStart(cityID, faction, coords)
         end
         
     elseif command == "UPDATE" then
-        -- Format: UPDATE:cityId:phase:attackers:defenders:elapsed:remaining:leaderHealth:WP:count:x:y:z...:ATK:count:x:y:z...:DEF:count:x:y:z...:BATK:count:x:y:z...:BDEF:count:x:y:z...
+        -- Format: UPDATE:cityId:phase:attackers:defenders:elapsed:remaining:leaderHealth:leaderName:WP:count:x:y:z...
         local parts = {}
         for part in string.gmatch(message, "([^:]+)") do
             table.insert(parts, part)
         end
         
-        if #parts >= 8 then
+        if #parts >= 9 then
             local cityID = tonumber(parts[2])
             local phase = tonumber(parts[3])
             local attackerCount = tonumber(parts[4])
@@ -150,6 +161,7 @@ function EventHandler:ParseAddonMessage(message)
             local elapsed = tonumber(parts[6])
             local remaining = tonumber(parts[7])
             local leaderHealth = tonumber(parts[8])
+            local leaderName = parts[9] or "Unknown Leader"
             
             -- Parse waypoints, attacker positions, defender positions, bot positions
             local data = {
@@ -159,26 +171,11 @@ function EventHandler:ParseAddonMessage(message)
                 attackerBots = {},
                 defenderBots = {}
             }
-
-            local i = 9
-
-            local function parsePositionSection(target)
-                i = i + 1
-                local count = tonumber(parts[i]) or 0
-                i = i + 1
-
-                for j = 1, count do
-                    if i + 2 <= #parts then
-                        table.insert(target, {
-                            x = tonumber(parts[i]),
-                            y = tonumber(parts[i + 1]),
-                            z = tonumber(parts[i + 2])
-                        })
-                        i = i + 3
-                    end
-                end
-            end
             
+            -- Section markers begin right after leaderName (part 9), so the
+            -- first one is part 10. Scanning from 12 skipped the WP block
+            -- entirely and left the map with no route to draw.
+            local i = 10
             while i <= #parts do
                 local section = parts[i]
                 
@@ -187,9 +184,28 @@ function EventHandler:ParseAddonMessage(message)
                     i = i + 1
                     local wpCount = tonumber(parts[i]) or 0
                     i = i + 1
+                    -- Each waypoint is x:y:z:mx:my - world position followed
+                    -- by the server's map percentage for it.
                     for j = 1, wpCount do
-                        if i + 2 <= #parts then
+                        if i + 4 <= #parts then
                             table.insert(data.waypoints, {
+                                x = tonumber(parts[i]),
+                                y = tonumber(parts[i + 1]),
+                                z = tonumber(parts[i + 2]),
+                                mx = tonumber(parts[i + 3]),
+                                my = tonumber(parts[i + 4]),
+                            })
+                            i = i + 5
+                        end
+                    end
+                elseif section == "ATK" then
+                    -- Attacker positions
+                    i = i + 1
+                    local atkCount = tonumber(parts[i]) or 0
+                    i = i + 1
+                    for j = 1, atkCount do
+                        if i + 2 <= #parts then
+                            table.insert(data.attackerPositions, {
                                 x = tonumber(parts[i]),
                                 y = tonumber(parts[i + 1]),
                                 z = tonumber(parts[i + 2])
@@ -197,22 +213,60 @@ function EventHandler:ParseAddonMessage(message)
                             i = i + 3
                         end
                     end
-                elseif section == "ATK" then
-                    parsePositionSection(data.attackerPositions)
                 elseif section == "DEF" then
-                    parsePositionSection(data.defenderPositions)
-                elseif section == "BATK" then
-                    parsePositionSection(data.attackerBots)
-                elseif section == "BDEF" then
-                    parsePositionSection(data.defenderBots)
+                    -- Defender positions
+                    i = i + 1
+                    local defCount = tonumber(parts[i]) or 0
+                    i = i + 1
+                    for j = 1, defCount do
+                        if i + 2 <= #parts then
+                            table.insert(data.defenderPositions, {
+                                x = tonumber(parts[i]),
+                                y = tonumber(parts[i + 1]),
+                                z = tonumber(parts[i + 2])
+                            })
+                            i = i + 3
+                        end
+                    end
                 else
                     i = i + 1
                 end
             end
             
-            self:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCount, elapsed, remaining, leaderHealth, data)
+            self:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCount, elapsed, remaining, leaderHealth, leaderName, data)
         end
         
+    elseif command == "ROUTE" then
+        -- Format: ROUTE:cityID:token:seq:total:count:mx:my:mx:my...
+        -- The client refuses addon messages over 255 bytes, so the route
+        -- arrives in pieces that are reassembled in HandleRouteChunk.
+        local parts = {}
+        for part in string.gmatch(message, "([^:]+)") do
+            table.insert(parts, part)
+        end
+
+        if #parts >= 6 then
+            local cityID = tonumber(parts[2])
+            local token = tonumber(parts[3])
+            local seq = tonumber(parts[4])
+            local total = tonumber(parts[5])
+            local count = tonumber(parts[6]) or 0
+
+            local nodes = {}
+            local i = 7
+            for j = 1, count do
+                if i + 1 <= #parts then
+                    table.insert(nodes, {
+                        mx = tonumber(parts[i]),
+                        my = tonumber(parts[i + 1]),
+                    })
+                    i = i + 2
+                end
+            end
+
+            self:HandleRouteChunk(cityID, token, seq, total, nodes)
+        end
+
     elseif command == "END" then
         -- Format: END:cityId:winner
         local cityID, winner = string.match(message, "^END:(%d+):(%w+)")
@@ -232,7 +286,8 @@ function EventHandler:ParseAddonMessage(message)
             
             local data = {
                 waypoints = {},
-                leaderPos = nil
+                muster = nil,
+                leaderPos = nil,
             }
             
             local i = 3
@@ -245,32 +300,42 @@ function EventHandler:ParseAddonMessage(message)
                     local wpCount = tonumber(parts[i]) or 0
                     i = i + 1
                     for j = 1, wpCount do
-                        if i + 2 <= #parts then
-                            local wp = {
+                        if i + 4 <= #parts then
+                            table.insert(data.waypoints, {
                                 x = tonumber(parts[i]),
                                 y = tonumber(parts[i + 1]),
-                                z = tonumber(parts[i + 2])
-                            }
-                            table.insert(data.waypoints, wp)
-                            i = i + 3
+                                z = tonumber(parts[i + 2]),
+                                mx = tonumber(parts[i + 3]),
+                                my = tonumber(parts[i + 4]),
+                            })
+                            i = i + 5
                         end
                     end
                     
-                elseif section == "LEADER" then
-                    -- Leader position
-                    if i + 3 <= #parts then
-                        data.leaderPos = {
+                elseif section == "LEADER" or section == "MUSTER" then
+                    -- x:y:z:mx:my, same shape as a waypoint
+                    if i + 5 <= #parts then
+                        local pos = {
                             x = tonumber(parts[i + 1]),
                             y = tonumber(parts[i + 2]),
-                            z = tonumber(parts[i + 3])
+                            z = tonumber(parts[i + 3]),
+                            mx = tonumber(parts[i + 4]),
+                            my = tonumber(parts[i + 5]),
                         }
-                        i = i + 4
+                        if section == "LEADER" then
+                            data.leaderPos = pos
+                        else
+                            data.muster = pos
+                        end
+                        i = i + 6
+                    else
+                        i = i + 1
                     end
                 else
                     i = i + 1
                 end
             end
-
+            
             -- Send to MapDisplay
             if CitySiege_MapDisplay then
                 CitySiege_MapDisplay:UpdateMapData(cityID, data)
@@ -318,6 +383,56 @@ function EventHandler:HandleSiegeStart(cityID, faction, coords)
     end
 end
 
+-- Partial routes, keyed by city, until every chunk of one send has arrived.
+local pendingRoutes = {}
+
+function EventHandler:HandleRouteChunk(cityID, token, seq, total, nodes)
+    if not cityID or not token or not seq or not total or total < 1 then return end
+
+    local pending = pendingRoutes[cityID]
+    if not pending or pending.token ~= token then
+        -- A new send supersedes whatever was half-assembled before.
+        pending = { token = token, total = total, chunks = {}, received = 0 }
+        pendingRoutes[cityID] = pending
+    end
+
+    if not pending.chunks[seq] then
+        pending.chunks[seq] = nodes
+        pending.received = pending.received + 1
+    end
+
+    if pending.received < pending.total then
+        return
+    end
+
+    local waypoints = {}
+    for index = 1, pending.total do
+        for _, node in ipairs(pending.chunks[index] or {}) do
+            table.insert(waypoints, node)
+        end
+    end
+    pendingRoutes[cityID] = nil
+
+    CitySiege_Utils:Debug(string.format("Route for city %d assembled: %d waypoints in %d chunk(s)",
+        cityID, #waypoints, total))
+
+    if CitySiege_SiegeTracker then
+        local siegeData = CitySiege_SiegeTracker:GetSiege(cityID)
+        if siegeData then
+            siegeData.waypoints = waypoints
+            CitySiege_SiegeTracker:UpdateSiege(cityID, siegeData)
+        end
+    end
+
+    if CitySiege_MapDisplay then
+        CitySiege_MapDisplay:UpdateMapData(cityID, { waypoints = waypoints })
+    end
+
+    if CitySiege_MainFrame and CitySiege_MainFrame.UpdateSiegeDisplay then
+        CitySiege_MainFrame:UpdateSiegeDisplay()
+    end
+end
+
 function EventHandler:HandleSiegeEnd(cityID, winner)
     if not cityID then return end
     
@@ -333,11 +448,11 @@ function EventHandler:HandleSiegeEnd(cityID, winner)
     end
 end
 
-function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCount, elapsed, remaining, leaderHealth, data)
+function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCount, elapsed, remaining, leaderHealth, leaderName, data)
     if not cityID then return end
     
-    CitySiege_Utils:Debug(string.format("Siege update: city=%d, phase=%d, atk=%d, def=%d, time=%d, remaining=%d, leaderHP=%.1f", 
-        cityID, phase or 0, attackerCount or 0, defenderCount or 0, elapsed or 0, remaining or 0, leaderHealth or 100))
+    CitySiege_Utils:Debug(string.format("Siege update: city=%d, phase=%d, atk=%d, def=%d, time=%d, remaining=%d, leaderHP=%.1f, leader=%s", 
+        cityID, phase or 0, attackerCount or 0, defenderCount or 0, elapsed or 0, remaining or 0, leaderHealth or 100, leaderName or "Unknown"))
     
     if CitySiege_SiegeTracker then
         local siegeData = CitySiege_SiegeTracker:GetSiege(cityID)
@@ -348,19 +463,22 @@ function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCo
             siegeData.elapsedTime = elapsed
             siegeData.remaining = remaining
             siegeData.leaderHealth = leaderHealth
+            siegeData.leaderName = leaderName
+            -- Stamped so the UI can count the timer down between server packets.
+            siegeData.syncTime = GetTime()
             
-            -- Update waypoint data if provided
+            -- Update position data if provided. The route arrives separately
+            -- (ROUTE chunks), so an update without one must not wipe it.
             if data then
-                siegeData.waypoints = data.waypoints or {}
+                if data.waypoints and #data.waypoints > 0 then
+                    siegeData.waypoints = data.waypoints
+                end
                 siegeData.attackerPositions = data.attackerPositions or {}
                 siegeData.defenderPositions = data.defenderPositions or {}
                 siegeData.attackerBots = data.attackerBots or {}
                 siegeData.defenderBots = data.defenderBots or {}
             end
             
-            if not siegeData.stats then
-                siegeData.stats = {}
-            end
             CitySiege_SiegeTracker:UpdateSiege(cityID, siegeData)
         else
             -- Create new siege data if it doesn't exist
@@ -373,8 +491,10 @@ function EventHandler:HandleSiegeUpdate(cityID, phase, attackerCount, defenderCo
                 elapsedTime = elapsed,
                 remaining = remaining,
                 leaderHealth = leaderHealth,
+                leaderName = leaderName,
                 status = "Active",
                 startTime = GetTime() - (elapsed or 0),
+                syncTime = GetTime(),
                 waypoints = data and data.waypoints or {},
                 attackerPositions = data and data.attackerPositions or {},
                 defenderPositions = data and data.defenderPositions or {},
@@ -431,6 +551,6 @@ function EventHandler:SendToServer(command, ...)
         SendAddonMessage("CitySiege", message, "GUILD")
     else
         -- Fallback: Use chat command (server should handle this)
-        CitySiege_Utils:ExecuteServerCommand(".citysiege " .. message)
+        SendChatMessage(".citysiege " .. message, "GUILD")
     end
 end

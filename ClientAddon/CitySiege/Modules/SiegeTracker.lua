@@ -12,8 +12,15 @@ local updateTimer = nil
 local lastUpdate = 0
 
 function Tracker:Initialize()
-    -- Load saved sieges
-    activeSieges = CitySiege_Config:GetActiveSieges()
+    -- Sieges are not carried across sessions. Their timers are GetTime()
+    -- based, which restarts with the client, so a saved siege comes back as
+    -- "under siege, 0s remaining" with a route the map cannot draw, and it
+    -- stays that way until the server happens to send an END for that city.
+    -- The server re-announces live sieges to everyone on the map, and the
+    -- map tab asks for the route when opened, so nothing is lost by starting
+    -- clean.
+    activeSieges = {}
+    CitySiege_Config:ClearActiveSieges()
     
     -- Start update timer
     self:StartUpdateTimer()
@@ -160,17 +167,8 @@ function Tracker:RemoveSiege(cityID, winner)
         end
     end
     
-    -- Update tracked statistics only for completed sieges with a real winner.
-    if winner == "Alliance" or winner == "Horde" then
-        CitySiege_Config:IncrementStat("siegesParticipated", 1)
-
-        local playerFaction = UnitFactionGroup("player")
-        if playerFaction == winner then
-            CitySiege_Config:IncrementStat("siegesWon", 1)
-        else
-            CitySiege_Config:IncrementStat("siegesLost", 1)
-        end
-    end
+    -- Update statistics
+    CitySiege_Config:IncrementStat("siegesParticipated", 1)
     
     -- Remove from active sieges
     activeSieges[cityID] = nil
@@ -287,8 +285,8 @@ function Tracker:GetNPCs(cityID)
 end
 
 function Tracker:RequestStatusUpdate()
-    -- Request authoritative addon sync instead of parsing human-readable status text.
-    CitySiege_Utils:ExecuteServerCommand(".citysiege sync")
+    -- Send command to get status (silent operation)
+    SendChatMessage(".citysiege status", "GUILD")
 end
 
 function Tracker:CheckCitySiege(cityID)

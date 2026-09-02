@@ -19,22 +19,22 @@ function Config:Initialize(db)
     
     -- Minimap settings
     if not self.db.profile.minimap then
-        self.db.profile.minimap = CopyTable(CitySiege_DefaultConfig.minimap)
+        self.db.profile.minimap = CitySiege_Utils:CopyTable(CitySiege_DefaultConfig.minimap)
     end
     
     -- UI settings
     if not self.db.profile.ui then
-        self.db.profile.ui = CopyTable(CitySiege_DefaultConfig.ui)
+        self.db.profile.ui = CitySiege_Utils:CopyTable(CitySiege_DefaultConfig.ui)
     end
     
     -- Notification settings
     if not self.db.profile.notifications then
-        self.db.profile.notifications = CopyTable(CitySiege_DefaultConfig.notifications)
+        self.db.profile.notifications = CitySiege_Utils:CopyTable(CitySiege_DefaultConfig.notifications)
     end
     
     -- Map settings
     if not self.db.profile.map then
-        self.db.profile.map = CopyTable(CitySiege_DefaultConfig.map)
+        self.db.profile.map = CitySiege_Utils:CopyTable(CitySiege_DefaultConfig.map)
     end
     
     -- Frame positions
@@ -174,10 +174,10 @@ end
 
 -- Reset functions
 function Config:ResetProfile()
-    self.db.profile.minimap = CopyTable(CitySiege_DefaultConfig.minimap)
-    self.db.profile.ui = CopyTable(CitySiege_DefaultConfig.ui)
-    self.db.profile.notifications = CopyTable(CitySiege_DefaultConfig.notifications)
-    self.db.profile.map = CopyTable(CitySiege_DefaultConfig.map)
+    self.db.profile.minimap = CitySiege_Utils:CopyTable(CitySiege_DefaultConfig.minimap)
+    self.db.profile.ui = CitySiege_Utils:CopyTable(CitySiege_DefaultConfig.ui)
+    self.db.profile.notifications = CitySiege_Utils:CopyTable(CitySiege_DefaultConfig.notifications)
+    self.db.profile.map = CitySiege_Utils:CopyTable(CitySiege_DefaultConfig.map)
     self.db.profile.framePositions = {}
 end
 

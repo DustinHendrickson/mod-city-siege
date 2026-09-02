@@ -100,16 +100,6 @@ function Utils:Print(msg, r, g, b)
     DEFAULT_CHAT_FRAME:AddMessage("|cFF16C3F2[City Siege]|r " .. msg)
 end
 
-function Utils:ExecuteServerCommand(command)
-    if not command or command == "" then
-        return false
-    end
-
-    local chatType = (IsInGuild and IsInGuild()) and "GUILD" or "SAY"
-    SendChatMessage(command, chatType)
-    return true
-end
-
 -- Print debug message (only if debug enabled)
 function Utils:Debug(msg)
     -- Debug disabled
@@ -252,5 +242,7 @@ function Utils:FormatPercent(value, total)
     return string.format("%.1f%%", percent)
 end
 
--- Global alias for compatibility
-CopyTable = CitySiege_Utils.CopyTable
+-- Note: this file used to publish `CopyTable` as a global alias of the method
+-- above. That clobbered any existing global of the same name with a function
+-- whose first argument is `self`, breaking every other caller on the client.
+-- Call CitySiege_Utils:CopyTable(...) instead.

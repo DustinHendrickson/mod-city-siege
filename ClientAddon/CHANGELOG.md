@@ -5,6 +5,43 @@ All notable changes to the City Siege client addon will be documented in this fi
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0]
+
+### Added
+- Blizzard-style interface. Every window now uses the default UI's dialog chrome, header plaque,
+  recessed insets, `CharacterFrame` tabs and `UIPanel` buttons via a shared `Modules/UI.lua` toolkit.
+- **Overview** tab: live siege stage, countdown, city leader health bar, force counts, attacking
+  faction, and whether your faction is attacking or defending.
+- Minimap button tooltip listing every running siege with its remaining time.
+- Confirmation prompts before destructive commands.
+- Route commands in the command panel (`route`, `repath`, `showroute`).
+- `PROTOCOL.md` documenting the server-to-client message format.
+
+### Changed
+- Siege data now arrives as a hidden addon message (`CHAT_MSG_ADDON`). Players without the addon no
+  longer see raw protocol text in their chat log. The old system-chat transport is still handled and
+  can be re-enabled server-side with `CitySiege.Addon.UseSystemChannel`.
+- Command buttons are sent over `SAY` rather than `GUILD`; the server consumes dot-commands on any
+  channel, and `GUILD` errored out for guildless characters.
+- Window dragging uses `StartMoving`/`StopMovingOrSizing` instead of a hand-rolled `OnUpdate` loop.
+- Documentation consolidated from eleven overlapping files into `README.md`, `PROTOCOL.md`,
+  `TROUBLESHOOTING.md` and this changelog.
+
+### Fixed
+- Minimap button never appeared: the `.toc` loaded LibDataBroker-1.1 and LibDBIcon-1.0, neither of
+  which shipped with the addon. It is now self-contained and only uses LibDBIcon when another addon
+  has already provided it.
+- The route was never drawn on the battle map: the `UPDATE` parser began scanning for section
+  markers at field 12, but the `WP` marker is at field 10.
+- The addon published a global `CopyTable` whose first argument was `self`, breaking any other code
+  on the client that called `CopyTable(tbl)`.
+- The chat filter hid any system message containing `UPDATE:`, `START:`, `END:` or `POS:`, which
+  swallowed unrelated server and addon messages. It now matches only the exact protocol prefix.
+- `CitySiege_GetFactionColor` returns a colour table; concatenating it as a string raised a Lua
+  error. Added `CitySiege_GetFactionColorString` for use in text.
+- Slider frames were named with `math.random`, which could collide. They now use a counter.
+- Removed `Templates.xml` and a duplicate `Libs/LibStub.lua`: nothing referenced either.
+
 ## [Unreleased]
 
 ### Planned Features

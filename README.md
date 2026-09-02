@@ -1,618 +1,308 @@
 # AzerothCore Module: City Siege
 
-<p align="center">
-  <img src="./icon.png" alt="City Siege Icon" title="City Siege Icon" width="256">
-</p>
+An enemy war host musters outside one of the eight capitals, marches through its streets, and tries
+to kill the city leader. Players of **any level** can turn up and fight, and the event scales itself
+to whoever answers the call.
 
-Overview
---------
-The City Siege module for AzerothCore adds dynamic, timed siege events to all major cities in World of Warcraft. On a random, configurable timer, opposing faction forces assault a major city, spawning enemy units outside the city limits who march toward the city leader while engaging defenders. Enemy forces spawn at the city outskirts and use pathfinding and waypoints to march into the city, attacking the faction leader as their primary objective. 
+![icon](icon.png)
 
-**Both factions can win rewards:** Defenders earn rewards if they protect their city leader until the event ends, while attackers earn rewards if they successfully kill the city leader. This creates competitive PvE content where both Alliance and Horde players have incentive to participate. The module features fully configurable spawn locations, creature entries, reward scaling, and RP elements to create exciting world events that encourage faction participation and creates a more dynamic, living world experience.
+---
 
-> [!CAUTION]
-> THIS MODULE IS IN ACTIVE DEVELOPMENT. IT PROBABLY WON’T WORK, WILL SOMETIMES WORK POORLY, AND MAY RANDOMLY DECIDE TO TAKE A VACATION. DO NOT USE ON AN ACTIVE SERVER OR EXPECT ANYTHING RESEMBLING RELIABILITY UNTIL THIS NOTICE IS GONE.
+## What happens during a siege
 
-Features
---------
-- **Dynamic Siege Events:**  
-  Random timer-based events that bring warfare to major cities with configurable intervals.
-- **All Major Cities Supported:**  
-  Alliance: Stormwind, Ironforge, Darnassus, Exodar  
-  Horde: Orgrimmar, Undercity, Thunder Bluff, Silvermoon
-- **Waypoint System:**  
-  Siege units follow configurable waypoint paths to navigate through cities to reach their targets. Each city can have multiple waypoints configured for optimal pathing.
-- **Dynamic Unit Respawning:**  
-  Fallen siege units automatically respawn during active sieges with configurable respawn timers based on unit type (Leaders: 5 min, Mini-bosses: 3 min, Elites: 2 min, Minions: 1 min, Defenders: 45 sec). Attackers respawn at siege spawn point, defenders respawn near city leader. Creates sustained pressure throughout the event.
-- **4-Tier Enemy System:**  
-  Regular minions, Elite soldiers, Mini-bosses, and Faction leaders with configurable spawn counts, levels, and scale sizes.
-- **City Defender System:**  
-  Configurable defender units spawn near the city leader and march backwards through waypoints to meet attackers, creating dynamic frontlines throughout the city.
-- **Waypoint Visualization:**  
-  GM command to toggle tall beam-style markers showing spawn points, waypoint paths, and leader positions for easy diagnosis of pathfinding issues.
-- **Cinematic RP Phase:**  
-  Configurable delay where siege forces stand passive and yell RP messages before combat begins to give players time to join in and get ready.
-- **Weather Override System:**  
-  Temporarily overrides zone weather during the RP phase to create dramatic atmospheric effects (storm, rain, snow, or clear weather).
-- **Periodic Yells:**  
-  Leaders and mini-bosses yell threatening messages every 30 seconds during combat for immersion.
-- **Flexible Event Timing:**  
-  Configurable minimum (120min default) and maximum (240min default) intervals between events.
-- **Event Duration Control:**  
-  Configurable siege duration (default 30 minutes).
-- **Single or Multiple Sieges:**  
-  Choose whether only one city can be under siege at a time, or allow multiple simultaneous events.
-- **City-Specific Configuration:**  
-  Enable or disable events for individual cities.
-- **Reward System:**  
-  Automatic honor (100 default) and level-scaled gold rewards for winning faction players (base 50 silver + 50 silver per level).
+| Stage | What you see |
+|---|---|
+| **Muster** | The war host forms up outside the gates. It is passive and immune while its warlord and officers deliver a randomly chosen roleplay script. The sky turns foul and a theme plays. A countdown warns the server. |
+| **Assault** | The army is released and marches along its route toward the throne room, fighting anything hostile on the way. |
+| **Breach** | Once the vanguard is a third of the way in, the city is told the gates are breached. |
+| **Throne** | The vanguard reaches the city leader and engages them directly. Health callouts go out at 50%, 25% and 10%. |
+| **Resolution** | The leader dies (attackers win) or the clock runs out (defenders win). Rewards go to everyone who actually fought, the top three combatants are named, weather and the leader are restored. |
 
-Playerbot Support
------------------
-This module can optionally recruit Playerbots (random bots) to participate in sieges when the `MOD_PLAYERBOTS` build option is enabled and the Playerbots module is active.
+---
 
-- Recruitment source: `RandomPlayerbotMgr` (rndbots). The module prefers randomly-managed bots and will not recruit alternate-character/explicitly-managed accounts.
-- Exclusions: Bots that are dead, in combat, inside instances/battlegrounds, or currently in a party/raid will be skipped.
-- Level and count: Recruited bots respect `Playerbots.MinLevel`, `Playerbots.MaxAttackers` and `Playerbots.MaxDefenders` configuration values.
-- Behavior: Recruited bots are teleported to spawn points or near the city leader and will be returned to their original location and strategies after the siege ends.
+## Highlights
 
-Notes
------
-- Ensure the Playerbots module is enabled and configured before enabling playerbot recruitment for sieges.
+- **No hand-placed waypoints.** Marching routes are generated from the server navmesh at runtime,
+  for every city, and cached. See [Routing](#routing).
+- **The host stays spread out.** Every unit holds its own patch of ground beside the line of march, so the
+  army arrives spread across the street rather than as one pile of overlapping models. See
+  [Spread](#spread).
+- **Real leader targeting.** The throne position is read out of the `creature` table, so the siege
+  always aims at where your city leader actually stands.
+- **Scales to the players present.** The army's level is derived from who is near the city when the
+  siege starts, and rank-and-file troops spawn across a level band.
+- **Playable at any level.** A bracket handicap softens the blows an under-levelled defender takes
+  and boosts the damage they deal, so a level 25 character can meaningfully help defend a level 80
+  siege instead of being deleted at the gate.
+- **Rewards for taking part, not for standing nearby.** Damage, healing and killing blows are
+  tracked per player; honor, gold, experience and an optional item are handed out on that basis,
+  with a reduced consolation reward for the losing side.
+- **Optional client addon** with a live map, tracker and command panel.
+- **Optional mod-playerbots integration** to fill both sides with bots.
 
-Installation
-------------
-1. **Clone the Module**  
-   Clone the module into your AzerothCore modules directory:
-   
-       cd /path/to/azerothcore/modules
-       git clone https://github.com/DustinHendrickson/mod-city-siege.git
+---
 
-2. **Recompile AzerothCore**  
-   Rebuild the project with the new module:
-   
-       cd /path/to/azerothcore
-       mkdir build && cd build
-       cmake .. -DCMAKE_INSTALL_PREFIX=/path/to/server
-       make -j$(nproc)
-       make install
+## Installation
 
-3. **Configure the Module**  
-   Copy the configuration file to your server's config directory:
-   
-       cp /path/to/azerothcore/modules/mod-city-siege/conf/mod_city_siege.conf.dist /path/to/server/etc/modules/mod_city_siege.conf
-
-4. **Restart the Server**  
-   Launch the world server:
-   
-       ./worldserver
-
-GM Commands
------------
-Game Masters with `SEC_GAMEMASTER` security level have access to manual siege control commands. Administrators with `SEC_ADMINISTRATOR` level can also reload configuration. These commands allow you to trigger, stop, and manage siege events for testing or special events.
-
-### Available Commands
-
-- `.citysiege start [cityname]` - Manually start a siege event
-- `.citysiege stop <cityname> <faction>` - Stop an active siege and declare a winner
-- `.citysiege cleanup [cityname]` - Force cleanup of siege creatures
-- `.citysiege status` - Display current siege events and module status
-- `.citysiege info` - Inspect the currently selected siege NPC or playerbot
-- `.citysiege testwaypoint` - Spawn a temporary test marker at your position (20 seconds)
-- `.citysiege waypoints <cityname>` - Toggle visualization of siege waypoint path
-- `.citysiege reload` - Reload configuration from file (Administrator only)
-
-#### `.citysiege start [cityname]`
-Starts a siege event immediately in the specified city or a random enabled city if no name is provided.
-
-**Usage:**
-```
-.citysiege start                  # Start siege in random enabled city
-.citysiege start Stormwind        # Start siege in Stormwind
-.citysiege start orgrimmar        # Start siege in Orgrimmar (case-insensitive)
+```bash
+cd /path/to/azerothcore/modules
+git clone <this-repo> mod-city-siege
+cd ..
+mkdir -p build && cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/azeroth-server -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DSCRIPTS=static -DMODULES=static
+make -j$(nproc) && make install
 ```
 
-**Notes:**
-- City name matching is case-insensitive
-- Validates city exists and is enabled in configuration
-- Will not start if a siege is already active in that city
-- Respects `CitySiege.AllowMultipleCities` setting
+Copy `mod_city_siege.conf.dist` to your config directory as `mod_city_siege.conf` and edit it there.
+No SQL is required.
 
-#### `.citysiege stop <cityname> <alliance|horde>`
-Stops an active siege event and declares a winner. The GM specifies which faction wins, and players of that faction receive rewards.
+**mmaps are strongly recommended.** Automatic routing uses the server navmesh. Without mmaps the
+module logs why routing failed and falls back to any manual waypoints you configured, or to a direct
+march at the throne.
 
-**Usage:**
-```
-.citysiege stop Stormwind alliance    # Alliance wins - all Alliance players get rewards
-.citysiege stop Stormwind horde       # Horde wins - all Horde players get rewards
-.citysiege stop Orgrimmar horde       # Horde wins - all Horde players get rewards
-.citysiege stop Orgrimmar alliance    # Alliance wins - all Alliance players get rewards
-```
+---
 
-**Notes:**
-- **Faction parameter is required** - GM manually decides which faction wins the battle
-- **Winning faction's players receive rewards** regardless of which city is under siege
-- If Alliance wins: Alliance players within range get honor and gold
-- If Horde wins: Horde players within range get honor and gold
-- Losing faction receives no rewards
-- Despawns all siege creatures
-- Removes event from active list
+## Routing
 
-#### `.citysiege cleanup [cityname]`
-Force despawns all siege creatures and clears event data. Use this if a siege becomes stuck or has issues.
+`CitySiege.Route.Mode` selects how the army finds its way in:
 
-**Usage:**
-```
-.citysiege cleanup                # Cleanup all active sieges
-.citysiege cleanup Darnassus      # Cleanup Darnassus siege only
-```
+- **`auto`** (default) — the module asks the navmesh for a walkable corridor from the muster point to
+  the throne and turns its corners into waypoints. A single pathfinder call is capped at one
+  corridor, so long marches are stitched together from several chained calls; that is what lets a
+  route cross an entire city and climb into an interior throne room. Corridor corners are, by
+  construction, connected by walkable ground, so the creatures' own pathfinding handles the hops
+  between them cleanly.
+- **`manual`** — use only the `CitySiege.<City>.WaypointN` entries in the config.
+- **`direct`** — no waypoints; walk straight at the leader. Fine for open cities, poor for walls.
 
-**Notes:**
-- Force removes creatures **without** reward distribution
-- Clears all event data and timers
-- Use this for troubleshooting problematic events
-- Does not trigger normal end-of-event procedures
-- No winner determination or rewards
+### Keeping the host on the roads
 
-#### `.citysiege status`
-Displays the current status of the City Siege module and all active events.
+Left alone, the navmesh will march an army over the hillside next to a city gate. That is not a bug
+in the mesh — it is asked for the shortest walkable line, open ground outside a capital *is*
+walkable, and it has no concept of a road. Worse, `PathGenerator::CreateFilter()` grants every
+walking creature both `NAV_GROUND` and `NAV_GROUND_STEEP`, so a grassy embankment looks exactly as
+good as a paved street and the shorter one wins.
 
-**Usage:**
-```
-.citysiege status
-```
+The mmap extractor already tags steep triangles as `NAV_GROUND_STEEP`; nothing was asking for it.
+`CitySiege.Route.SteepCost` weights that terrain in the query filter, so the pathfinder pays more to
+use it and takes the streets on its own — no per-city waypoints and no hand-drawn routes.
 
-**Output includes:**
-- Module enabled/disabled state
-- Number of active sieges
-- Details for each active siege:
-  - City name
-  - Time remaining in the event
-  - Number of creatures alive
-- Time until next automatic siege event
+It is a cost rather than an exclusion on purpose. Banning steep ground outright would make any city
+whose approach is a ramp — Thunder Bluff's rises, the climb to Ironforge's gate — fail to route at
+all instead of taking the ramp. A high cost means *go around if there is a reasonable way around*,
+which is what a marching column does, while still allowing the climb when it is the only way in.
+`CitySiege.Route.WaterCost` does the same for canals and moats.
 
-#### `.citysiege info`
-Displays waypoint and target information for the currently selected siege NPC or playerbot.
+If a particular city should be entered a particular way, `CitySiege.<City>.Approach` lists points the
+march must pass through. It is an override, not a requirement — the navmesh still finds the way
+between consecutive anchors, so rough coordinates are enough.
 
-**Usage:**
-```
-.citysiege info
-```
+Routes are built the first time a city is besieged and then cached for the lifetime of the server.
+`.citysiege reload` and `.citysiege repath` clear the cache.
 
-**Notes:**
-- Requires a siege NPC or siege playerbot to be selected first
-- Useful for diagnosing waypoint progress and stuck units
-- Reports the unit's current target and distance to that target
+If routing fails, the reason is logged and shown by `.citysiege route <city>` — for example
+*"Server has no mmaps for this area"* or *"Hit the 24-leg limit 240 yards short of the throne; raise
+CitySiege.Route.MaxLegs."*
 
-#### `.citysiege testwaypoint`
-Spawns a temporary waypoint marker at your current position for 20 seconds. Use this to preview and test waypoint positions before adding them to the config file.
+---
 
-**Usage:**
-```
-.citysiege testwaypoint            # Spawn test marker at current position
-```
+## Spread
 
-**Output:**
-- Spawns a white spotlight beam (scale 2.5) at your location
-- Displays your exact coordinates (X, Y, Z) with +1 yard Z buffer built-in
-- Marker automatically despawns after 20 seconds
+Sending every unit to the same waypoint makes an army walk as a single clump. Instead each unit gets
+its own patch of ground beside the line of march when it spawns, and keeps it for the whole siege,
+including after it respawns. When the army moves, a unit aims at *its own spot* projected onto the
+current leg rather than at the waypoint itself.
 
-**Notes:**
-- Stand where you want a waypoint, then use this command
-- The marker shows exactly what the waypoint will look like
-- **Z coordinate automatically includes +1 yard buffer** to prevent ground clipping
-- Copy the displayed coordinates to your config file
-- Perfect for building and testing waypoint paths
-- The buffer prevents units from sinking into the ground during movement
+This is a **scatter, not a parade formation**, and that is deliberate. Ranked rows look sharp on open
+ground and jam the moment the route turns a corner or narrows into a street: a rigid line has no
+choice but to put somebody inside a wall, and a unit standing in a wall is a unit standing still.
+Offsets are spread on a golden-angle spiral instead — radius growing as `sqrt(index)` so the crowd
+holds constant density at any army size, and the angle keeping consecutive units off the same spoke —
+so no two units share a spot and nothing depends on holding a line.
 
-#### `.citysiege waypoints <cityname>`
-Toggles visualization of the siege waypoint path for a specific city. Shows tall beam-style markers to help diagnose pathfinding issues.
+Three things keep units off the geometry:
 
-**Usage:**
-```
-.citysiege waypoints Stormwind     # Toggle waypoint visualization for Stormwind
-.citysiege waypoints Darnassus     # Toggle waypoint visualization for Darnassus
-```
+- **Line-of-sight validation.** A spot is only accepted if there is a clear line to it from the
+  waypoint. Ground height alone is not enough — the floor under a wall is still floor, so a
+  height-only check happily places a unit inside a building.
+- **Rotate before closing in.** A blocked spot is swung around the waypoint through eight directions
+  at full radius before the radius is reduced. Beside a wall the open ground is usually still there,
+  just in another direction, so the host stays spread rather than bunching up at the first obstacle.
+- **Escalation when stuck.** A unit that has not moved for two watchdog ticks abandons its spot and
+  heads for the bare waypoint; after four it gives up on that waypoint and takes the next one. Both
+  reset as soon as it moves again. This is what clears a unit wedged on a corner, which reports its
+  movement as finished and would otherwise be re-sent into the same wall forever.
 
-**Visual Markers:**
-- **Spawn Position** (scale 3.0): Large green spotlight beam marking attacker spawn point
-- **Waypoint Path** (scale 2.5): Medium white spotlight beams marking each waypoint along the route
-- **Leader Position** (scale 3.0): Large green spotlight beam marking where the leader stops (same as spawn)
+The spread also halves for the final push at the throne so nobody is shoved into a wall in a tight
+room, and `forceDestination` is off throughout, so a unit that cannot reach its spot simply paths as
+close as the navmesh allows.
 
-**Output:**
-- Shows how many waypoints are configured for the city
-- Reports successful marker spawns and any failures
-- Displays total marker count breakdown (spawn + waypoints + leader)
-- Path guide: Spawn (Green/Large) -> Waypoints (White/Medium) -> Leader (Green/Large)
+Cities with narrow streets look better with a tighter `CitySiege.Formation.Spacing`.
 
-**Notes:**
-- Run the command again to hide the waypoints
-- Markers are visible from afar for easy diagnosis
-- Large green beams mark start (spawn) and end (leader) positions
-- Medium white beams mark the path waypoints in between
-- Useful for identifying problematic waypoint positions
-- Helps visualize the complete attack path
-- Each city's waypoints can be toggled independently
-- If markers are missing, check the output messages for spawn failures
-- Enable debug mode to see detailed spawn logs in server console
+---
 
-#### `.citysiege reload`
-Reloads all configuration values from `mod_city_siege.conf` without restarting the server. Allows you to make changes to waypoints, timers, spawn counts, and other settings on the fly.
+## Commands
 
-**Usage:**
-```
-.citysiege reload
-```
+| Command | Access | Description |
+|---|---|---|
+| `.citysiege start [city]` | GM | Start a siege in the named city, or a random enabled one. |
+| `.citysiege stop <city> [alliance\|horde]` | GM | End a siege. Without a faction the natural result (is the leader alive?) decides the winner. |
+| `.citysiege cleanup [city]` | GM | Remove siege forces with no winner and no rewards. |
+| `.citysiege status` | Player | Running sieges, stage, army level, leader health, participant count. |
+| `.citysiege list` | Player | Every city: faction, enabled state, and its current route. |
+| `.citysiege route <city>` | GM | Print the route, where it came from, and the last generation result. |
+| `.citysiege repath <city\|all>` | GM | Rebuild the cached route. |
+| `.citysiege showroute <city>` | GM | Place visible beacons along the route. Run again to remove them. |
+| `.citysiege info` | GM | Inspect the selected siege unit: rank, level, route progress, current target. |
+| `.citysiege here` | GM | Print your exact coordinates, for filling in muster points or manual waypoints. |
+| `.citysiege mapdata <cityId>` | Player | Push route data to the client addon (used by the addon itself). |
+| `.citysiege reload` | Admin | Reload the config, re-resolve leader positions, clear cached routes. |
 
-**What Gets Reloaded:**
-- All timer settings (min/max spawn timer, event duration)
-- Spawn counts (minions, elites, mini-bosses, leaders, defenders)
-- Level and scale settings
-- City enable/disable flags
-- Waypoint configurations for all cities
-- Spawn and leader positions
-- Creature entry IDs
-- Aggro and respawn settings
-- Reward settings
-- Messages and yells
-
-**Output:**
-- Confirmation message when reload is complete
-- Displays current status (enabled/disabled, debug mode, timers, duration)
-- Lists waypoint counts for each city that has waypoints configured
-- Note about active sieges continuing with old settings
-
-**Notes:**
-- Requires Administrator security level (SEC_ADMINISTRATOR)
-- Active sieges will continue using their original configuration
-- Only new sieges started after reload will use updated settings
-- Useful for testing different waypoint configurations without server restarts
-- Perfect for adjusting spawn counts, timers, and other balance settings
-- Changes to waypoints take effect immediately for new siege events
-
-### Command Examples
-
-```
-# Test a siege event in Stormwind
+```bash
 .citysiege start Stormwind
-
-# Check how the event is progressing
-.citysiege status
-
-# Building waypoint paths - spawn a test marker at your current position
-.citysiege testwaypoint
-
-# Visualize the complete waypoint path to diagnose pathing issues
-.citysiege waypoints Stormwind
-
-# Hide the waypoint markers when done diagnosing
-.citysiege waypoints Stormwind
-
-# Reload configuration after making changes to the .conf file
-.citysiege reload
-
-# GM observes and decides Alliance wins - Alliance players get rewards
-.citysiege stop Stormwind alliance
-
-# Or if GM decides Horde wins - Horde players get rewards
-.citysiege stop Stormwind horde
-
-# If creatures get stuck, force cleanup (no rewards, no winner)
-.citysiege cleanup Stormwind
 ```
 
-Configuration Options
----------------------
-Customize the module's behavior by editing the `mod_city_siege.conf` file. All configuration options are detailed below.
-
-### Core Settings
-
-Setting                                | Description                                                                         | Default | Valid Values
----------------------------------------|-------------------------------------------------------------------------------------|---------|-----------------
-CitySiege.Enabled                      | Enable/disable the module.                                                         | 1       | 0 (off) / 1 (on)
-CitySiege.DebugMode                    | Enable debug logging for the City Siege module.                                    | 0       | 0 (off) / 1 (on)
-CitySiege.TimerMin                     | Minimum time between events (minutes).                                             | 120     | Positive Integer
-CitySiege.TimerMax                     | Maximum time between events (minutes).                                             | 240     | Positive Integer
-CitySiege.EventDuration                | Duration of each siege (minutes).                                                  | 30      | Positive Integer
-CitySiege.AllowMultipleCities          | Allow simultaneous sieges on multiple cities.                                      | 0       | 0 (single) / 1 (multiple)
-CitySiege.AnnounceRadius               | Announcement radius in yards (0 = world-wide).                                     | 1500     | Non-negative Integer
-CitySiege.MinimumLevel                 | Minimum player level to receive rewards.                                           | 1       | 1-80
-
-### City-Specific Settings
-
-Each major city can be individually enabled or disabled, and has configurable spawn locations:
-
-Setting                                | City          | Default
----------------------------------------|---------------|--------
-CitySiege.Stormwind.Enabled            | Stormwind     | 1
-CitySiege.Stormwind.SpawnX/Y/Z         | Spawn coordinates | -8913.23, 554.633, 93.7944
-CitySiege.Ironforge.Enabled            | Ironforge     | 1
-CitySiege.Ironforge.SpawnX/Y/Z         | Spawn coordinates | -4981.25, -881.542, 501.660
-CitySiege.Darnassus.Enabled            | Darnassus     | 1
-CitySiege.Darnassus.SpawnX/Y/Z         | Spawn coordinates | 9947.52, 2482.73, 1316.21
-CitySiege.Exodar.Enabled               | Exodar        | 1
-CitySiege.Exodar.SpawnX/Y/Z            | Spawn coordinates | -3864.92, -11643.7, -137.644
-CitySiege.Orgrimmar.Enabled            | Orgrimmar     | 1
-CitySiege.Orgrimmar.SpawnX/Y/Z         | Spawn coordinates | 1633.75, -4439.39, 15.4396
-CitySiege.Undercity.Enabled            | Undercity     | 1
-CitySiege.Undercity.SpawnX/Y/Z         | Spawn coordinates | 1633.75, 240.167, -43.1034
-CitySiege.ThunderBluff.Enabled         | Thunder Bluff | 1
-CitySiege.ThunderBluff.SpawnX/Y/Z      | Spawn coordinates | -1043.11, 285.809, 135.165
-CitySiege.Silvermoon.Enabled           | Silvermoon    | 1
-CitySiege.Silvermoon.SpawnX/Y/Z        | Spawn coordinates | 9338.74, -7277.27, 13.7014
-
-### Spawn Settings
-
-Setting                                | Description                                    | Default
----------------------------------------|------------------------------------------------|--------
-CitySiege.SpawnCount.Minions           | Number of regular attacker units.              | 15
-CitySiege.SpawnCount.Elites            | Number of elite attacker units.                | 5
-CitySiege.SpawnCount.MiniBosses        | Number of mini-bosses.                         | 2
-CitySiege.SpawnCount.Leaders           | Number of faction leaders.                     | 1
-CitySiege.AggroPlayers                 | Whether enemies aggro players.                 | 1
-CitySiege.AggroNPCs                    | Whether enemies aggro city NPCs.               | 1
-
-### Defender Settings
-
-Setting                                | Description                                    | Default
----------------------------------------|------------------------------------------------|--------
-CitySiege.Defenders.Enabled            | Enable/disable defender spawning.              | 1
-CitySiege.Defenders.Count              | Number of city defender units to spawn.        | 10
-CitySiege.Defenders.RespawnTime        | Respawn time for defenders (seconds).          | 45
-CitySiege.Creature.Alliance.Defender   | Alliance defender creature entry ID.           | 17919
-CitySiege.Creature.Horde.Defender      | Horde defender creature entry ID.              | 17932
-
-### Creature Entry Settings
-
-All creature entries are fully configurable:
-
-Setting                                      | Description                                        | Default
----------------------------------------------|----------------------------------------------------|--------
-CitySiege.Creature.Alliance.Minion           | Alliance attacker minion                           | 17919
-CitySiege.Creature.Alliance.Elite            | Alliance attacker elite                            | 17920
-CitySiege.Creature.Alliance.MiniBoss         | Alliance attacker mini-boss                        | 17921
-CitySiege.Creature.Horde.Minion              | Horde attacker minion                              | 17932
-CitySiege.Creature.Horde.Elite               | Horde attacker elite                               | 17933
-CitySiege.Creature.Horde.MiniBoss            | Horde attacker mini-boss                           | 17934
-
-Attacking leaders are chosen randomly from the opposing faction's city leader pool.
-
-### Level Settings
-
-Configure the level of spawned siege units:
-
-Setting                                | Description                                    | Default
----------------------------------------|------------------------------------------------|--------
-CitySiege.Level.Leader                 | Level for attacker leaders.                    | 80
-CitySiege.Level.MiniBoss               | Level for attacker mini-bosses.                | 80
-CitySiege.Level.Elite                  | Level for attacker elites.                     | 75
-CitySiege.Level.Minion                 | Level for attacker minions.                    | 70
-CitySiege.Level.Defender               | Level for city defenders.                      | 70
-
-### Scale Settings
-
-Configure the visual size of siege units (1.0 = normal size):
-
-Setting                                | Description                                    | Default
----------------------------------------|------------------------------------------------|--------
-CitySiege.Scale.Leader                 | Scale multiplier for leaders.                  | 1.6 (60% larger)
-CitySiege.Scale.MiniBoss               | Scale multiplier for mini-bosses.              | 1.3 (30% larger)
-
-### Cinematic and RP Settings
-
-Setting                                | Description                                           | Default
----------------------------------------|-------------------------------------------------------|--------
-CitySiege.CinematicDelay               | Initial RP phase duration (seconds).                  | 150
-CitySiege.YellFrequency                | How often leaders yell (seconds).                     | 30
-CitySiege.Weather.Enabled              | Enable weather override during RP phase.              | 1
-CitySiege.Weather.Type                 | Weather type (0=Fine, 1=Rain, 2=Snow, 3=Storm).       | 3
-CitySiege.Weather.Grade                | Weather intensity (0.0-1.0).                          | 1.0
-
-### Respawn Settings
-
-Setting                                | Description                                           | Default
----------------------------------------|-------------------------------------------------------|--------
-CitySiege.Respawn.Enabled              | Enable automatic respawning during sieges.            | 1
-CitySiege.Respawn.LeaderTime           | Respawn time for attacker leaders (seconds).          | 300 (5 min)
-CitySiege.Respawn.MiniBossTime         | Respawn time for attacker mini-bosses (seconds).      | 180 (3 min)
-CitySiege.Respawn.EliteTime            | Respawn time for attacker elites (seconds).           | 120 (2 min)
-CitySiege.Respawn.MinionTime           | Respawn time for attacker minions (seconds).          | 60 (1 min)
-
-### Waypoint Settings
-
-Each city can have custom waypoints configured to guide siege units through the city:
-
-Setting                                | Description                                           | Example
----------------------------------------|-------------------------------------------------------|--------
-CitySiege.CITYNAME.WaypointCount       | Number of waypoints for this city (0 = direct path). | 3
-CitySiege.CITYNAME.Waypoint1.X/Y/Z     | Coordinates for first waypoint.                       | -8829.0, 640.530, 94.11582
-CitySiege.CITYNAME.Waypoint2.X/Y/Z     | Coordinates for second waypoint.                      | -8749.465, 560.5182, 97.400345
-CitySiege.CITYNAME.WaypointN.X/Y/Z     | Additional waypoints as needed.                       | Continues for WaypointCount
-
-**Example - Stormwind with 3 waypoints:**
-```
-CitySiege.Stormwind.WaypointCount = 3
-CitySiege.Stormwind.Waypoint1.X = -8829.0
-CitySiege.Stormwind.Waypoint1.Y = 640.530
-CitySiege.Stormwind.Waypoint1.Z = 94.11582
-CitySiege.Stormwind.Waypoint2.X = -8749.465
-CitySiege.Stormwind.Waypoint2.Y = 560.5182
-CitySiege.Stormwind.Waypoint2.Z = 97.400345
-CitySiege.Stormwind.Waypoint3.X = -8609.125
-CitySiege.Stormwind.Waypoint3.Y = 507.26778
-CitySiege.Stormwind.Waypoint3.Z = 103.72089
+```bash
+.citysiege repath all
 ```
 
-**Notes:**
-- Waypoints guide units through the city: Spawn → WP1 → WP2 → WP3 → Leader
-- Units progress to next waypoint when within 10 yards of current waypoint
-- Units resume movement to their current waypoint after combat ends
-- Setting WaypointCount to 0 makes units path directly to the leader
-- Use `.gps` command in-game to get coordinates for waypoints
+---
 
-### Reward Settings
+## Configuration
 
-Setting                                | Description                                           | Default
----------------------------------------|-------------------------------------------------------|--------
-CitySiege.RewardOnDefense              | Enable rewards for defenders.                         | 1
-CitySiege.RewardHonor                  | Honor points for successful defense.                  | 100
-CitySiege.RewardGoldBase               | Base gold at level 1 in copper (50 silver = 5000).   | 5000
-CitySiege.RewardGoldPerLevel           | Additional gold per player level in copper.           | 5000
+Every option is documented inline in `mod_city_siege.conf.dist`. The sections are:
 
-### Announcement Messages
+| Section | What it covers |
+|---|---|
+| General | Master switch, siege timers, duration, muster length, announcement radius. |
+| City selection | Which of the eight capitals can be besieged. All are enabled by default. |
+| Route generation | `Route.Mode`, leader auto-detection, node spacing, budgets, terrain costs. |
+| Muster points | Where each army forms up. |
+| City leaders | Leader creature entry per city, plus fallback coordinates. |
+| Manual waypoints | Legacy fallback, off by default. |
+| Army composition | Rank counts, creature entries, warlord pools, aggro behaviour. |
+| City garrison | Defender count and how far out they hold the line. |
+| Marching formation | Slot spacing, rows per rank, and how far back each rank marches. |
+| Level scaling | How the army's level is derived and how each rank sits relative to it. |
+| Bracket handicap | Making the fight playable well below the army's level. |
+| Reinforcements | Respawn timers per rank. |
+| Rewards | Honor, gold, experience, items, participation thresholds. |
+| Atmosphere | Weather override and music per phase. |
+| Addon bridge | Transport and update rate for the client addon. |
+| Text | Announcements, taunts and the roleplay scripts. |
+| Playerbots | Bot recruitment limits (only active with mod-playerbots). |
 
-Setting                                | Description                                           | Default
----------------------------------------|-------------------------------------------------------|--------
-CitySiege.Message.SiegeStart           | Message when siege begins (use {CITYNAME}).           | \|cffff0000[City Siege]\|r The city of {CITYNAME} is under attack! Defenders are needed!
-CitySiege.Message.SiegeEnd             | Message when siege ends (use {CITYNAME}).             | \|cff00ff00[City Siege]\|r The siege of {CITYNAME} has ended!
-CitySiege.Message.Reward               | Base reward message ({CITYNAME}, {ACTION}).          | \|cff00ff00[City Siege]\|r You have been rewarded for {ACTION} {CITYNAME}!
+### Level scaling in practice
 
-### Creature Yells
+When a siege starts, the module samples the levels of eligible players within
+`CitySiege.Scaling.SampleRadius` of the city and takes the average of the upper half — so a few low
+level alts parked at the bank do not trivialise the event. That value is clamped to
+`Scaling.MinLevel`..`Scaling.MaxLevel` and becomes the **army level**. Each rank then sits at an
+offset from it, and minions roll within a band below their offset so there is always something a
+weaker defender can bring down.
 
-Setting                                | Description                                           | Default
----------------------------------------|-------------------------------------------------------|--------
-CitySiege.Yell.LeaderSpawn             | Message leaders yell when spawning.                   | This city will fall before our might!
-CitySiege.Yell.Combat                  | Random combat yells (semicolon separated).            | Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!
+Unlike a plain `SetLevel`, the module re-derives health, mana, damage and attack power from the
+creature base stat tables, so the level actually means something.
 
-Customization
--------------
-### Adding Custom Creatures
+### Bracket handicap
 
-To use custom creatures for siege events:
+A player more than `Bracket.FreeLevels` below the army's level:
 
-1. Create or select creature entries in your database.
-2. Update the `mod_city_siege.conf` file with your custom creature entry IDs.
-3. Restart the worldserver for changes to take effect.
+- takes reduced damage from siege units, floored at `Bracket.MinDamageTaken` of a normal hit;
+- deals boosted damage to siege units, capped at `Bracket.MaxDamageBoost`.
 
-### Customizing Messages and Yells
+Players at or near the army's level are unaffected. Set `CitySiege.Bracket.Enabled = 0` to turn the
+whole mechanic off.
 
-All announcement messages and creature yells are configurable in `mod_city_siege.conf`:
+### Participation and rewards
 
-1. **Announcement Messages:**  
-  Edit `CitySiege.Message.SiegeStart`, `CitySiege.Message.SiegeEnd`, and `CitySiege.Message.Reward` to customize text. Use `{CITYNAME}` for the city name and `{ACTION}` in the reward message for defending/conquering.
+Contribution is scored as `damage + healing/2 + 500 per killing blow`. Anyone above
+`Reward.ParticipationThreshold` whose last contribution was within `Reward.ParticipationWindow` gets
+rewarded — winners in full, losers scaled by `Reward.LoserFactor` if `Reward.LosingSide` is on.
+Experience is the piece that makes the event worth joining while levelling; it is ignored at max
+level.
 
-2. **Creature Yells:**  
-   - `CitySiege.Yell.LeaderSpawn`: Message leaders yell when they spawn
-   - `CitySiege.Yell.Combat`: Semicolon-separated list of random combat yells. Leaders and mini-bosses will randomly select one message to yell every 30 seconds (configurable via `CitySiege.YellFrequency`).
+---
 
-3. Restart the worldserver for changes to take effect.
+## Client addon
 
-Example custom combat yells:
-```
-CitySiege.Yell.Combat = "We will crush you!;Bow before us!;Your end is near!;Resistance is futile!"
-```
+`ClientAddon/CitySiege` is an optional addon built to match the 3.3.5 default UI. It has three tabs:
+a live **Overview** (stage, countdown, leader health, force counts), a **Battle Map** showing the
+generated route, and a GM **Commands** panel. Copy the `CitySiege` folder into
+`World of Warcraft/Interface/AddOns/` — see [ClientAddon/README.md](ClientAddon/README.md).
 
-### Adjusting Spawn Locations
+The battle map draws the city on the client's own world-map tiles and places markers with map
+coordinates the server computes through `Map2ZoneCoordinates` — the `WorldMapArea.dbc` lookup the
+game itself uses for the player's dot. The server derives the zone from the throne position at
+runtime, so there is no per-city calibration on either side and no bundled map images; a waypoint is
+drawn exactly where the game would draw it.
 
-Spawn coordinates for each city are fully configurable in `mod_city_siege.conf`:
+The client silently drops any addon message over 255 bytes, and a full route is several times that.
+The route is therefore sent on its own as numbered `ROUTE` chunks (map percentages only) which the
+addon reassembles — once at siege start, and again whenever the map tab asks for it. `UPDATE` carries
+only the live numbers and stays well under the limit.
 
-1. Use `.gps` command in-game to get coordinates outside city gates.
-2. Update `CitySiege.CITYNAME.SpawnX/Y/Z` in your config file.
-3. Restart the worldserver for changes to take effect.
+The server sends state over a hidden addon message, so **players without the addon see nothing**. If
+your client build does not deliver addon messages, set `CitySiege.Addon.UseSystemChannel = 1` to fall
+back to the old visible-system-chat transport.
 
-Example for Stormwind:
-```
-CitySiege.Stormwind.SpawnX = -8500.0
-CitySiege.Stormwind.SpawnY = 600.0
-CitySiege.Stormwind.SpawnZ = 95.0
-```
+The message format is documented in [ClientAddon/PROTOCOL.md](ClientAddon/PROTOCOL.md).
 
-Enemies will spawn in a 30-yard radius circular formation around this point.
+---
 
-### Configuring Waypoints
+## Playerbots
 
-Waypoints allow you to create custom paths for siege units through each city:
+With `mod-playerbots` compiled in and `CitySiege.Playerbots.Enabled = 1`, free bots of each faction
+are pulled in, flagged for PvP, sent along the same route as the NPC army, and returned to where they
+were standing (with their roleplay strategy restored) when the siege ends. Grouped bots and bots in
+instances are never recruited.
 
-1. **Enable waypoints for a city:**
-   ```
-   CitySiege.Stormwind.WaypointCount = 3
-   ```
+---
 
-2. **Position yourself in-game** at key locations using `.gps` to get coordinates:
-   - City entrance/gates
-   - Main roads or districts
-   - Near the leader location
+## Troubleshooting
 
-3. **Use `.citysiege testwaypoint`** to preview the waypoint marker at your current position:
-   - Spawns a temporary visual marker for 20 seconds
-   - Displays exact coordinates to copy
-   - Shows exactly how the waypoint will appear
+**The army walks into walls or bunches at the gate.**
+Check `.citysiege route <city>`. If the source says *direct* or *manual*, automatic routing failed —
+the diagnostic line explains why. The usual cause is missing mmaps.
 
-4. **Add waypoint coordinates** to your config file:
-   ```
-   CitySiege.Stormwind.Waypoint1.X = -8829.0
-   CitySiege.Stormwind.Waypoint1.Y = 640.530
-   CitySiege.Stormwind.Waypoint1.Z = 94.11582
-   ```
+**The army climbs a hillside or crosses a wall instead of using the streets.**
+Raise `CitySiege.Route.SteepCost`, then `.citysiege repath <city>`. The mesh treats a walkable slope
+as an ordinary shortcut; that setting is what makes it pay for the privilege. Try 50, then 100. If
+the route is cutting a canal rather than a hill, raise `CitySiege.Route.WaterCost` instead.
 
-5. **Repeat for each waypoint** (numbered sequentially: Waypoint1, Waypoint2, Waypoint3, etc.)
+**Routing stops short of the throne.**
+Read the diagnostic before changing anything — it reports how many approach segments completed and
+how many corridor corners were reached. If the corner count does not change when you raise
+`CitySiege.Route.MaxLegs`, the leg budget was never the limit and raising it further will not help;
+the obstacle is terrain the filter is refusing. Lower `CitySiege.Route.SteepCost` in that case, or
+set `CitySiege.<City>.Approach` to route the host in a way that exists.
 
-6. **Restart the worldserver** for changes to take effect.
+**The siege never ends early.**
+The city leader could not be found. Check the startup log; either the leader has no spawn in the
+`creature` table on that map, or `CitySiege.<City>.LeaderEntry` is wrong. Without a leader the siege
+simply runs to the timer.
 
-7. **Verify with `.citysiege waypoints CITYNAME`** to visualize the complete path.
+**The army bunches up into a single blob.**
+`CitySiege.Formation.Spacing` is what spreads it, so check it is above zero. Some bunching is
+expected and correct in tight interiors: when nothing beside a waypoint passes the line-of-sight
+check, units collapse onto the waypoint itself rather than being sent into a wall.
 
-**Tips:**
-- Waypoints should form a logical path from spawn point to leader
-- Space waypoints 50-100 yards apart for smooth movement
-- Use `.citysiege testwaypoint` at each position before adding to config
-- Use `.citysiege waypoints CITYNAME` to see the full path visualization
-- Test with `.citysiege start CITYNAME` to verify pathing
-- Set WaypointCount to 0 to disable waypoints and use direct pathing
+**Units stand still against a wall or corner.**
+They should free themselves within about eight seconds — a unit that stops moving drops its spot
+after two watchdog ticks and skips the waypoint after four. If one is stuck for longer than that,
+the waypoint itself is likely unreachable; check `.citysiege route <city>` for unwalkable hops.
 
-Debugging
----------
-To enable detailed debug logging, update the configuration file:
+**Low level players get flattened.**
+Raise `CitySiege.Bracket.MinDamageTaken`, or lower `CitySiege.Scaling.MaxLevel`.
 
-    CitySiege.DebugMode = 1
+**Sieges feel too easy.**
+Raise the health multipliers, the rank counts, or `CitySiege.Level.*Offset`.
 
-This will output comprehensive information about:
-- Configuration loading (including waypoint paths)
-- Event scheduling
-- Creature spawning
-- Waypoint progression (which waypoint each unit is moving toward)
-- Respawn timers and respawn events
-- AI state changes
-- Reward distribution
+Turn on `CitySiege.DebugMode` for per-node route logging and detailed spawn output.
 
-Troubleshooting
----------------
-> **Events are not starting.**  
-> Ensure that `CitySiege.Enabled = 1` and at least one city is enabled in the configuration file. Check server logs for any errors.
+---
 
-> **No announcements appearing.**  
-> Verify `CitySiege.AnnounceRadius` is set correctly. This radius applies to siege start/end, countdown, battle start, and periodic status messages. Set to 0 for world-wide announcements.
+## License
 
-> **Configuration changes not taking effect.**  
-> Confirm the config file is in the correct location (`/path/to/server/etc/modules/mod_city_siege.conf`), check file permissions, and restart the worldserver after making changes.
-
-> **Creatures not spawning.**  
-> Enable debug mode and check logs for spawning errors. Verify that the configured creature entries exist in your database.
-
-> **Creatures clipping through walls or ground.**  
-> Ensure waypoints are configured for the city. Units need proper waypoint paths to navigate complex city layouts. Use `.gps` to get coordinates along the intended path and configure waypoints in the config file.
-
-> **Creatures not moving or getting stuck.**  
-> Check that waypoint coordinates are valid and accessible. Verify waypoints form a logical path with no obstructions. Enable debug mode to see which waypoint each unit is targeting. Use `.citysiege waypoints <cityname>` to visualize the complete path and identify problematic positions. The module includes automatic ground validation to prevent units from moving to invalid positions in mid-air or underground.
-
-> **Respawned units not appearing.**  
-> Verify `CitySiege.Respawn.Enabled = 1` in config. Check that the siege is still active (respawning stops when event ends). Enable debug mode to see respawn timer logs.
-
-> **Rewards not being distributed.**  
-> Ensure `CitySiege.RewardOnDefense = 1` and that players meet the minimum level requirement. Players must be within the announcement radius of the city center when the event ends successfully.
-
-License
--------
-This module is released under the GNU AGPL v3 license, consistent with AzerothCore's licensing model.
-
-Credits
--------
-
-Created by Dustin Hendrickson
-
-Created for the AzerothCore Project.
-
-Inspired by Classic WoW world events and city raids.
-
-Contribution
-------------
-Pull requests and issues are welcome. Please ensure that contributions adhere to AzerothCore's coding standards and include appropriate documentation.
+GNU AGPL v3. See [LICENSE](LICENSE).

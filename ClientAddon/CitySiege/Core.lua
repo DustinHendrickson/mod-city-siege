@@ -44,9 +44,6 @@ function Core:OnInitialize()
     if CitySiege_MinimapButton then
         CitySiege_MinimapButton:Initialize()
     end
-    
-    -- Print welcome message
-    CitySiege_Utils:Print("Addon loaded! Type |cFFFFFF00/cs|r or |cFFFFFF00/citysiege|r for commands.")
 end
 
 function Core:OnEnable()
@@ -55,6 +52,7 @@ function Core:OnEnable()
     self:RegisterEvent("PLAYER_LEAVING_WORLD")
     self:RegisterEvent("ZONE_CHANGED_NEW_AREA")
     self:RegisterEvent("CHAT_MSG_SYSTEM")
+    self:RegisterEvent("CHAT_MSG_ADDON") -- Primary transport since server 2.x
     self:RegisterEvent("PLAYER_REGEN_DISABLED") -- Enter combat
     self:RegisterEvent("PLAYER_REGEN_ENABLED")  -- Leave combat
     
@@ -63,12 +61,15 @@ function Core:OnEnable()
         RegisterAddonMessagePrefix("CitySiege")
     end
     
-    -- Add chat filter to hide CitySiege messages
+    -- Hide raw protocol traffic if the server is configured to use the legacy
+    -- system-chat transport. Only the exact prefix is matched: the old filter
+    -- swallowed anything containing "UPDATE:" or "END:", which ate unrelated
+    -- messages from the server and from other addons.
     ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", function(self, event, message, ...)
-        if message and (string.find(message, "CitySiege") or string.find(message, "UPDATE:") or string.find(message, "START:") or string.find(message, "MAP_DATA:")) then
-            return true -- Filter it out (hide it)
+        if message and string.find(message, "^CitySiege\t") then
+            return true
         end
-        return false -- Show it
+        return false
     end)
     
     -- Initialize modules
@@ -123,12 +124,8 @@ end
 
 function Core:PLAYER_REGEN_DISABLED()
     -- Entered combat
-    if CitySiege_MainFrame then
-        CitySiege_MainFrame.wasShownBeforeCombat = CitySiege_MainFrame:IsShown()
-
-        if not CitySiege_Config:GetUISettings().showInCombat and
-           CitySiege_MainFrame.wasShownBeforeCombat and
-           CitySiege_MainFrame.Hide then
+    if CitySiege_MainFrame and not CitySiege_Config:GetUISettings().showInCombat then
+        if CitySiege_MainFrame.Hide then
             CitySiege_MainFrame:Hide()
         end
     end
@@ -136,16 +133,20 @@ end
 
 function Core:PLAYER_REGEN_ENABLED()
     -- Left combat
-    if CitySiege_MainFrame and
-       not CitySiege_Config:GetUISettings().showInCombat and
-       CitySiege_MainFrame.wasShownBeforeCombat then
-        if CitySiege_MainFrame.Show then
+    if CitySiege_MainFrame and CitySiege_Config:GetUISettings().showInCombat then
+        if CitySiege_MainFrame.wasShownBeforeCombat then
             CitySiege_MainFrame:Show()
         end
     end
+end
 
-    if CitySiege_MainFrame then
-        CitySiege_MainFrame.wasShownBeforeCombat = false
+-- Preferred transport: the server sends siege state as a hidden addon message,
+-- so players without this addon never see the raw protocol in their chat log.
+function Core:CHAT_MSG_ADDON(event, prefix, message)
+    if prefix ~= "CitySiege" or not message then return end
+
+    if CitySiege_EventHandler then
+        CitySiege_EventHandler:ParseAddonMessage(message)
     end
 end
 
@@ -268,7 +269,7 @@ function Core:ShowHelp()
     CitySiege_Utils:Print("|cFFFFFF00/cs start [city]|r - Start a siege (GM only)")
     CitySiege_Utils:Print("|cFFFFFF00/cs stop [city] [faction]|r - Stop a siege (GM only)")
     CitySiege_Utils:Print("|cFFFFFF00/cs cleanup [city]|r - Clean up siege NPCs (GM only)")
-    CitySiege_Utils:Print("|cFFFFFF00/cs info|r - Show info for your selected siege NPC/playerbot (GM only)")
+    CitySiege_Utils:Print("|cFFFFFF00/cs info|r - Show detailed info (GM only)")
     CitySiege_Utils:Print("|cFFFFFF00/cs reload|r - Reload config (Admin only)")
     CitySiege_Utils:Print("|cFFFFFF00/cs reset|r - Reset addon settings")
     CitySiege_Utils:Print("|cFF00FF00/cs testmap [cityID]|r - Enable test mode with demo data")
@@ -277,11 +278,7 @@ end
 
 function Core:ToggleMainFrame()
     if CitySiege_MainFrame then
-        if CitySiege_MainFrame:IsShown() then
-            CitySiege_MainFrame:Hide()
-        else
-            CitySiege_MainFrame:Show()
-        end
+        CitySiege_MainFrame:Toggle()
     end
 end
 
@@ -309,7 +306,7 @@ function Core:ToggleMinimap()
 end
 
 function Core:RequestStatus()
-    CitySiege_Utils:ExecuteServerCommand(".citysiege sync")
+    SendChatMessage(".citysiege status", "GUILD")
     -- Silent operation - no user-facing message
 end
 
@@ -318,7 +315,7 @@ function Core:SendCommand(cmd, arg1, arg2)
     if arg1 then command = command .. " " .. arg1 end
     if arg2 then command = command .. " " .. arg2 end
     
-    CitySiege_Utils:ExecuteServerCommand(command)
+    SendChatMessage(command, "GUILD")
     CitySiege_Utils:Print("Command sent: " .. command)
 end
 

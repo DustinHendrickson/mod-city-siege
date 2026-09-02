@@ -1,903 +1,699 @@
 [worldserver]
 
-##############################################
-# mod-city-siege configuration
-##############################################
+###################################################################################################
+# mod-city-siege
+#
+# An enemy war host musters outside a capital, marches through the streets and tries to kill the
+# city leader. Defenders of any level can join in.
+#
+# Routing is automatic. The module reads each city leader's real position out of the `creature`
+# table and then generates the marching route with the server's navmesh (mmaps), so no waypoints
+# have to be placed by hand for any city. See the "Route generation" section below.
+###################################################################################################
+
+###################################################################################################
+# GENERAL
+###################################################################################################
+
 #
 #    CitySiege.Enabled
-#        Description: Enables the City Siege module.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
+#        Description: Master switch for the module.
+#        Default:     1 - Enabled
+#                     0 - Disabled
 CitySiege.Enabled = 1
 
 #
 #    CitySiege.DebugMode
-#        Description: Enables debug logging for the City Siege module.
-#        Default:     0 (disabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
+#        Description: Verbose logging, including every generated route node.
+#        Default:     0
 CitySiege.DebugMode = 0
 
 #
 #    CitySiege.TimerMin
-#        Description: Minimum time (in minutes) between city siege events.
-#        Default:     120 (2 hours)
+#        Description: Minimum number of minutes between automatic sieges.
+#        Default:     120
 CitySiege.TimerMin = 120
 
 #
 #    CitySiege.TimerMax
-#        Description: Maximum time (in minutes) between city siege events.
-#        Default:     240 (4 hours)
+#        Description: Maximum number of minutes between automatic sieges.
+#        Default:     240
 CitySiege.TimerMax = 240
 
 #
 #    CitySiege.EventDuration
-#        Description: Duration (in minutes) of each siege event.
+#        Description: How long a siege lasts, in minutes. If the city leader is still alive when
+#                     the clock runs out, the defenders win.
 #        Default:     30
 CitySiege.EventDuration = 30
 
 #
-#    CitySiege.AllowMultipleCities
-#        Description: Allow siege events in multiple cities at the same time.
-#        Default:     0 (only one city at a time)
-#                     Valid values: 0 (single) / 1 (multiple)
-CitySiege.AllowMultipleCities = 0
-
-#
-#    CitySiege.AnnounceRadius
-#        Description: Radius (in yards) for announcing siege events to nearby players.
-#                     Applies to siege start/end, countdown, battle start, and status messages.
-#                     Set to 0 to announce to the entire world.
-#        Default:     1500
-CitySiege.AnnounceRadius = 1500
-
-#
-#    CitySiege.MinimumLevel
-#        Description: Minimum player level to participate in siege events.
-#        Default:     1
-CitySiege.MinimumLevel = 1
-
-###############################################
-# City Configurations
-###############################################
-# Each city can be enabled/disabled individually.
-# Cities: Stormwind, Ironforge, Darnassus, Exodar,
-#         Orgrimmar, Undercity, Thunder Bluff, Silvermoon
-
-#
-#    CitySiege.Stormwind.Enabled
-#        Description: Enable siege events in Stormwind.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Stormwind.Enabled = 1
-
-#
-#    CitySiege.Ironforge.Enabled
-#        Description: Enable siege events in Ironforge.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Ironforge.Enabled = 0
-
-#
-#    CitySiege.Darnassus.Enabled
-#        Description: Enable siege events in Darnassus.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Darnassus.Enabled = 0
-
-#
-#    CitySiege.Exodar.Enabled
-#        Description: Enable siege events in the Exodar.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Exodar.Enabled = 0
-
-#
-#    CitySiege.Orgrimmar.Enabled
-#        Description: Enable siege events in Orgrimmar.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Orgrimmar.Enabled = 1
-
-#
-#    CitySiege.Undercity.Enabled
-#        Description: Enable siege events in Undercity.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Undercity.Enabled = 0
-
-#
-#    CitySiege.ThunderBluff.Enabled
-#        Description: Enable siege events in Thunder Bluff.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.ThunderBluff.Enabled = 0
-
-#
-#    CitySiege.Silvermoon.Enabled
-#        Description: Enable siege events in Silvermoon City.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Silvermoon.Enabled = 0
-
-###############################################
-# City Spawn Locations
-###############################################
-
-#
-#    CitySiege.Stormwind.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Stormwind gates (Elwynn Forest entrance).
-#        Default:     -9161.16, 353.365, 88.117
-CitySiege.Stormwind.SpawnX = -9161.16
-CitySiege.Stormwind.SpawnY = 353.365
-CitySiege.Stormwind.SpawnZ = 88.117
-
-#
-#    CitySiege.Ironforge.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Ironforge gates (Dun Morogh entrance).
-#        Default:     -5174.09, -594.361, 397.853
-CitySiege.Ironforge.SpawnX = -5174.09
-CitySiege.Ironforge.SpawnY = -594.361
-CitySiege.Ironforge.SpawnZ = 397.853
-
-#
-#    CitySiege.Darnassus.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Darnassus gates (Teldrassil entrance).
-#        Default:     9887.36, 1856.49, 1317.14
-CitySiege.Darnassus.SpawnX = 9887.36
-CitySiege.Darnassus.SpawnY = 1856.49
-CitySiege.Darnassus.SpawnZ = 1317.14
-
-#
-#    CitySiege.Exodar.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Exodar gates (Azuremyst Isle entrance).
-#        Default:     -4080.80, -12193.2, 1.712
-CitySiege.Exodar.SpawnX = -4080.80
-CitySiege.Exodar.SpawnY = -12193.2
-CitySiege.Exodar.SpawnZ = 1.712
-
-#
-#    CitySiege.Orgrimmar.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Orgrimmar gates (Durotar entrance).
-#        Default:     1114.96, -4374.63, 25.813
-CitySiege.Orgrimmar.SpawnX = 1250.33
-CitySiege.Orgrimmar.SpawnY = -4412.59
-CitySiege.Orgrimmar.SpawnZ = 25.48
-
-#
-#    CitySiege.Undercity.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Undercity gates (Tirisfal Glades entrance).
-#        Default:     1982.26, 226.674, 35.951
-CitySiege.Undercity.SpawnX = 1982.26
-CitySiege.Undercity.SpawnY = 226.674
-CitySiege.Undercity.SpawnZ = 35.951
-
-#
-#    CitySiege.ThunderBluff.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Thunder Bluff gates (Mulgore entrance).
-#        Default:     -1558.61, -5.071, 5.384
-CitySiege.ThunderBluff.SpawnX = -1558.61
-CitySiege.ThunderBluff.SpawnY = -5.071
-CitySiege.ThunderBluff.SpawnZ = 5.384
-
-#
-#    CitySiege.Silvermoon.SpawnX/Y/Z
-#        Description: Spawn location for siege forces outside Silvermoon gates (Eversong Woods/Dead Scar entrance).
-#        Default:     9230.47, -6962.67, 5.004
-CitySiege.Silvermoon.SpawnX = 9230.47
-CitySiege.Silvermoon.SpawnY = -6962.67
-CitySiege.Silvermoon.SpawnZ = 5.004
-
-###############################################
-# City Leader Locations
-###############################################
-
-#
-#    CitySiege.Stormwind.LeaderX/Y/Z
-#        Description: Location of the city leader (King Varian Wrynn) for siege targeting.
-#        Default:     -8442.578, 334.6064, 122.476685 (Stormwind Keep throne room)
-CitySiege.Stormwind.LeaderX = -8442.578
-CitySiege.Stormwind.LeaderY = 334.6064
-CitySiege.Stormwind.LeaderZ = 122.476685
-
-#
-#    CitySiege.Ironforge.LeaderX/Y/Z
-#        Description: Location of the city leader (King Magni Bronzebeard) for siege targeting.
-#        Default:     -4981.25, -881.542, 501.660
-CitySiege.Ironforge.LeaderX = -4981.25
-CitySiege.Ironforge.LeaderY = -881.542
-CitySiege.Ironforge.LeaderZ = 501.660
-
-#
-#    CitySiege.Darnassus.LeaderX/Y/Z
-#        Description: Location of the city leader (Tyrande Whisperwind) for siege targeting.
-#        Default:     9947.52, 2482.73, 1316.21
-CitySiege.Darnassus.LeaderX = 9947.52
-CitySiege.Darnassus.LeaderY = 2482.73
-CitySiege.Darnassus.LeaderZ = 1316.21
-
-#
-#    CitySiege.Exodar.LeaderX/Y/Z
-#        Description: Location of the city leader (Prophet Velen) for siege targeting.
-#        Default:     -3864.92, -11643.7, -137.644
-CitySiege.Exodar.LeaderX = -3864.92
-CitySiege.Exodar.LeaderY = -11643.7
-CitySiege.Exodar.LeaderZ = -137.644
-
-#
-#    CitySiege.Orgrimmar.LeaderX/Y/Z
-#        Description: Location of the city leader (Thrall) for siege targeting.
-#        Default:     1633.75, -4439.39, 15.4396
-CitySiege.Orgrimmar.LeaderX = 1921.57
-CitySiege.Orgrimmar.LeaderY = -4148.41
-CitySiege.Orgrimmar.LeaderZ = 41.64
-
-#
-#    CitySiege.Undercity.LeaderX/Y/Z
-#        Description: Location of the city leader (Lady Sylvanas Windrunner) for siege targeting.
-#        Default:     1633.75, 240.167, -43.1034
-CitySiege.Undercity.LeaderX = 1633.75
-CitySiege.Undercity.LeaderY = 240.167
-CitySiege.Undercity.LeaderZ = -43.1034
-
-#
-#    CitySiege.ThunderBluff.LeaderX/Y/Z
-#        Description: Location of the city leader (Cairne Bloodhoof) for siege targeting.
-#        Default:     -1043.11, 285.809, 135.165
-CitySiege.ThunderBluff.LeaderX = -1043.11
-CitySiege.ThunderBluff.LeaderY = 285.809
-CitySiege.ThunderBluff.LeaderZ = 135.165
-
-#
-#    CitySiege.Silvermoon.LeaderX/Y/Z
-#        Description: Location of the city leader (Lor'themar Theron) for siege targeting.
-#        Default:     9338.74, -7277.27, 13.7014
-CitySiege.Silvermoon.LeaderX = 9338.74
-CitySiege.Silvermoon.LeaderY = -7277.27
-CitySiege.Silvermoon.LeaderZ = 13.7014
-
-###############################################
-# City Waypoint Configurations
-###############################################
-# Waypoints guide siege creatures from spawn point to leader location.
-# Creatures will move through waypoints in order before reaching the leader.
-# This ensures proper pathfinding through complex city layouts.
-#
-# Format:
-#   CitySiege.<CityName>.WaypointCount = <number>
-#   CitySiege.<CityName>.Waypoint1.X/Y/Z = coordinates
-#   CitySiege.<CityName>.Waypoint2.X/Y/Z = coordinates
-#   etc.
-#
-# Example waypoint path for Stormwind:
-#   Spawn (outside gates) -> WP1 (inside gates) -> WP2 (trade district) -> 
-#   WP3 (keep entrance) -> Leader (throne room)
-
-#
-#    CitySiege.Stormwind.WaypointCount
-#        Description: Number of waypoints for Stormwind siege path.
-#        Default:     14 (complete path through Stormwind to King Varian)
-CitySiege.Stormwind.WaypointCount = 14
-
-# Waypoint 1 - Outside gates
-CitySiege.Stormwind.Waypoint1.X = -9070.56
-CitySiege.Stormwind.Waypoint1.Y = 429.37
-CitySiege.Stormwind.Waypoint1.Z = 94.06
-
-# Waypoint 2
-CitySiege.Stormwind.Waypoint2.X = -8883.58
-CitySiege.Stormwind.Waypoint2.Y = 577.11
-CitySiege.Stormwind.Waypoint2.Z = 93.98
-
-# Waypoint 3
-CitySiege.Stormwind.Waypoint3.X = -8830.57
-CitySiege.Stormwind.Waypoint3.Y = 624.65
-CitySiege.Stormwind.Waypoint3.Z = 94.91
-
-# Waypoint 4
-CitySiege.Stormwind.Waypoint4.X = -8846.97
-CitySiege.Stormwind.Waypoint4.Y = 723.27
-CitySiege.Stormwind.Waypoint4.Z = 98.11
-
-# Waypoint 5
-CitySiege.Stormwind.Waypoint5.X = -8869.63
-CitySiege.Stormwind.Waypoint5.Y = 760.62
-CitySiege.Stormwind.Waypoint5.Z = 98.5
-
-# Waypoint 6
-CitySiege.Stormwind.Waypoint6.X = -8824.29
-CitySiege.Stormwind.Waypoint6.Y = 811.57
-CitySiege.Stormwind.Waypoint6.Z = 99.70
-
-# Waypoint 7
-CitySiege.Stormwind.Waypoint7.X = -8817.26
-CitySiege.Stormwind.Waypoint7.Y = 956.38
-CitySiege.Stormwind.Waypoint7.Z = 101.51
-
-# Waypoint 8
-CitySiege.Stormwind.Waypoint8.X = -8760.37
-CitySiege.Stormwind.Waypoint8.Y = 892.38
-CitySiege.Stormwind.Waypoint8.Z = 102.60
-
-# Waypoint 9
-CitySiege.Stormwind.Waypoint9.X = -8697.61
-CitySiege.Stormwind.Waypoint9.Y = 865.26
-CitySiege.Stormwind.Waypoint9.Z = 98.08
-
-# Waypoint 10
-CitySiege.Stormwind.Waypoint10.X = -8620.92
-CitySiege.Stormwind.Waypoint10.Y = 777.78
-CitySiege.Stormwind.Waypoint10.Z = 97.65
-
-# Waypoint 11
-CitySiege.Stormwind.Waypoint11.X = -8538.03
-CitySiege.Stormwind.Waypoint11.Y = 688.95
-CitySiege.Stormwind.Waypoint11.Z = 98.68
-
-# Waypoint 12
-CitySiege.Stormwind.Waypoint12.X = -8400.78
-CitySiege.Stormwind.Waypoint12.Y = 671.10
-CitySiege.Stormwind.Waypoint12.Z = 95.90
-
-# Waypoint 13
-CitySiege.Stormwind.Waypoint13.X = -8497.73
-CitySiege.Stormwind.Waypoint13.Y = 542.96
-CitySiege.Stormwind.Waypoint13.Z = 98.21
-
-# Waypoint 14 - Near throne room
-CitySiege.Stormwind.Waypoint14.X = -8547.18
-CitySiege.Stormwind.Waypoint14.Y = 466.92
-CitySiege.Stormwind.Waypoint14.Z = 105.53
-
-
-
-#
-#    CitySiege.Ironforge.WaypointCount
-#        Description: Number of waypoints for Ironforge siege path.
-#        Default:     0 (direct path - add waypoints if needed)
-CitySiege.Ironforge.WaypointCount = 0
-
-#
-#    CitySiege.Darnassus.WaypointCount
-#        Description: Number of waypoints for Darnassus siege path.
-#        Default:     0 (direct path - add waypoints if needed)
-CitySiege.Darnassus.WaypointCount = 0
-
-#
-#    CitySiege.Exodar.WaypointCount
-#        Description: Number of waypoints for Exodar siege path.
-#        Default:     0 (direct path - add waypoints if needed)
-CitySiege.Exodar.WaypointCount = 0
-
-#
-#    CitySiege.Orgrimmar.WaypointCount
-#        Description: Number of waypoints for Orgrimmar siege path.
-#        Default:     0 (direct path - add waypoints if needed)
-CitySiege.Orgrimmar.WaypointCount = 14
-
-# Orgrimmar waypoint path (spawn -> waypoints -> leader)
-CitySiege.Orgrimmar.Waypoint1.X = 1426.18
-CitySiege.Orgrimmar.Waypoint1.Y = -4364.05
-CitySiege.Orgrimmar.Waypoint1.Z = 26.46
-
-CitySiege.Orgrimmar.Waypoint2.X = 1539.32
-CitySiege.Orgrimmar.Waypoint2.Y = -4408.84
-CitySiege.Orgrimmar.Waypoint2.Z = 12.25
-
-CitySiege.Orgrimmar.Waypoint3.X = 1657.09
-CitySiege.Orgrimmar.Waypoint3.Y = -4415.28
-CitySiege.Orgrimmar.Waypoint3.Z = 17.77
-
-CitySiege.Orgrimmar.Waypoint4.X = 1713.08
-CitySiege.Orgrimmar.Waypoint4.Y = -4372.30
-CitySiege.Orgrimmar.Waypoint4.Z = 28.90
-
-CitySiege.Orgrimmar.Waypoint5.X = 1728.06
-CitySiege.Orgrimmar.Waypoint5.Y = -4477.64
-CitySiege.Orgrimmar.Waypoint5.Z = 33.76
-
-CitySiege.Orgrimmar.Waypoint6.X = 1774.96
-CitySiege.Orgrimmar.Waypoint6.Y = -4532.50
-CitySiege.Orgrimmar.Waypoint6.Z = 25.69
-
-CitySiege.Orgrimmar.Waypoint7.X = 1926.51
-CitySiege.Orgrimmar.Waypoint7.Y = -4486.32
-CitySiege.Orgrimmar.Waypoint7.Z = 24.88
-
-CitySiege.Orgrimmar.Waypoint8.X = 1844.84
-CitySiege.Orgrimmar.Waypoint8.Y = -4411.77
-CitySiege.Orgrimmar.Waypoint8.Z = 5.91
-
-CitySiege.Orgrimmar.Waypoint9.X = 1802.93
-CitySiege.Orgrimmar.Waypoint9.Y = -4304.78
-CitySiege.Orgrimmar.Waypoint9.Z = -9.96
-
-CitySiege.Orgrimmar.Waypoint10.X = 1758.48
-CitySiege.Orgrimmar.Waypoint10.Y = -4306.42
-CitySiege.Orgrimmar.Waypoint10.Z = 7.81
-
-CitySiege.Orgrimmar.Waypoint11.X = 1780.20
-CitySiege.Orgrimmar.Waypoint11.Y = -4234.99
-CitySiege.Orgrimmar.Waypoint11.Z = 40.61
-
-CitySiege.Orgrimmar.Waypoint12.X = 1890.68
-CitySiege.Orgrimmar.Waypoint12.Y = -4285.49
-CitySiege.Orgrimmar.Waypoint12.Z = 31.71
-
-CitySiege.Orgrimmar.Waypoint13.X = 1931.49
-CitySiege.Orgrimmar.Waypoint13.Y = -4285.40
-CitySiege.Orgrimmar.Waypoint13.Z = 29.28
-
-CitySiege.Orgrimmar.Waypoint14.X = 1926.68
-CitySiege.Orgrimmar.Waypoint14.Y = -4218.74
-CitySiege.Orgrimmar.Waypoint14.Z = 42.17
-
-#
-#    CitySiege.Undercity.WaypointCount
-#        Description: Number of waypoints for Undercity siege path.
-#        Default:     0 (direct path - add waypoints if needed)
-CitySiege.Undercity.WaypointCount = 0
-
-#
-#    CitySiege.ThunderBluff.WaypointCount
-#        Description: Number of waypoints for Thunder Bluff siege path.
-#        Default:     0 (direct path - add waypoints if needed)
-CitySiege.ThunderBluff.WaypointCount = 0
-
-#
-#    CitySiege.Silvermoon.WaypointCount
-#        Description: Number of waypoints for Silvermoon siege path.
-#        Default:     0 (direct path - add waypoints if needed)
-CitySiege.Silvermoon.WaypointCount = 0
-
-###############################################
-# Spawn Configurations
-###############################################
-
-#
-#    CitySiege.SpawnCount.Minions
-#        Description: Number of regular enemy units to spawn during siege.
-#        Default:     15
-CitySiege.SpawnCount.Minions = 15
-
-#
-#    CitySiege.SpawnCount.Elites
-#        Description: Number of elite enemy units to spawn during siege.
-#        Default:     5
-CitySiege.SpawnCount.Elites = 5
-
-#
-#    CitySiege.SpawnCount.MiniBosses
-#        Description: Number of mini-bosses to spawn during siege.
-#        Default:     2
-CitySiege.SpawnCount.MiniBosses = 2
-
-#
-#    CitySiege.SpawnCount.Leaders
-#        Description: Number of faction leaders to spawn during siege.
-#        Default:     1
-CitySiege.SpawnCount.Leaders = 1
-
-###############################################
-# Creature Entry Configurations
-###############################################
-# These define which creature entries to use for siege forces.
-# Attacking faction leaders are now randomly selected from opposing faction city leader pools for variety.
-# Each siege will feature a different opposing faction leader leading the attack.
-# There are no separate config keys for individual attacker leader entries.
-#
-# Alliance attackers spawn Footmen, Knights, Riflemen, and a random Horde city leader.
-# Horde attackers spawn Grunts, Tauren Warriors, Headhunters, and a random Alliance city leader.
-#
-# Leader pools (randomly selected per siege):
-#   Alliance City Leaders: King Varian Wrynn (29611), King Magni Bronzebeard (2784),
-#                          Tyrande Whisperwind (7999), Prophet Velen (17468)
-#   Horde City Leaders: Thrall (4949), Cairne Bloodhoof (3057),
-#                       Lady Sylvanas Windrunner (10181), Lor'themar Theron (16802)
-
-#
-#    CitySiege.Creature.Alliance.Minion
-#        Description: Creature entry for Alliance city attackers (regular minions).
-#        Default:     17919 (Alliance Footman from Mount Hyjal)
-CitySiege.Creature.Alliance.Minion = 17919
-
-#
-#    CitySiege.Creature.Alliance.Elite
-#        Description: Creature entry for Alliance city attackers (elites).
-#        Default:     17920 (Alliance Knight from Mount Hyjal)
-CitySiege.Creature.Alliance.Elite = 17920
-
-#
-#    CitySiege.Creature.Alliance.MiniBoss
-#        Description: Creature entry for Alliance city attackers (mini-bosses).
-#        Default:     17921 (Alliance Rifleman from Mount Hyjal)
-CitySiege.Creature.Alliance.MiniBoss = 17921
-
-
-#
-#    CitySiege.Creature.Horde.Minion
-#        Description: Creature entry for Horde city attackers (regular minions).
-#        Default:     17932 (Horde Grunt from Mount Hyjal)
-CitySiege.Creature.Horde.Minion = 17932
-
-#
-#    CitySiege.Creature.Horde.Elite
-#        Description: Creature entry for Horde city attackers (elites).
-#        Default:     17933 (Tauren Warrior from Mount Hyjal)
-CitySiege.Creature.Horde.Elite = 17933
-
-#
-#    CitySiege.Creature.Horde.MiniBoss
-#        Description: Creature entry for Horde city attackers (mini-bosses).
-#        Default:     17934 (Horde Headhunter from Mount Hyjal)
-CitySiege.Creature.Horde.MiniBoss = 17934
-
-
-#
-#    CitySiege.AggroPlayers
-#        Description: Whether siege units should aggro players on sight.
-#        Default:     1 (yes)
-#                     Valid values: 0 (no) / 1 (yes)
-CitySiege.AggroPlayers = 1
-
-#
-#    CitySiege.AggroNPCs
-#        Description: Whether siege units should aggro city NPCs on sight.
-#        Default:     1 (yes)
-#                     Valid values: 0 (no) / 1 (yes)
-CitySiege.AggroNPCs = 1
-
-###############################################
-# Defender Settings
-###############################################
-
-#
-#    CitySiege.Defenders.Enabled
-#        Description: Enable spawning of city defenders during siege.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Defenders.Enabled = 1
-
-#
-#    CitySiege.Defenders.Count
-#        Description: Number of defender minions to spawn.
-#        Default:     10
-CitySiege.Defenders.Count = 10
-
-#
-#    CitySiege.Creature.Alliance.Defender
-#        Description: Creature entry for Alliance city defenders.
-#        Default:     17919 (Alliance Footman from Mount Hyjal)
-CitySiege.Creature.Alliance.Defender = 17919
-
-#
-#    CitySiege.Creature.Horde.Defender
-#        Description: Creature entry for Horde city defenders.
-#        Default:     17932 (Horde Grunt from Mount Hyjal)
-CitySiege.Creature.Horde.Defender = 17932
-
-#
-#    CitySiege.Defenders.RespawnTime
-#        Description: Respawn time (in seconds) for city defenders.
-#        Default:     45 (45 seconds)
-CitySiege.Defenders.RespawnTime = 45
-
-###############################################
-# Level Settings
-###############################################
-
-#
-#    CitySiege.Level.Leader
-#        Description: Level for siege leaders (attackers).
-#        Default:     80
-CitySiege.Level.Leader = 80
-
-#
-#    CitySiege.Level.MiniBoss
-#        Description: Level for siege mini-bosses (attackers).
-#        Default:     70
-CitySiege.Level.MiniBoss = 70
-
-#
-#    CitySiege.Level.Elite
-#        Description: Level for siege elite units (attackers).
-#        Default:     60
-CitySiege.Level.Elite = 60
-
-#
-#    CitySiege.Level.Minion
-#        Description: Level for siege minion units (attackers).
-#        Default:     50
-CitySiege.Level.Minion = 50
-
-#
-#    CitySiege.Level.Defender
-#        Description: Level for city defender units.
-#        Default:     60
-CitySiege.Level.Defender = 60
-
-###############################################
-# Scale Settings
-###############################################
-
-#
-#    CitySiege.Scale.Leader
-#        Description: Scale multiplier for siege leaders (1.0 = normal size).
-#                     Makes leaders visually larger and easier to identify.
-#        Default:     1.6 (60% larger)
-CitySiege.Scale.Leader = 1.6
-
-#
-#    CitySiege.Scale.MiniBoss
-#        Description: Scale multiplier for siege mini-bosses (1.0 = normal size).
-#                     Makes mini-bosses visually larger than regular units.
-#        Default:     1.30 (30% larger)
-CitySiege.Scale.MiniBoss = 1.30
-
-###############################################
-# Cinematic and RP Settings
-###############################################
-
-#
 #    CitySiege.CinematicDelay
-#        Description: Time (in seconds) for the initial cinematic/RP phase before combat.
+#        Description: Length of the muster (roleplay) phase in seconds. The army is passive and
+#                     immune during this window while its officers deliver the RP script.
 #        Default:     150
 CitySiege.CinematicDelay = 150
 
 #
 #    CitySiege.YellFrequency
-#        Description: How often (in seconds) siege leaders yell during the event.
+#        Description: Seconds between roleplay lines and combat taunts.
 #        Default:     30
 CitySiege.YellFrequency = 30
 
-###############################################
-# Weather Override Settings
-###############################################
+#
+#    CitySiege.AllowMultipleCities
+#        Description: Allow sieges in several different cities at the same time. A single city is
+#                     never besieged twice at once regardless of this setting.
+#        Default:     0
+CitySiege.AllowMultipleCities = 0
 
 #
-#    CitySiege.Weather.Enabled
-#        Description: Enable weather override during siege RP phase.
-#                     When enabled, weather will be temporarily changed during the cinematic phase
-#                     and restored to normal when the siege ends.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Weather.Enabled = 1
+#    CitySiege.AnnounceRadius
+#        Description: Radius in yards for local siege chatter (status updates, stage changes).
+#                     0 sends those to the whole map.
+#        Default:     1500
+CitySiege.AnnounceRadius = 1500
 
 #
-#    CitySiege.Weather.Type
-#        Description: Weather type to set during siege RP phase.
-#                     Valid values: 0 (WEATHER_TYPE_FINE) - Clear weather
-#                                   1 (WEATHER_TYPE_RAIN) - Rain
-#                                   2 (WEATHER_TYPE_SNOW) - Snow
-#                                   3 (WEATHER_TYPE_STORM) - Storm
-#        Default:     3 (WEATHER_TYPE_STORM)
-CitySiege.Weather.Type = 3
+#    CitySiege.WorldAnnounce
+#        Description: Send the big beats (siege starting, assault beginning, city taken/held) to
+#                     the entire server rather than just to players near the city.
+#        Default:     1
+CitySiege.WorldAnnounce = 1
 
 #
-#    CitySiege.Weather.Grade
-#        Description: Weather intensity grade (0.0 to 1.0).
-#                     0.0 = No weather effect, 1.0 = Maximum weather intensity
-#                     Example: 0.5 = Moderate rain/snow/storm
-#        Default:     1.0 (maximum intensity)
-CitySiege.Weather.Grade = 1.0
+#    CitySiege.MinimumLevel
+#        Description: Minimum player level considered a participant for scaling and rewards.
+#        Default:     1
+CitySiege.MinimumLevel = 1
 
-###############################################
-# Music Settings
-###############################################
+###################################################################################################
+# CITY SELECTION
+#
+# All eight capitals work out of the box because routes are generated automatically.
+###################################################################################################
+
+CitySiege.Stormwind.Enabled    = 1
+CitySiege.Ironforge.Enabled    = 1
+CitySiege.Darnassus.Enabled    = 1
+CitySiege.Exodar.Enabled       = 1
+CitySiege.Orgrimmar.Enabled    = 1
+CitySiege.Undercity.Enabled    = 1
+CitySiege.ThunderBluff.Enabled = 1
+CitySiege.Silvermoon.Enabled   = 1
+
+###################################################################################################
+# ROUTE GENERATION
+#
+# How the army finds its way from the muster point to the throne room.
+#
+#   auto   - Ask the server navmesh for a walkable corridor and turn its corners into waypoints.
+#            This is the default and needs mmaps to be extracted and enabled. Long marches are
+#            stitched together from several pathfinder calls, so a route can cross an entire city.
+#   manual - Only use the CitySiege.<City>.WaypointN entries below.
+#   direct - No waypoints at all; the army walks straight at the leader. Fine for open cities,
+#            poor for anything with walls.
+#
+# In "auto" mode the configured waypoints are still used as a fallback if route generation fails
+# (for example when mmaps are missing). The reason is written to the log and is also shown by
+# `.citysiege route <city>`.
+#
+# Useful commands:
+#   .citysiege repath <city|all>   rebuild the cached route
+#   .citysiege route <city>        print the current route and how it was produced
+#   .citysiege showroute <city>    place visible beacons along the route (run again to remove)
+###################################################################################################
 
 #
-#    CitySiege.Music.Enabled
-#        Description: Enable music playback during siege events.
-#                     When enabled, thematic battle music will play during different siege phases.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Music.Enabled = 1
+#    CitySiege.Route.Mode
+#        Description: auto | manual | direct
+#        Default:     auto
+CitySiege.Route.Mode = auto
 
 #
-#    CitySiege.Music.RPMusicId
-#        Description: SoundKit ID for music played during the RP/cinematic phase.
-#                     This music plays when siege forces first spawn and during the preparation phase.
-#                     Find music IDs in AzerothCore's SoundEntries.dbc or by searching existing scripts.
-#                     Example: 17289 (battle music from various instances)
-#        Default:     17289
-CitySiege.Music.RPMusicId = 17289
+#    CitySiege.Route.AutoDetectLeaderPosition
+#        Description: Read each city leader's throne position from the `creature` table instead of
+#                     trusting the LeaderX/Y/Z values below. Turn this off only if you have moved
+#                     your leaders and want to pin the target by hand.
+#        Default:     1
+CitySiege.Route.AutoDetectLeaderPosition = 1
 
 #
-#    CitySiege.Music.CombatMusicId
-#        Description: SoundKit ID for music played during active combat.
-#                     This music plays when the cinematic phase ends and battle begins.
-#                     Should be intense, thematic battle music to enhance immersion.
-#                     Example: 17459 (combat music from Icecrown Citadel)
-#        Default:     17459
-CitySiege.Music.CombatMusicId = 17459
+#    CitySiege.Route.NodeSpacing
+#        Description: Minimum distance in yards between two generated waypoints. Lower values hug
+#                     the streets more closely at the cost of more nodes.
+#        Default:     28
+CitySiege.Route.NodeSpacing = 28
 
 #
-#    CitySiege.Music.VictoryMusicId
-#        Description: SoundKit ID for music played when defenders win the siege.
-#                     This music plays when the city leader survives and attackers are defeated.
-#                     Should be triumphant, celebratory music.
-#                     Example: 17460 (victory music from various events)
-#        Default:     17460
-CitySiege.Music.VictoryMusicId = 17460
+#    CitySiege.Route.MaxNodes
+#        Description: Upper bound on generated waypoints per city. Longer routes are thinned out.
+#        Default:     64
+CitySiege.Route.MaxNodes = 64
 
 #
-#    CitySiege.Music.DefeatMusicId
-#        Description: SoundKit ID for music played when attackers win the siege.
-#                     This music plays when the city leader is killed and attackers conquer the city.
-#                     Should be somber, dramatic music to reflect the city's fall.
-#                     Example: 17458 (defeat music from various events)
-#        Default:     17458
-CitySiege.Music.DefeatMusicId = 17458
-
-###############################################
-# Respawn Settings
-###############################################
+#    CitySiege.Route.MaxLegs
+#        Description: How many chained pathfinder calls may be used to reach the throne. Each leg
+#                     covers one navmesh corridor. Raise this if the log reports that a route
+#                     stopped short of the throne.
+#        Default:     24
+CitySiege.Route.MaxLegs = 24
 
 #
-#    CitySiege.Respawn.Enabled
-#        Description: Enable automatic respawning of siege units during active sieges.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
-CitySiege.Respawn.Enabled = 1
+#    CitySiege.Route.SteepCost
+#        Description: How much more a stretch of steep ground costs the pathfinder than flat ground.
+#
+#                     This is the knob for "the army is climbing the hillside instead of using the
+#                     street". The mmap extractor already tags steep triangles as NAV_GROUND_STEEP,
+#                     but the core hands every walking creature both NAV_GROUND and NAV_GROUND_STEEP,
+#                     so by default a hillside looks exactly as good to the pathfinder as a road and
+#                     it simply takes whichever is shorter - which outside a city is the hillside.
+#                     Weighting steep ground makes the roads win on their own.
+#
+#                     Detour scores each stretch as its length times this cost, so a value of 25
+#                     means the host will detour up to roughly 25 yards along flat ground to avoid
+#                     one yard of hillside.
+#
+#                       1    off; steep ground is as good as a road
+#                       25   keeps the host on roads and streets (recommended)
+#                       100+ steep ground is nearly a last resort
+#
+#                     This is a cost, not a ban, so a city whose only approach is a ramp - Thunder
+#                     Bluff's rises, the climb to Ironforge's gate - still routes correctly.
+#        Default:     25
+CitySiege.Route.SteepCost = 25
 
 #
-#    CitySiege.Respawn.LeaderTime
-#        Description: Respawn time (in seconds) for siege leaders.
-#        Default:     300 (5 minutes)
-CitySiege.Respawn.LeaderTime = 300
+#    CitySiege.Route.WaterCost
+#        Description: Same idea for water: how much more it costs than dry land. Keeps a column from
+#                     swimming a canal or moat when a bridge is available, without making cities
+#                     unreachable if wading really is the only way in.
+#        Default:     8
+CitySiege.Route.WaterCost = 8
+
+###################################################################################################
+# MUSTER POINTS
+#
+# Where the attacking army forms up. These are outside each city's main gate.
+###################################################################################################
+
+CitySiege.Stormwind.SpawnX = -9161.16
+CitySiege.Stormwind.SpawnY = 353.365
+CitySiege.Stormwind.SpawnZ = 88.117
+
+CitySiege.Ironforge.SpawnX = -5174.09
+CitySiege.Ironforge.SpawnY = -594.361
+CitySiege.Ironforge.SpawnZ = 397.853
+
+CitySiege.Darnassus.SpawnX = 9887.36
+CitySiege.Darnassus.SpawnY = 1856.49
+CitySiege.Darnassus.SpawnZ = 1317.14
+
+CitySiege.Exodar.SpawnX = -4080.80
+CitySiege.Exodar.SpawnY = -12193.2
+CitySiege.Exodar.SpawnZ = 1.712
+
+CitySiege.Orgrimmar.SpawnX = 1250.33
+CitySiege.Orgrimmar.SpawnY = -4412.59
+CitySiege.Orgrimmar.SpawnZ = 25.48
+
+CitySiege.Undercity.SpawnX = 1982.26
+CitySiege.Undercity.SpawnY = 226.674
+CitySiege.Undercity.SpawnZ = 35.951
+
+CitySiege.ThunderBluff.SpawnX = -1558.61
+CitySiege.ThunderBluff.SpawnY = -5.071
+CitySiege.ThunderBluff.SpawnZ = 5.384
+
+CitySiege.Silvermoon.SpawnX = 9230.47
+CitySiege.Silvermoon.SpawnY = -6962.67
+CitySiege.Silvermoon.SpawnZ = 5.004
+
+###################################################################################################
+# CITY LEADERS
+#
+# LeaderEntry is the creature the siege is trying to kill. With
+# CitySiege.Route.AutoDetectLeaderPosition = 1 (the default) the LeaderX/Y/Z values are only a
+# fallback used when that creature has no spawn in the `creature` table.
+###################################################################################################
+
+CitySiege.Stormwind.LeaderEntry = 29611
+CitySiege.Stormwind.LeaderX = -8441.42
+CitySiege.Stormwind.LeaderY = 333.102
+CitySiege.Stormwind.LeaderZ = 122.679
+
+CitySiege.Ironforge.LeaderEntry = 2784
+CitySiege.Ironforge.LeaderX = -4865.73
+CitySiege.Ironforge.LeaderY = -1022.67
+CitySiege.Ironforge.LeaderZ = 505.798
+
+CitySiege.Darnassus.LeaderEntry = 7999
+CitySiege.Darnassus.LeaderX = 9662.52
+CitySiege.Darnassus.LeaderY = 2524.57
+CitySiege.Darnassus.LeaderZ = 1360.08
+
+CitySiege.Exodar.LeaderEntry = 17468
+CitySiege.Exodar.LeaderX = -3993.71
+CitySiege.Exodar.LeaderY = -11413.7
+CitySiege.Exodar.LeaderZ = -122.136
+
+CitySiege.Orgrimmar.LeaderEntry = 4949
+CitySiege.Orgrimmar.LeaderX = 1919.9
+CitySiege.Orgrimmar.LeaderY = -4123.8
+CitySiege.Orgrimmar.LeaderZ = 44.3715
+
+CitySiege.Undercity.LeaderEntry = 10181
+CitySiege.Undercity.LeaderX = 1290.41
+CitySiege.Undercity.LeaderY = 316.247
+CitySiege.Undercity.LeaderZ = -57.2376
+
+CitySiege.ThunderBluff.LeaderEntry = 3057
+CitySiege.ThunderBluff.LeaderX = -1209.64
+CitySiege.ThunderBluff.LeaderY = -112.698
+CitySiege.ThunderBluff.LeaderZ = 163.882
+
+CitySiege.Silvermoon.LeaderEntry = 16802
+CitySiege.Silvermoon.LeaderX = 9990.5
+CitySiege.Silvermoon.LeaderY = -7052.52
+CitySiege.Silvermoon.LeaderZ = 45.4464
+
+###################################################################################################
+# APPROACH ANCHORS (OPTIONAL)
+#
+# Points the march must pass through, in order, between the muster point and the throne. Automatic
+# routing does not need these - Route.SteepCost already keeps the host on roads - so leave them
+# unset unless you want a particular city entered a particular way, for example to send the army in
+# through a side gate or make it parade through a specific district.
+#
+# Unlike manual waypoints these do not replace pathfinding: the navmesh still finds the way between
+# consecutive anchors, so a couple of rough coordinates are enough. Each anchor must be somewhere a
+# unit could stand.
+#
+# Format, per city, as a comma separated list of "x y z":
+#   CitySiege.<City>.Approach = -8835.7 620.5 93.2, -8452.0 346.9 120.9
+#
+# Setting the value to an empty string clears any anchors for that city.
+#
+
+###################################################################################################
+# MANUAL WAYPOINTS (LEGACY / FALLBACK)
+#
+# Only needed if you set CitySiege.Route.Mode = manual, or if automatic routing cannot run on your
+# server (no mmaps). Leave the counts at 0 to rely purely on automatic routing.
+#
+# Format, per city:
+#   CitySiege.<City>.WaypointCount = <n>
+#   CitySiege.<City>.Waypoint1.X = ...
+#   CitySiege.<City>.Waypoint1.Y = ...
+#   CitySiege.<City>.Waypoint1.Z = ...
+#   ... up to Waypoint<n>
+#
+# Use `.citysiege here` while standing on the spot to print coordinates you can paste in.
+#
+# Worked example (the old hand-placed Stormwind route), left here as a template:
+#   CitySiege.Stormwind.WaypointCount = 3
+#   CitySiege.Stormwind.Waypoint1.X = -9070.56
+#   CitySiege.Stormwind.Waypoint1.Y = 429.37
+#   CitySiege.Stormwind.Waypoint1.Z = 94.06
+#   CitySiege.Stormwind.Waypoint2.X = -8883.58
+#   CitySiege.Stormwind.Waypoint2.Y = 577.11
+#   CitySiege.Stormwind.Waypoint2.Z = 93.98
+#   CitySiege.Stormwind.Waypoint3.X = -8497.73
+#   CitySiege.Stormwind.Waypoint3.Y = 542.96
+#   CitySiege.Stormwind.Waypoint3.Z = 98.21
+###################################################################################################
+
+CitySiege.Stormwind.WaypointCount    = 0
+CitySiege.Ironforge.WaypointCount    = 0
+CitySiege.Darnassus.WaypointCount    = 0
+CitySiege.Exodar.WaypointCount       = 0
+CitySiege.Orgrimmar.WaypointCount    = 0
+CitySiege.Undercity.WaypointCount    = 0
+CitySiege.ThunderBluff.WaypointCount = 0
+CitySiege.Silvermoon.WaypointCount   = 0
+
+###################################################################################################
+# ARMY COMPOSITION
+###################################################################################################
 
 #
-#    CitySiege.Respawn.MiniBossTime
-#        Description: Respawn time (in seconds) for siege mini-bosses.
-#        Default:     180 (3 minutes)
+#    CitySiege.SpawnCount.*
+#        Description: Size of each rank in the attacking war host.
+CitySiege.SpawnCount.Minions    = 15
+CitySiege.SpawnCount.Elites     = 5
+CitySiege.SpawnCount.MiniBosses = 2
+CitySiege.SpawnCount.Leaders    = 1
+
+#
+#    CitySiege.Creature.*
+#        Description: Creature entries used for the attacking ranks. The defaults are the Mount
+#                     Hyjal battle units, which have matching Alliance and Horde models.
+CitySiege.Creature.Alliance.Minion   = 17919
+CitySiege.Creature.Alliance.Elite    = 17920
+CitySiege.Creature.Alliance.MiniBoss = 17921
+CitySiege.Creature.Alliance.Defender = 17919
+
+CitySiege.Creature.Horde.Minion   = 17932
+CitySiege.Creature.Horde.Elite    = 17933
+CitySiege.Creature.Horde.MiniBoss = 17934
+CitySiege.Creature.Horde.Defender = 17932
+
+#
+#    CitySiege.Creature.<Faction>.Warlords
+#        Description: Comma separated pool of named champions who lead an assault. One is picked at
+#                     random per siege. The defaults are the opposing faction's own city leaders.
+#                     Replace them with custom NPCs if a duplicate Thrall breaks your immersion.
+CitySiege.Creature.Alliance.Warlords = 29611,2784,7999,17468
+CitySiege.Creature.Horde.Warlords    = 4949,3057,10181,16802
+
+#
+#    CitySiege.AggroPlayers / CitySiege.AggroNPCs
+#        Description: Whether the war host attacks on sight. If both are 0 the army only fights
+#                     back when struck.
+CitySiege.AggroPlayers = 1
+CitySiege.AggroNPCs    = 1
+
+###################################################################################################
+# CITY GARRISON
+###################################################################################################
+
+CitySiege.Defenders.Enabled = 1
+CitySiege.Defenders.Count   = 10
+
+#
+#    CitySiege.Defenders.HoldLineFraction
+#        Description: How far along the route the garrison advances before digging in, as a
+#                     fraction of the route. 0.5 means they meet the assault halfway; 0 keeps them
+#                     at the throne; 1 sends them to the city gates.
+#        Default:     0.5
+CitySiege.Defenders.HoldLineFraction = 0.5
+
+CitySiege.Defenders.RespawnTime = 45
+
+###################################################################################################
+# MARCHING SPREAD
+#
+# Every unit is given its own patch of ground relative to the line of march and keeps it for the
+# whole siege, including after it respawns. Without this the entire host walks at the same waypoint
+# and collapses into one pile of overlapping models.
+#
+# This is a scatter, not a parade formation. Ranked rows look sharp on open ground and jam the
+# moment the route turns a corner or narrows into a street, because a rigid line has no choice but
+# to put somebody inside a wall - and a unit standing in a wall is a unit standing still. Offsets
+# are spread on a golden-angle spiral instead, so no two units share a spot and each one is free to
+# swing around its waypoint or close in on it when the ground beside it is blocked.
+###################################################################################################
+
+#
+#    CitySiege.Formation.Spacing
+#        Description: Controls how far the host spreads. This is the radius, in yards, of the patch
+#                     the first unit gets; the crowd grows outward from there at constant density,
+#                     so raising it spreads the whole army proportionally. Lower it for cities with
+#                     narrow streets.
+#        Default:     6
+CitySiege.Formation.Spacing = 6
+
+#
+#    CitySiege.Formation.*Depth
+#        Description: Yards each rank drifts toward the back of the crowd. Flavour rather than
+#                     structure - it biases where a unit sits in the scatter and constrains nothing.
+CitySiege.Formation.MinionDepth   = 0
+CitySiege.Formation.EliteDepth    = 14
+CitySiege.Formation.MiniBossDepth = 26
+CitySiege.Formation.WarlordDepth  = 34
+
+#
+#    CitySiege.Formation.Jitter
+#        Description: Random wobble in yards applied to each spot, so the host looks like troops
+#                     rather than a pattern. 0 makes the spread perfectly regular.
+#        Default:     1.5
+CitySiege.Formation.Jitter = 1.5
+
+###################################################################################################
+# LEVEL SCALING
+#
+# The war host is scaled to whoever actually shows up, so a siege is a real fight on a level 20
+# server and on a level 80 one.
+###################################################################################################
+
+#
+#    CitySiege.Scaling.Enabled
+#        Description: Scale the army to the players near the city when the siege starts. With this
+#                     off, every siege uses CitySiege.Scaling.FallbackLevel.
+#        Default:     1
+CitySiege.Scaling.Enabled = 1
+
+#
+#    CitySiege.Scaling.FallbackLevel
+#        Description: Level used when nobody is around, or when scaling is disabled.
+#        Default:     80
+CitySiege.Scaling.FallbackLevel = 80
+
+#
+#    CitySiege.Scaling.MinLevel / MaxLevel
+#        Description: Clamp for the computed army level.
+CitySiege.Scaling.MinLevel = 20
+CitySiege.Scaling.MaxLevel = 83
+
+#
+#    CitySiege.Scaling.SampleRadius
+#        Description: Radius in yards around the city centre used to sample player levels. Also the
+#                     radius in which healing counts toward participation.
+#        Default:     600
+CitySiege.Scaling.SampleRadius = 600
+
+#
+#    CitySiege.Level.*Offset
+#        Description: Level of each rank relative to the computed army level.
+CitySiege.Level.WarlordOffset  = 3
+CitySiege.Level.MiniBossOffset = 2
+CitySiege.Level.EliteOffset    = 0
+CitySiege.Level.MinionOffset   = -2
+CitySiege.Level.DefenderOffset = -1
+
+#
+#    CitySiege.Level.MinionSpread
+#        Description: Rank-and-file minions roll a level in a band this many levels wide below their
+#                     offset, so there is always something a weaker defender can bring down.
+#        Default:     4
+CitySiege.Level.MinionSpread = 4
+
+#
+#    CitySiege.Health.* / CitySiege.Damage.*
+#        Description: Health and damage multipliers per rank, applied on top of the level scaling.
+CitySiege.Health.WarlordMultiplier  = 12.0
+CitySiege.Health.MiniBossMultiplier = 5.0
+CitySiege.Health.EliteMultiplier    = 2.5
+CitySiege.Health.MinionMultiplier   = 1.0
+CitySiege.Health.DefenderMultiplier = 1.5
+
+CitySiege.Damage.WarlordMultiplier  = 1.6
+CitySiege.Damage.MiniBossMultiplier = 1.3
+CitySiege.Damage.EliteMultiplier    = 1.1
+CitySiege.Damage.MinionMultiplier   = 1.0
+CitySiege.Damage.DefenderMultiplier = 1.0
+
+#
+#    CitySiege.Scale.*
+#        Description: Model scale, purely visual, so officers stand out in a crowd.
+CitySiege.Scale.Leader   = 1.6
+CitySiege.Scale.MiniBoss = 1.3
+
+###################################################################################################
+# BRACKET HANDICAP
+#
+# Lets a player who is well below the army's level still fight and still matter: the army hits them
+# softer and their own damage counts for more. Players at or near the army's level are unaffected.
+###################################################################################################
+
+#
+#    CitySiege.Bracket.Enabled
+#        Default:     1
+CitySiege.Bracket.Enabled = 1
+
+#
+#    CitySiege.Bracket.FreeLevels
+#        Description: Level difference tolerated before the handicap kicks in.
+#        Default:     3
+CitySiege.Bracket.FreeLevels = 3
+
+#
+#    CitySiege.Bracket.MinDamageTaken
+#        Description: Floor on incoming damage, as a fraction. 0.15 means a badly under-levelled
+#                     player never takes more than 15% of a normal hit.
+#        Default:     0.15
+CitySiege.Bracket.MinDamageTaken = 0.15
+
+#
+#    CitySiege.Bracket.MaxDamageBoost
+#        Description: Cap on how much an under-levelled player's damage is multiplied.
+#        Default:     8.0
+CitySiege.Bracket.MaxDamageBoost = 8.0
+
+###################################################################################################
+# REINFORCEMENTS
+###################################################################################################
+
+CitySiege.Respawn.Enabled      = 1
+CitySiege.Respawn.LeaderTime   = 300
 CitySiege.Respawn.MiniBossTime = 180
+CitySiege.Respawn.EliteTime    = 120
+CitySiege.Respawn.MinionTime   = 60
 
+###################################################################################################
+# REWARDS
 #
-#    CitySiege.Respawn.EliteTime
-#        Description: Respawn time (in seconds) for siege elites.
-#        Default:     120 (2 minutes)
-CitySiege.Respawn.EliteTime = 120
-
-#
-#    CitySiege.Respawn.MinionTime
-#        Description: Respawn time (in seconds) for siege minions (attackers).
-#        Default:     60 (1 minute)
-CitySiege.Respawn.MinionTime = 60
-
-###############################################
-# Reward Settings
-###############################################
+# Rewards go to players who actually took part - damage dealt to the war host, healing done in the
+# battle, or killing blows - not to everyone standing in the city.
+###################################################################################################
 
 #
 #    CitySiege.RewardOnDefense
-#        Description: Enable rewards for players who defend the city.
-#        Default:     1 (enabled)
-#                     Valid values: 0 (disabled) / 1 (enabled)
+#        Description: Master switch for rewards.
 CitySiege.RewardOnDefense = 1
 
 #
 #    CitySiege.RewardHonor
-#        Description: Amount of honor points to award for successful defense.
-#        Default:     100
+#        Description: Honor granted to a participant on the winning side.
 CitySiege.RewardHonor = 100
 
 #
-#    CitySiege.RewardGoldBase
-#        Description: Base amount of gold (in copper) to award for successful defense at level 1.
-#                     This is the starting amount before level scaling is applied.
-#        Default:     5000 (50 silver)
-CitySiege.RewardGoldBase = 5000
-
-#
-#    CitySiege.RewardGoldPerLevel
-#        Description: Additional gold (in copper) per player level for defense rewards.
-#                     Total gold = RewardGoldBase + (RewardGoldPerLevel * player level)
-#                     Example: Level 80 player = 5000 + (5000 * 80) = 405,000 copper (40.5 gold)
-#        Default:     5000 (0.5 gold per level)
+#    CitySiege.RewardGoldBase / CitySiege.RewardGoldPerLevel
+#        Description: Copper granted as base + perLevel * playerLevel.
+#                     Default is 0.5g + 0.5g per level, so 40.5g at level 80.
+CitySiege.RewardGoldBase     = 5000
 CitySiege.RewardGoldPerLevel = 5000
 
-###############################################
-# Announcement Messages
-###############################################
+#
+#    CitySiege.Reward.ExperienceEnabled / ExperiencePerLevel
+#        Description: Experience granted as perLevel * playerLevel. This is what makes the event
+#                     worth joining for a levelling character. Ignored at max level.
+CitySiege.Reward.ExperienceEnabled = 1
+CitySiege.Reward.ExperiencePerLevel = 400
 
 #
-#    CitySiege.Message.SiegeStart
-#        Description: Message announced when a siege begins. Use {CITYNAME} for city name.
-#        Default:     "|cffff0000[City Siege]|r The city of {CITYNAME} is under attack! Defenders are needed!"
+#    CitySiege.Reward.ItemId / ItemCount
+#        Description: Optional item handed to participants on the winning side. 0 disables it.
+CitySiege.Reward.ItemId    = 0
+CitySiege.Reward.ItemCount = 1
+
+#
+#    CitySiege.Reward.LosingSide / LoserFactor
+#        Description: Give a reduced reward to participants whose side lost, so turning up is never
+#                     a waste of time. LoserFactor scales honor, gold and experience.
+CitySiege.Reward.LosingSide  = 1
+CitySiege.Reward.LoserFactor = 0.35
+
+#
+#    CitySiege.Reward.ParticipationThreshold
+#        Description: Minimum contribution score needed to count as a participant. The score is
+#                     damage + healing/2 + 500 per killing blow.
+#        Default:     1
+CitySiege.Reward.ParticipationThreshold = 1
+
+#
+#    CitySiege.Reward.ParticipationWindow
+#        Description: Seconds since a player's last contribution for it to still count at the end.
+#        Default:     600
+CitySiege.Reward.ParticipationWindow = 600
+
+#
+#    CitySiege.Reward.AnnounceTopContributors
+#        Description: Name the three most valuable combatants when the siege ends.
+CitySiege.Reward.AnnounceTopContributors = 1
+
+###################################################################################################
+# ATMOSPHERE
+###################################################################################################
+
+#
+#    CitySiege.Weather.*
+#        Description: Weather override for the duration of the siege. Type values:
+#                     0 fine, 1 fog, 3 light rain, 4 medium rain, 5 heavy rain,
+#                     6 light snow, 7 medium snow, 8 heavy snow,
+#                     22 light sandstorm, 41 thunders, 42 blackrain.
+#                     When the siege ends the zone is set back to fine and the normal weather
+#                     system takes over again.
+CitySiege.Weather.Enabled = 1
+CitySiege.Weather.Type    = 5
+CitySiege.Weather.Grade   = 0.9
+
+#
+#    CitySiege.Music.*
+#        Description: SoundKit ids played at each beat of the siege. LoopSeconds re-sends the combat
+#                     track so the battle never falls silent; 0 disables the loop.
+CitySiege.Music.Enabled         = 1
+CitySiege.Music.RPMusicId       = 11803
+CitySiege.Music.CombatMusicId   = 11804
+CitySiege.Music.VictoryMusicId  = 16039
+CitySiege.Music.DefeatMusicId   = 14127
+CitySiege.Music.LoopSeconds     = 120
+
+###################################################################################################
+# CLIENT ADDON BRIDGE
+###################################################################################################
+
+#
+#    CitySiege.Addon.Enabled
+#        Description: Send siege state to the CitySiege client addon.
+CitySiege.Addon.Enabled = 1
+
+#
+#    CitySiege.Addon.UseSystemChannel
+#        Description: Legacy transport. When 0 (the default) the data is sent as a hidden addon
+#                     message, so players without the addon see nothing. Set to 1 only if your
+#                     client build does not deliver addon messages; the raw protocol will then be
+#                     visible in everyone's chat log.
+CitySiege.Addon.UseSystemChannel = 0
+
+#
+#    CitySiege.Addon.BroadcastInterval
+#        Description: Seconds between state updates pushed to the addon.
+CitySiege.Addon.BroadcastInterval = 15
+
+###################################################################################################
+# TEXT
+#
+# Placeholders: {CITYNAME} / {CITY} for the city, {LEADER} for the city leader's name.
+###################################################################################################
+
 CitySiege.Message.SiegeStart = "|cffff0000[City Siege]|r The city of {CITYNAME} is under attack! Defenders are needed!"
-
-#
-#    CitySiege.Message.SiegeEnd
-#        Description: Message announced when a siege ends. Use {CITYNAME} for city name.
-#        Default:     "|cff00ff00[City Siege]|r The siege of {CITYNAME} has ended!"
 CitySiege.Message.SiegeEnd = "|cff00ff00[City Siege]|r The siege of {CITYNAME} has ended!"
-
-#
-#    CitySiege.Message.Reward
-#        Description: Base message sent to rewarded players.
-#                     Use {CITYNAME} for the city name and {ACTION} for defending/conquering.
-#        Default:     "|cff00ff00[City Siege]|r You have been rewarded for {ACTION} {CITYNAME}!"
-CitySiege.Message.Reward = "|cff00ff00[City Siege]|r You have been rewarded for {ACTION} {CITYNAME}!"
-
-###############################################
-# Creature Yells
-###############################################
+CitySiege.Message.Reward = "|cff00ff00[City Siege]|r You fought for {CITYNAME} and have been rewarded!"
 
 #
 #    CitySiege.Yell.LeaderSpawn
-#        Description: Message that siege leaders yell when they spawn.
-#                     Separate multiple yells with semicolons (;) for random selection.
-#        Default:     "This city will fall before our might!"
-CitySiege.Yell.LeaderSpawn = "This city will fall before our might!;Prepare to witness your doom!;We have come to raze your walls!;Today, this city falls!;Your defenses will not hold!"
+#        Description: Lines the warlord may shout when the army musters. Separated by semicolons.
+CitySiege.Yell.LeaderSpawn = "This city will fall before our might!;Prepare to witness your doom!;We have come to raze your walls!;Today, {CITY} falls!;Your defenses will not hold!"
 
 #
 #    CitySiege.Yell.Combat
-#        Description: Random yells during combat. Separate multiple yells with semicolons (;).
-#                     Leaders and mini-bosses will randomly yell one of these messages.
-#        Default:     "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!"
-CitySiege.Yell.Combat = "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;Your leaders will fall!"
+#        Description: Battle taunts from officers. Separated by semicolons.
+CitySiege.Yell.Combat = "Your defenses crumble!;This city will burn!;Face your doom!;None can stand against us!;{LEADER} will fall with the rest of you!;Push on! The throne is within reach!"
 
 #
-#    CitySiege.RP.Alliance
-#        Description: RP scripts for Alliance attackers during cinematic phase.
-#                     Multiple scripts separated by pipe (|), lines within each script separated by semicolon (;).
-#                     One script is randomly chosen per siege and plays sequentially.
-#                     Leaders and mini-bosses will yell these lines one at a time during the RP phase.
-#                     Use {LEADER} placeholder for city leader's name, {CITY} for city name.
-#        Default:     Multiple lore-based RP scripts
-CitySiege.RP.Alliance = "Citizens of {CITY}, your time has come! We march under the banner of the Alliance!;{LEADER}, your people cry out for mercy, but you have shown none to ours!;We have crossed mountains and seas to bring justice to {CITY}. Surrender now, or face annihilation!;The Light guides our blades, and the might of Stormwind stands behind us. Your defenses will crumble!;This ends today! {LEADER}, come forth and face the Alliance, or watch {CITY} burn!|The Alliance has gathered its greatest heroes for this assault on {CITY}. You cannot stand against us!;{LEADER}, your leadership has made the Horde enemies it cannot defeat! We will tear down these walls!;Too long have you raided our villages and slaughtered our people. Today, we bring the war to {CITY}!;Your shamans' magic cannot protect you. Our priests and paladins have blessed this army!;Prepare to face the wrath of the Alliance! {LEADER}, your reign over {CITY} ends here and now!|By order of King Varian Wrynn, {CITY} is to be taken! Resistance is futile!;{LEADER}! Come forth and face us, or hide like a coward while your people suffer!;The Horde's reign of terror ends here at {CITY}. We will show no mercy to those who threaten peace!;Our siege engines are ready. The walls of {CITY} mean nothing to the might of the Alliance!;For every innocent killed by Horde aggression, {LEADER}, you will pay with your life!"
+#    CitySiege.RP.Alliance / CitySiege.RP.Horde
+#        Description: Roleplay scripts delivered during the muster phase. Scripts are separated by
+#                     a pipe (|) and one is chosen at random per siege; lines inside a script are
+#                     separated by semicolons and are delivered in order.
+CitySiege.RP.Alliance = "Citizens of {CITY}, your time has come! We march under the banner of the Alliance!;{LEADER}, your people cry out for mercy, but you have shown none to ours!;We have crossed mountains and seas to bring justice to {CITY}. Surrender now, or face annihilation!;The Light guides our blades, and the might of Stormwind stands behind us. Your defenses will crumble!;This ends today! {LEADER}, come forth and face the Alliance, or watch {CITY} burn!|The Alliance has gathered its greatest heroes for this assault on {CITY}. You cannot stand against us!;{LEADER}, your leadership has made the Horde enemies it cannot defeat! We will tear down these walls!;Too long have you raided our villages and slaughtered our people. Today, we bring the war to {CITY}!;Your shamans' magic cannot protect you. Our priests and paladins have blessed this army!;Prepare to face the wrath of the Alliance! {LEADER}, your reign over {CITY} ends here and now!|By order of the King, {CITY} is to be taken! Resistance is futile!;{LEADER}! Come forth and face us, or hide like a coward while your people suffer!;The Horde's reign of terror ends here at {CITY}. We will show no mercy to those who threaten peace!;Our siege engines are ready. The walls of {CITY} mean nothing to the might of the Alliance!;For every innocent killed by Horde aggression, {LEADER}, you will pay with your life!"
 
-#
-#    CitySiege.RP.Horde
-#        Description: RP scripts for Horde attackers during cinematic phase.
-#                     Multiple scripts separated by pipe (|), lines within each script separated by semicolon (;).
-#                     One script is randomly chosen per siege and plays sequentially.
-#                     Leaders and mini-bosses will yell these lines one at a time during the RP phase.
-#                     Use {LEADER} placeholder for city leader's name, {CITY} for city name.
-#        Default:     Multiple lore-based RP scripts
 CitySiege.RP.Horde = "The Horde has come to claim {CITY}! Your precious Alliance ends today!;{LEADER}, you have oppressed our people for the last time! Come out and face your fate!;We are not savages - we are warriors! And today, we show {CITY} what true strength means!;Your guards are weak. Your walls are weak. {LEADER} hides in the throne room while we stand at the gates!;Blood and honor! Today we prove that the Horde is the superior force in Azeroth!|Citizens of {CITY}, flee while you can! We have come for your leaders, not for you!;{LEADER}! Your reign of tyranny over {CITY} ends today! The throne will belong to the Horde!;You call us monsters, but it is YOU who started this war! We finish it today at {CITY}!;The spirits of our ancestors guide us. No amount of Light magic will save {CITY} from our wrath!;Lok'tar Ogar! {LEADER}, today you fall, and the Horde claims {CITY}!|The Warchief has sent his finest warriors to end Alliance tyranny at {CITY} once and for all!;Your pitiful city guard cannot stop the Horde war machine! {LEADER}, your time has come!;We march for honor! We march for glory! We march to prove that the Horde will take {CITY}!;Every siege tower, every warrior, every drop of blood spilled today at {CITY} - it all leads to YOUR defeat!;{LEADER}, the Alliance has grown soft under your leadership. Today at {CITY}, the Horde reminds you why you should fear us!"
 
 ###################################################################################################
 # PLAYERBOT INTEGRATION
-# NOTE: These settings only work if you have the mod-playerbots module installed!
-#       If you don't have playerbots, these settings will be ignored (no errors).
+#
+# These settings do nothing unless mod-playerbots is installed and compiled in.
 ###################################################################################################
 
-#
-#    CitySiege.Playerbots.Enabled
-#        Description: Enable integration with mod-playerbots to recruit bots during sieges.
-#                     Requires mod-playerbots module to be installed and compiled.
-#        Default:     0 (disabled)
-
-CitySiege.Playerbots.Enabled = 0
+CitySiege.Playerbots.Enabled       = 0
+CitySiege.Playerbots.MinLevel      = 50
+CitySiege.Playerbots.MaxDefenders  = 20
+CitySiege.Playerbots.MaxAttackers  = 20
+CitySiege.Playerbots.RespawnDelay  = 30
 
 #
-#    CitySiege.Playerbots.MinLevel
-#        Description: Minimum level for playerbots to participate in city sieges
-#        Default:     50
-
-CitySiege.Playerbots.MinLevel = 50
-
-#
-#    CitySiege.Playerbots.MaxDefenders
-#        Description: Maximum number of defending playerbots to teleport to city
-#        Default:     30
-
-CitySiege.Playerbots.MaxDefenders = 30
-
-#
-#    CitySiege.Playerbots.MaxAttackers
-#        Description: Maximum number of attacking playerbots to teleport to spawn point
-#        Default:     30
-
-CitySiege.Playerbots.MaxAttackers = 30
-
-#
-#    CitySiege.Playerbots.RespawnDelay
-#        Description: Time in seconds before a dead bot is resurrected and returned to battle
-#                     Defenders respawn near the city leader (throne room), attackers respawn at spawn point
-#        Default:     30
-
-CitySiege.Playerbots.RespawnDelay = 30
-
-
-
+#    CitySiege.Playerbots.OrderCooldown
+#        Description: Minimum seconds between travel orders issued to a single bot.
+#        Default:     8
+CitySiege.Playerbots.OrderCooldown = 8

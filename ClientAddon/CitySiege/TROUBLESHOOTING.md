@@ -1,107 +1,64 @@
-# City Siege Addon - Troubleshooting Guide
+# City Siege addon - troubleshooting
 
-## No Data Showing on Map/Info/Status Tabs
+## The addon does not load
 
-### Quick Test
-1. Type `/cs testmap` in chat - this will inject fake siege data
-2. Open the main window with `/cs show`
-3. Select "Stormwind" from the dropdown
-4. Check the Info and Stats tabs
+Check the AddOns list at character select. If **City Siege** is missing, the `CitySiege` folder is in
+the wrong place; it must sit directly inside `Interface/AddOns/`, so that
+`Interface/AddOns/CitySiege/CitySiege.toc` exists.
 
-If the UI shows data with `/cs testmap`, the addon UI is working and the issue is server communication.
+If it is listed but greyed out, tick **Load out of date AddOns**.
 
-### Check Server Communication
+## No minimap button
 
-#### Step 1: Verify EventHandler is Loaded
-When you log in, you should see:
-```
-EventHandler initialized and listening for server messages...
-```
+Type `/cs` to open the window; if that works, the addon is loaded and the button is simply hidden.
+Right-click the minimap button (or open Settings from the window) and clear **Hide minimap button**.
 
-If you don't see this, the EventHandler module failed to load.
+If the button was never there on an older install, that was a bug: the `.toc` referenced
+LibDataBroker-1.1 and LibDBIcon-1.0 without shipping them. Update to the current version.
 
-#### Step 2: Enable Debug Mode
-Type `/cs debug` to enable debug logging. You should see more detailed messages.
+## The window opens but everything says "No siege in progress"
 
-#### Step 3: Start a Siege on Server
-Use the GM command:
-```
-.citysiege start stormwind
-```
+That is correct when nothing is under siege. Confirm with `.citysiege status` in chat.
 
-You should see messages in your chat like:
-```
-[RECEIVED] Siege started at city 0 by Horde
-```
+If a siege *is* running and the addon still shows nothing, the server is not sending data:
 
-If you don't see these messages, the server is not sending data to the addon.
+1. `CitySiege.Addon.Enabled` must be `1` in `mod_city_siege.conf`.
+2. Reload the module config with `.citysiege reload`, or restart the world server.
+3. If your client build does not deliver addon messages, set
+   `CitySiege.Addon.UseSystemChannel = 1` and reload. The addon handles both transports.
 
-### Common Issues
+## The battle map is blank or says "Map not loaded"
 
-#### 1. Server Not Broadcasting
-**Symptom**: No `[RECEIVED]` messages when siege starts
-**Cause**: Server's `BroadcastSiegeDataToAddon()` not being called or PSendSysMessage failing
-**Fix**: 
-- Check server console for "[City Siege] Sent addon message" logs
-- Ensure you're within 500 yards of the siege location
-- Verify `ChatHandler::PSendSysMessage()` is working
+The map images are BLP files under `Interface/AddOns/CitySiege/Media/Maps/`. WoW only reads textures
+that were present when the client started, so add the files and restart the game fully - `/reload` is
+not enough.
 
-#### 2. Message Format Mismatch
-**Symptom**: Server logs show messages sent but addon doesn't receive them
-**Cause**: Message prefix doesn't match
-**Fix**: 
-- Server sends: `CITYSIEGE_START:0:Horde`
-- Addon expects: `CITYSIEGE_START:...` or `CITYSIEGE:START:...`
-- Both formats are now supported
+## The map shows no route
 
-#### 3. No Active Siege Data
-**Symptom**: Messages received but no data on tabs
-**Cause**: SiegeTracker not updating UI correctly
-**Fix**:
-- Use `/cs testmap` to verify UI updates work
-- Check that `MainFrame:UpdateSiegeDisplay()` is being called
-- Verify cityID matches (Stormwind = 0, Orgrimmar = 4, etc.)
-
-#### 4. Map Shows No Texture
-**Symptom**: Map tab is dark/empty
-**Cause**: WoW 3.3.5 addons cannot access built-in map BLP files
-**Solution**: This is expected! The map uses a tactical overlay (dark background + grid).
-- To add custom maps, see `Media/MAP_TEXTURES_README.md`
-- The tactical overlay is fully functional for siege tracking
-
-### Manual Testing
-
-You can manually inject messages to test the addon:
-
-```lua
-/script CitySiege_EventHandler:ParseAddonMessage("START:0:Horde")
-/script CitySiege_EventHandler:ParseAddonMessage("UPDATE:0:2:25:30:120")
-/script CitySiege_EventHandler:ParseAddonMessage("END:0:Alliance")
-```
-
-### City IDs
+Routes are generated server-side from the navmesh. Ask a GM to run:
 
 ```
-Stormwind     = 0
-Ironforge     = 1
-Darnassus     = 2
-Exodar        = 3
-Orgrimmar     = 4
-Undercity     = 5
-Thunder Bluff = 6
-Silvermoon    = 7
+.citysiege route <city>
 ```
 
-### Reload Addon
-Type `/reload` to reload the UI and reinitialize all modules.
+If it reports `direct` or `manual` as the source, automatic routing failed on the server and the
+diagnostic line says why - usually missing mmaps. That is a server issue, not an addon one.
 
-### Check Lua Errors
-Install BugSack addon to catch and display Lua errors that might be preventing the addon from working.
+## Command buttons do nothing
 
-### Still Not Working?
+The server enforces permissions. `Start`, `Stop`, `Clear Forces`, and the route buttons need Game
+Master; `Reload Config` needs Administrator. Without the rank you get an error in chat.
 
-1. Check for Lua errors with `/bugsack show` (requires BugSack addon)
-2. Verify the addon is loaded: `/dump IsAddOnLoaded("CitySiege")`
-3. Check EventHandler exists: `/dump CitySiege_EventHandler`
-4. Try test mode: `/cs testmap 0`
-5. Check server console for "[City Siege]" log messages
+Commands are sent as chat beginning with a dot, which the server consumes before it reaches any
+channel, so nothing leaks to other players either way.
+
+## Raw text like `CitySiege UPDATE:0:2:...` in chat
+
+The server is using the legacy system-chat transport. Set `CitySiege.Addon.UseSystemChannel = 0` in
+`mod_city_siege.conf` and reload. The addon filters the text out regardless, but other players
+without the addon will see it.
+
+## Lua errors
+
+Enable error display with `/console scriptErrors 1`, reproduce the problem, and open an issue with
+the full error text and what you were doing.

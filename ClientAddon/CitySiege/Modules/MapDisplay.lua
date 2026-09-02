@@ -1,560 +1,415 @@
 --[[
     City Siege Addon - Map Display
-    Shows city maps with waypoints, NPCs, and player positions
+
+    Draws the besieged city on its own world-map art and places every marker
+    using map coordinates the server computed through WorldMapArea.dbc - the
+    same lookup the game uses to put the player's dot on the world map.
+
+    There is deliberately no calibration in here. Earlier versions projected
+    world coordinates through hand-tuned per-city offsets onto a re-encoded
+    copy of the map, and nothing lined up because nothing could: the offsets
+    were guesses, and the crop applied to the texture was never applied to the
+    projection. Now the server says "43.2% across, 61.7% down" and that is
+    where the marker goes, on the identical art the game shows for that city.
 ]]
 
 CitySiege_MapDisplay = {}
 local MapDisplay = CitySiege_MapDisplay
 
+-- Blizzard draws a zone map as twelve 256x256 tiles in a 4x3 grid. The map
+-- image occupies the top-left 1002x668 of that 1024x768 canvas and the rest
+-- of the right-hand and bottom tiles is padding. WorldMapArea.dbc coordinates
+-- span the 1002x668 image, so that is the rectangle markers are placed in.
+local TILE_COLUMNS = 4
+local TILE_ROWS    = 3
+local TILE_SIZE    = 256
+local MAP_WIDTH    = 1002
+local MAP_HEIGHT   = 668
+
+-- Width the map is shown at inside the panel. Height follows from the map's
+-- own aspect ratio so nothing is stretched.
+local DISPLAY_WIDTH = 460
+
+-- Pixels between dots on the drawn route.
+local DOT_SPACING = 6
+
+-- Folder and file stem of each city's tiles under Interface\WorldMap\. These
+-- are the client's internal zone names, spelling included. Keyed by the
+-- server's city ids (see CitySiege_Cities).
+local MAP_FILES = {
+    [0] = "Stormwind",
+    [1] = "Ironforge",
+    [2] = "Darnassis",
+    [3] = "TheExodar",
+    [4] = "Ogrimmar",
+    [5] = "Undercity",
+    [6] = "ThunderBluff",
+    [7] = "SilvermoonCity",
+}
+
+-- Raid target icons, which the legend below also uses.
+local RAID_ICONS    = "Interface\\TargetingFrame\\UI-RaidTargetingIcons"
+local ICON_MUSTER   = { 0.50, 0.75, 0.25, 0.50 }   -- cross
+local ICON_WAYPOINT = { 0.00, 0.25, 0.25, 0.50 }   -- moon
+local ICON_LEADER   = { 0.75, 1.00, 0.25, 0.50 }   -- skull
+
 local frame = nil
 local currentCityID = nil
-local icons = {}
-local lines = {}
+local routeCache = {}       -- cityID -> { waypoints, muster, leaderPos } from MAP_DATA
+local markers = {}          -- pooled marker textures by key
+local waypointMarkers = {}  -- pooled waypoint textures by index
+local dots = {}             -- pooled route dots
 local updateThrottle = 0
 
+-- ---------------------------------------------------------------------------
+-- Construction
+-- ---------------------------------------------------------------------------
+
 function MapDisplay:Create(parent)
-    if frame then 
-        return frame 
+    if frame then
+        return frame
     end
-    
+
     frame = CreateFrame("Frame", "CitySiegeMapDisplay", parent)
     frame:SetAllPoints(parent)
     frame:Show()
-    
-    -- Title
+
+    -- The tab already reads "Battle Map", so this line names the city instead.
     local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("City Map")
+    title:SetPoint("TOP", 0, -6)
+    title:SetText("No city selected")
     frame.titleText = title
-    
-    -- Map container - 4:3 aspect ratio to match the actual map
-    local mapContainer = CreateFrame("Frame", nil, frame)
-    mapContainer:SetPoint("CENTER", frame, "CENTER", -15, -10)
-    mapContainer:SetSize(460, 345)  -- Slightly smaller, maintain 4:3
-    mapContainer:Show()
-    frame.mapContainer = mapContainer
-    
-    -- Map background - transparent
-    local mapBg = mapContainer:CreateTexture(nil, "BACKGROUND")
-    mapBg:SetAllPoints(mapContainer)
-    mapBg:SetTexture(0, 0, 0, 0)  -- Fully transparent
-    frame.mapBg = mapBg
-    
-    -- Map texture - constrain to exact size
-    local mapTexture = mapContainer:CreateTexture(nil, "ARTWORK")
-    mapTexture:SetAllPoints(mapContainer)
-    frame.mapTexture = mapTexture
-    
-    -- Border
-    mapContainer:SetBackdrop({
+
+    local scale = DISPLAY_WIDTH / MAP_WIDTH
+    frame.scale = scale
+
+    -- Canvas sized to the map image, so its edges are the map's edges.
+    local canvas = CreateFrame("Frame", nil, frame)
+    canvas:SetSize(MAP_WIDTH * scale, MAP_HEIGHT * scale)
+    canvas:SetPoint("CENTER", frame, "CENTER", 0, -6)
+    frame.canvas = canvas
+
+    -- Shown when there is no city to draw.
+    local blank = canvas:CreateTexture(nil, "BACKGROUND")
+    blank:SetAllPoints(canvas)
+    blank:SetTexture(0.05, 0.05, 0.08, 1)
+    frame.blank = blank
+
+    -- The tile grid. Right-hand and bottom tiles are trimmed to the map image
+    -- so the padding never shows.
+    frame.tiles = {}
+    for row = 0, TILE_ROWS - 1 do
+        for col = 0, TILE_COLUMNS - 1 do
+            local width  = math.min(TILE_SIZE, MAP_WIDTH  - col * TILE_SIZE)
+            local height = math.min(TILE_SIZE, MAP_HEIGHT - row * TILE_SIZE)
+
+            local tile = canvas:CreateTexture(nil, "ARTWORK")
+            tile:SetSize(width * scale, height * scale)
+            tile:SetPoint("TOPLEFT", canvas, "TOPLEFT", col * TILE_SIZE * scale, -row * TILE_SIZE * scale)
+            tile:SetTexCoord(0, width / TILE_SIZE, 0, height / TILE_SIZE)
+            tile:Hide()
+
+            frame.tiles[row * TILE_COLUMNS + col + 1] = tile
+        end
+    end
+
+    -- Border on its own frame so it sits over the map edge rather than inside it.
+    local border = CreateFrame("Frame", nil, canvas)
+    border:SetPoint("TOPLEFT", canvas, "TOPLEFT", -5, 5)
+    border:SetPoint("BOTTOMRIGHT", canvas, "BOTTOMRIGHT", 5, -5)
+    border:SetBackdrop({
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = false,
         edgeSize = 16,
-        insets = {left = 4, right = 4, top = 4, bottom = 4},
     })
-    mapContainer:SetBackdropBorderColor(0.8, 0.8, 0.8, 1)
-    
-    -- Overlay frame
-    local overlay = CreateFrame("Frame", nil, mapContainer)
-    overlay:SetAllPoints(mapContainer)
-    overlay:Show()
+    border:SetBackdropBorderColor(0.8, 0.8, 0.8, 1)
+    border:SetFrameLevel(canvas:GetFrameLevel() + 1)
+
+    -- Markers live here, above the tiles and border.
+    local overlay = CreateFrame("Frame", nil, canvas)
+    overlay:SetAllPoints(canvas)
+    overlay:SetFrameLevel(canvas:GetFrameLevel() + 2)
     frame.overlay = overlay
-    
-    -- Legend - spans across the bottom
-    local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    legend:SetPoint("BOTTOM", frame, "BOTTOM", 0, 15)
+
+    local legendFrame = CreateFrame("Frame", nil, frame)
+    legendFrame:SetSize(470, 26)
+    legendFrame:SetPoint("BOTTOM", frame, "BOTTOM", 0, 6)
+    frame.legendFrame = legendFrame
+
+    local legend = legendFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    legend:SetPoint("CENTER", 0, 0)
     legend:SetJustifyH("CENTER")
-    legend:SetText("|TInterface\\TargetingFrame\\UI-RaidTargetingIcons:16:16:0:0:64:64:48:64:16:32|t Leader     |TInterface\\TargetingFrame\\UI-RaidTargetingIcons:14:14:0:0:64:64:0:16:16:32|t Waypoint     |TInterface\\TargetingFrame\\UI-RaidTargetingIcons:14:14:0:0:64:64:32:48:16:32|t Spawn Point")
-    legend:Show()
+    legend:SetText("|T" .. RAID_ICONS .. ":18:18:0:0:64:64:48:64:16:32|t |cFFFFD700Leader|r     "
+        .. "|T" .. RAID_ICONS .. ":16:16:0:0:64:64:0:16:16:32|t |cFF00FF00Waypoint|r     "
+        .. "|T" .. RAID_ICONS .. ":16:16:0:0:64:64:32:48:16:32|t |cFF16C3F2Muster|r")
     frame.legend = legend
-    
-    -- Stats text
-    local statsText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    statsText:SetPoint("BOTTOMRIGHT", -20, 15)
+
+    local statsText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    statsText:SetPoint("BOTTOMRIGHT", canvas, "TOPRIGHT", -2, 4)
     statsText:SetJustifyH("RIGHT")
-    statsText:SetText("Select a city from the dropdown")
-    statsText:Show()
+    statsText:SetText("")
     frame.statsText = statsText
-    
-    -- No siege message
-    local noSiegeText = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    noSiegeText:SetPoint("CENTER", mapContainer, "CENTER", 0, 0)
-    noSiegeText:SetText("|cFF808080No active siege\n\nSelect a city|r")
-    noSiegeText:SetJustifyH("CENTER")
-    noSiegeText:Show()
-    frame.noSiegeText = noSiegeText
-    
+
+    local placeholder = canvas:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    placeholder:SetPoint("CENTER", canvas, "CENTER", 0, 0)
+    placeholder:SetJustifyH("CENTER")
+    placeholder:SetText("|cFF808080Select a city from the dropdown above|r")
+    frame.placeholder = placeholder
+
     return frame
 end
 
+-- ---------------------------------------------------------------------------
+-- Placement
+-- ---------------------------------------------------------------------------
+
+-- Pixel offset from the canvas' top-left corner for a map percentage.
+local function ToPixels(mx, my)
+    local s = frame.scale
+    return mx / 100 * MAP_WIDTH * s, my / 100 * MAP_HEIGHT * s
+end
+
+-- True if a position carries usable map coordinates. The server sends -1
+-- when it could not place something on this city's map.
+local function OnMap(pos)
+    return pos and pos.mx and pos.my and pos.mx >= 0 and pos.my >= 0
+end
+
+local function PlaceMarker(texture, pos)
+    if not texture then return end
+
+    if not frame or not OnMap(pos) then
+        texture:Hide()
+        return
+    end
+
+    local px, py = ToPixels(pos.mx, pos.my)
+    texture:ClearAllPoints()
+    texture:SetPoint("CENTER", frame.overlay, "TOPLEFT", px, -py)
+    texture:Show()
+end
+
+local function IconScale()
+    local settings = CitySiege_Config and CitySiege_Config:GetMapSettings()
+    return (settings and settings.iconScale) or 1.0
+end
+
+local function GetMarker(key, texCoords, size)
+    local texture = markers[key]
+    if not texture then
+        texture = frame.overlay:CreateTexture(nil, "OVERLAY")
+        texture:SetTexture(RAID_ICONS)
+        markers[key] = texture
+    end
+
+    texture:SetTexCoord(texCoords[1], texCoords[2], texCoords[3], texCoords[4])
+    texture:SetSize(size * IconScale(), size * IconScale())
+    return texture
+end
+
+local function GetWaypointMarker(index)
+    local texture = waypointMarkers[index]
+    if not texture then
+        texture = frame.overlay:CreateTexture(nil, "OVERLAY")
+        texture:SetTexture(RAID_ICONS)
+        texture:SetTexCoord(ICON_WAYPOINT[1], ICON_WAYPOINT[2], ICON_WAYPOINT[3], ICON_WAYPOINT[4])
+        waypointMarkers[index] = texture
+    end
+
+    texture:SetSize(10 * IconScale(), 10 * IconScale())
+    return texture
+end
+
+-- Draws the route as a dotted line between consecutive waypoints. Textures
+-- cannot be rotated in this client, so a line is a run of dots.
+local function DrawRoute(waypoints)
+    local used = 0
+    local previous = nil
+
+    for _, wp in ipairs(waypoints) do
+        if OnMap(wp) then
+            if previous then
+                local x1, y1 = ToPixels(previous.mx, previous.my)
+                local x2, y2 = ToPixels(wp.mx, wp.my)
+                local dx, dy = x2 - x1, y2 - y1
+                local length = math.sqrt(dx * dx + dy * dy)
+                local steps = math.max(1, math.floor(length / DOT_SPACING))
+
+                for k = 1, steps - 1 do
+                    used = used + 1
+                    local dot = dots[used]
+                    if not dot then
+                        dot = frame.overlay:CreateTexture(nil, "ARTWORK")
+                        dot:SetTexture(1.0, 0.85, 0.2, 0.9)
+                        dot:SetSize(3, 3)
+                        dots[used] = dot
+                    end
+
+                    local t = k / steps
+                    dot:ClearAllPoints()
+                    dot:SetPoint("CENTER", frame.overlay, "TOPLEFT", x1 + dx * t, -(y1 + dy * t))
+                    dot:Show()
+                end
+            end
+
+            previous = wp
+        end
+    end
+
+    for k = used + 1, #dots do
+        dots[k]:Hide()
+    end
+end
+
+local function HideRoute()
+    for _, dot in ipairs(dots) do dot:Hide() end
+    for _, texture in ipairs(waypointMarkers) do texture:Hide() end
+end
+
+-- ---------------------------------------------------------------------------
+-- City selection
+-- ---------------------------------------------------------------------------
+
 function MapDisplay:SetCity(cityID)
     currentCityID = cityID
-    
-    if not cityID then
-        -- Show placeholder when no city selected
-        if frame and frame.mapTexture then
-            frame.mapTexture:SetTexture(nil)
-            frame.mapTexture:SetTexture(0.05, 0.05, 0.08, 1.0)
-            
-            if frame.gridTexture then
-                frame.gridTexture:Show()
-            end
-            
-            if not frame.noMapText then
-                frame.noMapText = frame.mapContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-                frame.noMapText:SetPoint("CENTER", frame.mapContainer, "CENTER", 0, 0)
-                frame.noMapText:SetTextColor(0.8, 0.6, 0.2, 1)
-            end
-            
-            frame.noMapText:SetText("|cFF808080Select a city from the dropdown above|r")
-            frame.noMapText:Show()
-            
-            if frame.mapCityLabel then
-                frame.mapCityLabel:Hide()
-            end
-        end
-        
-        if frame and frame.titleText then
-            frame.titleText:SetText("City Map")
-        end
+    if not frame then return end
+
+    local cityData = cityID and CitySiege_CityData[cityID]
+    local mapFile = cityID and MAP_FILES[cityID]
+
+    if not cityData or not mapFile then
+        for _, tile in ipairs(frame.tiles) do tile:Hide() end
+        frame.blank:Show()
+        frame.placeholder:Show()
+        frame.titleText:SetText("No city selected")
+        self:Clear()
         return
     end
-    
-    local cityData = CitySiege_CityData[cityID]
-    if not cityData then return end
-    
-    -- Update title
-    if frame and frame.titleText then
-        local color = CitySiege_GetCityColorString(cityID)
-        frame.titleText:SetText(string.format("%s%s|r Map", color, cityData.displayName))
+
+    for index, tile in ipairs(frame.tiles) do
+        tile:SetTexture("Interface\\WorldMap\\" .. mapFile .. "\\" .. mapFile .. index)
+        tile:Show()
     end
-    
-    -- Set city map texture using our custom map files
-    if frame and frame.mapTexture then
-        -- Map city names to file names (use actual folder names)
-        local mapFiles = {
-            [CitySiege_Cities.STORMWIND] = "Stormwind",
-            [CitySiege_Cities.IRONFORGE] = "Ironforge",
-            [CitySiege_Cities.DARNASSUS] = "Darnassis",
-            [CitySiege_Cities.EXODAR] = "TheExodar",
-            [CitySiege_Cities.ORGRIMMAR] = "Ogrimmar",
-            [CitySiege_Cities.UNDERCITY] = "Undercity",
-            [CitySiege_Cities.THUNDERBLUFF] = "ThunderBluff",
-            [CitySiege_Cities.SILVERMOON] = "SilvermoonCity",
-        }
-        
-        local mapFile = mapFiles[cityID]
-        if mapFile then
-            -- BLP files (no extension needed, WoW adds .blp automatically)
-            local texturePath = "Interface\\AddOns\\CitySiege\\Media\\Maps\\" .. mapFile
-            
-            frame.mapTexture:SetTexture(texturePath)
-            -- Crop black borders: aggressive crop to remove all black padding
-            frame.mapTexture:SetTexCoord(0.01, 0.96, 0.13, 0.78)
-            
-            -- Hide placeholders
-            if frame.mapCityLabel then frame.mapCityLabel:Hide() end
-            if frame.noMapText then frame.noMapText:Hide() end
-            if frame.noSiegeText then frame.noSiegeText:Hide() end
-            
-        else
-            MapDisplay:ShowMapFallback(cityID, cityData, nil)
-        end
-    end
+
+    frame.blank:Hide()
+    frame.placeholder:Hide()
+    frame.titleText:SetText(string.format("%s%s|r", CitySiege_GetCityColorString(cityID), cityData.displayName))
+
+    self:UpdateDisplay()
 end
 
-function MapDisplay:ShowMapFallback(cityID, cityData, mapFile)
-    if not frame or not frame.mapTexture then return end
-    
-    frame.mapTexture:SetTexture(nil)
-    frame.mapTexture:SetTexture(0.05, 0.05, 0.08, 1.0)
-    
-    -- Show "no map available" message
-    if not frame.noMapText then
-        frame.noMapText = frame.mapContainer:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-        frame.noMapText:SetPoint("CENTER", frame.mapContainer, "CENTER", 0, 20)
-        frame.noMapText:SetTextColor(0.8, 0.6, 0.2, 1)
-    end
-    
-    if mapFile then
-        frame.noMapText:SetText("|cFFFFAA00Map not loaded|r\n\n" .. cityData.displayName .. "\n\n|cFF808080Ensure BLP files are in:\nInterface/AddOns/CitySiege/Media/Maps/\nRestart game after adding files|r")
-    else
-        frame.noMapText:SetText("|cFFFFAA00No map configured|r\n\n" .. cityData.displayName)
-    end
-    
-    -- Show city name overlay
-    if not frame.mapCityLabel then
-        frame.mapCityLabel = frame.mapContainer:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge")
-        frame.mapCityLabel:SetPoint("TOP", frame.mapContainer, "TOP", 0, -10)
-        frame.mapCityLabel:SetAlpha(0.3)
-    end
-    
-    local color = cityData.color
-    frame.mapCityLabel:SetTextColor(color.r, color.g, color.b, 0.5)
-    frame.mapCityLabel:SetText(cityData.displayName:upper())
-end
+-- ---------------------------------------------------------------------------
+-- Drawing
+-- ---------------------------------------------------------------------------
 
 function MapDisplay:UpdateDisplay()
-    if not frame then
-        return
-    end
-    
+    if not frame then return end
+
     if not currentCityID then
-        -- Show "no siege" message
-        if frame.noSiegeText then
-            frame.noSiegeText:Show()
-        end
         self:Clear()
-        self:UpdateStats(nil)
         return
     end
-    
-    -- Hide "no siege" message
-    if frame.noSiegeText then
-        frame.noSiegeText:Hide()
-    end
-    
-    -- Always show city center marker
-    local cityData = CitySiege_CityData[currentCityID]
-    if cityData then
-        self:DrawCityCenter(cityData)
-    end
-    
-    local siegeData = CitySiege_SiegeTracker and CitySiege_SiegeTracker:GetSiege(currentCityID)
-    if not siegeData then
-        -- Show city layout even without active siege
-        self:UpdateStats(nil)
-        return
-    end
-    
-    local mapSettings = CitySiege_Config:GetMapSettings()
-    
-    -- Show/update NPC positions
-    if mapSettings.showNPCs then
-        self:UpdateNPCPositions(siegeData)
-    end
-    
-    -- Show/update waypoints
-    if mapSettings.showWaypoints then
-        self:UpdateWaypoints(siegeData)
-    end
-    
-    -- Update stats display
-    self:UpdateStats(siegeData)
-end
 
-function MapDisplay:DrawCityCenter(cityData)
-    if not cityData then return end
-    
-    -- Draw spawn point marker (green square - attacker spawn)
-    local spawnIcon = self:GetOrCreateIcon("spawn_point", "SPAWN")
-    if spawnIcon then
-        self:PositionIcon(spawnIcon, cityData.spawnX, cityData.spawnY, cityData)
-        spawnIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-        spawnIcon:SetTexCoord(0.5, 0.75, 0.25, 0.5) -- Green Square (icon 7)
-        spawnIcon:SetSize(16, 16)
-        spawnIcon:Show()
-    end
-end
+    local siege = CitySiege_SiegeTracker and CitySiege_SiegeTracker:GetSiege(currentCityID)
+    local cached = routeCache[currentCityID] or {}
 
-function MapDisplay:UpdateNPCPositions(siegeData)
-    if not siegeData then return end
-    
-    local cityData = CitySiege_CityData[currentCityID]
-    if not cityData then return end
-    
-    -- Clear previous NPC icons
-    for id, icon in pairs(icons) do
-        if type(id) == "string" and (string.match(id, "^npc_atk") or string.match(id, "^npc_def") or string.match(id, "^bot_atk") or string.match(id, "^bot_def")) then
-            icon:Hide()
-            icons[id] = nil
-        end
+    -- A live siege carries the route it is actually marching; otherwise show
+    -- the planned route from the last MAP_DATA reply.
+    local waypoints = cached.waypoints or {}
+    if siege and siege.waypoints and #siege.waypoints > 0 then
+        waypoints = siege.waypoints
     end
-    
-    -- Draw attacker NPC positions (red circles - raid icon 3)
-    if siegeData.attackerPositions then
-        for i, pos in ipairs(siegeData.attackerPositions) do
-            if pos.x and pos.y then
-                local icon = self:GetOrCreateIcon("npc_atk_" .. i, "NPC_ATTACKER")
-                self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-                icon:SetTexCoord(0, 0.25, 0, 0.25) -- Red Circle (icon 3)
-                icon:SetSize(10, 10)
-                icon:Show()
-            end
-        end
+
+    local muster = cached.muster
+    local leader = cached.leaderPos
+    if siege and siege.coords then
+        muster = muster or { mx = siege.coords.spawnMX, my = siege.coords.spawnMY }
+        leader = leader or { mx = siege.coords.leaderMX, my = siege.coords.leaderMY }
     end
-    
-    -- Draw defender NPC positions (blue circles - raid icon 2)
-    if siegeData.defenderPositions then
-        for i, pos in ipairs(siegeData.defenderPositions) do
-            if pos.x and pos.y then
-                local icon = self:GetOrCreateIcon("npc_def_" .. i, "NPC_DEFENDER")
-                self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-                icon:SetTexCoord(0.25, 0.5, 0, 0.25) -- Blue Circle (icon 2)
-                icon:SetSize(10, 10)
-                icon:Show()
-            end
+
+    local settings = CitySiege_Config:GetMapSettings()
+    if settings.showWaypoints then
+        DrawRoute(waypoints)
+
+        local shown = 0
+        for index, wp in ipairs(waypoints) do
+            shown = index
+            PlaceMarker(GetWaypointMarker(index), wp)
         end
+        for index = shown + 1, #waypointMarkers do
+            waypointMarkers[index]:Hide()
+        end
+    else
+        HideRoute()
     end
-    
-    -- Draw attacker bot positions (orange diamonds - raid icon 4)
-    if siegeData.attackerBots then
-        for i, pos in ipairs(siegeData.attackerBots) do
-            if pos.x and pos.y then
-                local icon = self:GetOrCreateIcon("bot_atk_" .. i, "BOT_ATTACKER")
-                self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-                icon:SetTexCoord(0.5, 0.75, 0, 0.25) -- Orange Diamond (icon 4)
-                icon:SetSize(8, 8)
-                icon:Show()
-            end
-        end
+
+    PlaceMarker(GetMarker("muster", ICON_MUSTER, 16), muster)
+    PlaceMarker(GetMarker("leader", ICON_LEADER, 20), leader)
+
+    -- Report what is drawable, not just what was received, so a route that
+    -- arrived without map coordinates is visible as such.
+    local drawable = 0
+    for _, wp in ipairs(waypoints) do
+        if OnMap(wp) then drawable = drawable + 1 end
     end
-    
-    -- Draw defender bot positions (purple diamonds - raid icon 1)
-    if siegeData.defenderBots then
-        for i, pos in ipairs(siegeData.defenderBots) do
-            if pos.x and pos.y then
-                local icon = self:GetOrCreateIcon("bot_def_" .. i, "BOT_DEFENDER")
-                self:PositionIcon(icon, pos.x, pos.y, cityData)
-                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-                icon:SetTexCoord(0.75, 1, 0, 0.25) -- Purple Diamond (icon 1)
-                icon:SetSize(8, 8)
-                icon:Show()
-            end
-        end
-    end
-    
-    -- Old code for legacy npcs table
-    if siegeData.npcs then
-        for guid, npcData in pairs(siegeData.npcs) do
-            if npcData.x and npcData.y then
-                local icon = self:GetOrCreateIcon(guid, "NPC")
-                self:PositionIcon(icon, npcData.x, npcData.y, cityData)
-                icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-                
-                -- Use raid icons based on side
-                if npcData.side == "attacker" then
-                    icon:SetTexCoord(0, 0.25, 0, 0.25) -- Red Circle
-                elseif npcData.side == "defender" then
-                    icon:SetTexCoord(0.25, 0.5, 0, 0.25) -- Blue Circle
-                else
-                    icon:SetTexCoord(0.5, 0.75, 0, 0.25) -- Orange Diamond
-                end
-                icon:SetSize(10, 10)
-                icon:Show()
-            end
-        end
+
+    if #waypoints == 0 then
+        frame.statsText:SetText(siege and "|cFFFF4040Under siege|r  -  waiting for route"
+                                       or "|cFF808080No route received yet|r")
+    elseif drawable < #waypoints then
+        frame.statsText:SetText(string.format("%s  -  %d of %d waypoints on this map",
+            siege and "|cFFFF4040Under siege|r" or "|cFF808080Planned route|r", drawable, #waypoints))
+    else
+        frame.statsText:SetText(string.format("%s  -  %d waypoints",
+            siege and "|cFFFF4040Under siege|r" or "|cFF808080Planned route|r", #waypoints))
     end
 end
 
-function MapDisplay:UpdateWaypoints(siegeData)
-    if not siegeData or not siegeData.waypoints then return end
-    
-    local cityData = CitySiege_CityData[currentCityID]
-    if not cityData then return end
-    
-    -- Draw lines between waypoints
-    for i = 1, #siegeData.waypoints do
-        local wp1 = siegeData.waypoints[i]
-        local wp2 = siegeData.waypoints[(i % #siegeData.waypoints) + 1] -- Connect last to first
-        
-        if wp1 and wp2 and wp1.x and wp1.y and wp2.x and wp2.y then
-            self:DrawLine(wp1.x, wp1.y, wp2.x, wp2.y, cityData)
-        end
+-- The server answers a map request with the city's route; keep it so the map
+-- can be shown when no siege is running.
+function MapDisplay:UpdateMapData(cityID, data)
+    if not cityID or not data then return end
+
+    -- MAP_DATA brings the muster and leader, ROUTE brings the waypoints;
+    -- merge so whichever arrives second does not discard the first.
+    local cached = routeCache[cityID] or {}
+    for key, value in pairs(data) do
+        cached[key] = value
     end
-    
-    -- Draw waypoint markers (red square raid icons)
-    for i, wp in ipairs(siegeData.waypoints) do
-        if wp.x and wp.y then
-            local icon = self:GetOrCreateIcon("waypoint_" .. i, "WAYPOINT")
-            self:PositionIcon(icon, wp.x, wp.y, cityData)
-            icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-            icon:SetTexCoord(0, 0.25, 0.25, 0.5) -- Red Square (icon 6)
-            icon:SetSize(12, 12)
-            icon:Show()
-        end
+    routeCache[cityID] = cached
+
+    if frame and currentCityID == cityID then
+        self:UpdateDisplay()
     end
 end
 
-function MapDisplay:GetOrCreateIcon(id, iconType)
-    if icons[id] then
-        return icons[id]
-    end
-    
-    local icon = frame.overlay:CreateTexture(nil, "OVERLAY")
-    
-    -- Icons will have their texture set by the calling code
-    -- Default to raid targeting icons
-    icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-    
-    local scale = CitySiege_Config:GetMapSettings().iconScale or 1.0
-    icon:SetSize(10 * scale, 10 * scale)
-    
-    icons[id] = icon
-    return icon
-end
-
-function MapDisplay:PositionIcon(icon, worldX, worldY, cityData)
-    if not icon or not frame or not frame.overlay then return end
-    
-    -- Convert world coordinates to map coordinates
-    local mapX, mapY = self:WorldToMap(worldX, worldY, cityData)
-    
-    local overlayWidth = frame.overlay:GetWidth() or 0
-    local overlayHeight = frame.overlay:GetHeight() or 0
-    
-    -- Safety check
-    if overlayWidth <= 0 or overlayHeight <= 0 then
-        return
-    end
-    
-    -- Position icons on the full overlay to match WoW map scaling
-    local pixelX = mapX * overlayWidth
-    local pixelY = (1 - mapY) * overlayHeight
-    
-    icon:ClearAllPoints()
-    icon:SetPoint("CENTER", frame.overlay, "BOTTOMLEFT", pixelX, pixelY)
-    icon:Show()
-end
-
-function MapDisplay:WorldToMap(worldX, worldY, cityData)
-    if not cityData then return 0.5, 0.5 end
-    
-    -- Get center and spawn coordinates
-    local originalCenterX = cityData.centerX
-    local originalCenterY = cityData.centerY
-    local spawnX = cityData.spawnX
-    local spawnY = cityData.spawnY
-    
-    -- Calculate map range using original center (before offsets)
-    local dx = spawnX - originalCenterX
-    local dy = spawnY - originalCenterY
-    local spawnDist = math.sqrt(dx * dx + dy * dy)
-    local mapRange = spawnDist * 1.75
-    if mapRange < 50 then mapRange = 500 end
-    
-    -- Now apply center offsets for positioning
-    local centerX = originalCenterX
-    local centerY = originalCenterY
-    
-    -- Convert world coordinates to relative positions from center
-    local relX = (worldX - centerX) / mapRange
-    local relY = (worldY - centerY) / mapRange
-    
-    -- Rotate 90 degrees counter-clockwise:
-    -- Counter-clockwise 90°: newX = -Y, newY = X
-    -- Then apply offset adjustments for proper WoW map alignment
-    local mapX = 0.5 - (relY * 0.35) + 0.05   -- Y becomes X, inverted, shift right
-    local mapY = 0.5 - (relX * 0.35) + 0.25   -- X becomes Y, inverted, shift down
-    
-    -- Display shift offsets (shift all icons on the final display)
-    -- Positive X moves right, negative X moves left
-    -- Positive Y moves up, negative Y moves down
-    local displayOffsetX = 0.12   -- Adjust this to shift all icons horizontally (0.1 = 10% of screen)
-    local displayOffsetY = 0.04   -- Adjust this to shift all icons vertically (0.1 = 10% of screen)
-    
-    mapX = mapX + displayOffsetX
-    mapY = mapY - displayOffsetY  -- Negative Y moves icons down in this inverted system
-    
-    -- Use full 0-1 range for proper positioning within cropped texture
-    mapX = math.max(0, math.min(1, mapX))
-    mapY = math.max(0, math.min(1, mapY))
-    
-    return mapX, mapY
-end
-
-function MapDisplay:DrawLine(x1, y1, x2, y2, cityData)
-    -- Draw lines by creating small dots along the path
-    local mapX1, mapY1 = self:WorldToMap(x1, y1, cityData)
-    local mapX2, mapY2 = self:WorldToMap(x2, y2, cityData)
-    
-    if not frame or not frame.overlay then return end
-    
-    local overlayWidth = frame.overlay:GetWidth()
-    local overlayHeight = frame.overlay:GetHeight()
-    
-    if not overlayWidth or overlayWidth <= 0 then return end
-    if not overlayHeight or overlayHeight <= 0 then return end
-    
-    -- Position lines on the full overlay to match WoW map scaling
-    local pixelX1 = mapX1 * overlayWidth
-    local pixelY1 = (1 - mapY1) * overlayHeight
-    local pixelX2 = mapX2 * overlayWidth
-    local pixelY2 = (1 - mapY2) * overlayHeight
-    
-    -- Calculate distance and angle
-    local dx = pixelX2 - pixelX1
-    local dy = pixelY2 - pixelY1
-    local distance = math.sqrt(dx * dx + dy * dy)
-    
-    if distance < 2 then return end
-    
-    -- Create line segment using a simple texture
-    local lineID = string.format("line_%.0f_%.0f", x1, y1)
-    local line = lines[lineID]
-    
-    if not line then
-        line = frame.overlay:CreateTexture(nil, "BACKGROUND")
-        line:SetTexture("Interface\\Buttons\\WHITE8X8")
-        line:SetTexture(0.5, 0.5, 0, 0.4) -- Yellow-ish line
-        lines[lineID] = line
-    end
-    
-    -- Set line as a thin horizontal bar (rotation not supported in 3.3.5)
-    line:SetSize(distance, 2)
-    line:SetPoint("CENTER", frame.overlay, "BOTTOMLEFT", (pixelX1 + pixelX2) / 2, (pixelY1 + pixelY2) / 2)
-    line:Show()
-end
-
-function MapDisplay:UpdateStats(siegeData)
-    if not frame or not frame.statsText then return end
-    
-    if not siegeData or not siegeData.stats then
-        frame.statsText:SetText("")
-        return
-    end
-    
-    local stats = siegeData.stats
-    local text = string.format(
-        "NPCs: %d  Bots: %d\nWaypoints: %d",
-        (siegeData.defenderPositions and #siegeData.defenderPositions or 0) + 
-        (siegeData.attackerPositions and #siegeData.attackerPositions or 0),
-        (siegeData.defenderBots and #siegeData.defenderBots or 0) + 
-        (siegeData.attackerBots and #siegeData.attackerBots or 0),
-        siegeData.waypoints and #siegeData.waypoints or 0
-    )
-    
-    frame.statsText:SetText(text)
+-- Kept for callers elsewhere in the addon; the server does not stream unit
+-- positions, so there is nothing separate to draw.
+function MapDisplay:UpdateNPCPositions()
+    self:UpdateDisplay()
 end
 
 function MapDisplay:Clear()
-    -- Hide all icons
-    for _, icon in pairs(icons) do
-        icon:Hide()
-    end
-    
-    -- Hide all lines
-    for _, line in pairs(lines) do
-        line:Hide()
-    end
-    
-    -- Clear tables but keep the objects for reuse
-    -- icons = {}
-    -- lines = {}
+    if not frame then return end
+
+    HideRoute()
+    for _, texture in pairs(markers) do texture:Hide() end
+    frame.statsText:SetText("")
 end
 
 function MapDisplay:UpdatePositions()
     local now = GetTime()
     if now - updateThrottle < 0.5 then
-        return -- Throttle updates
+        return
     end
     updateThrottle = now
-    
+
     self:UpdateDisplay()
 end
+
+-- ---------------------------------------------------------------------------
+-- Plumbing
+-- ---------------------------------------------------------------------------
 
 function MapDisplay:Show()
     if frame then
@@ -562,71 +417,6 @@ function MapDisplay:Show()
         self:UpdateDisplay()
     end
 end
-
-function MapDisplay:UpdateMapData(cityID, data)
-    if not frame or not data then 
-        return 
-    end
-    if currentCityID ~= cityID then 
-        return 
-    end
-
-    -- Clear existing icons
-    if frame.mapIcons then
-        for _, icon in ipairs(frame.mapIcons) do
-            icon:Hide()
-        end
-    end
-    frame.mapIcons = {}
-    
-    -- Add waypoint icons
-    if data.waypoints then
-        for i, wp in ipairs(data.waypoints) do
-            local icon = MapDisplay:CreateIcon(wp.x, wp.y, wp.z, "waypoint", i)
-            table.insert(frame.mapIcons, icon)
-        end
-    end
-    
-    -- Add leader icon
-    if data.leaderPos then
-        local icon = MapDisplay:CreateIcon(data.leaderPos.x, data.leaderPos.y, data.leaderPos.z, "leader")
-        table.insert(frame.mapIcons, icon)
-    end
-end
-
-function MapDisplay:CreateIcon(x, y, z, iconType, index)
-    local icon = frame.overlay:CreateTexture(nil, "OVERLAY")
-    
-    -- Use raid target icons for better visibility
-    icon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
-    
-    -- Different icons for different types
-    if iconType == "waypoint" then
-        icon:SetTexCoord(0, 0.25, 0.25, 0.5) -- Red Square (icon 6)
-        icon:SetSize(12, 12)
-    elseif iconType == "leader" then
-        icon:SetTexCoord(0.75, 1, 0.25, 0.5) -- Skull (icon 8)
-        icon:SetSize(20, 20)
-    end
-
-    -- Use PositionIcon helper to convert world coords to overlay pixels
-    local cityData = CitySiege_CityData[currentCityID]
-    if cityData then
-        self:PositionIcon(icon, x, y, cityData)
-    else
-        -- Fallback: center the icon
-        icon:ClearAllPoints()
-        icon:SetPoint("CENTER", frame.overlay, "CENTER")
-    end
-
-    icon:Show()
-    return icon
-end
-
--- NOTE: The older WorldToMap(worldX, worldY, cityID) implementation was removed
--- because it returned pixel coordinates and conflicted with the normalized
--- WorldToMap(worldX, worldY, cityData) helper above. Use PositionIcon to
--- place icons consistently on the overlay.
 
 function MapDisplay:Hide()
     if frame then
@@ -637,4 +427,3 @@ end
 function MapDisplay:GetFrame()
     return frame
 end
-

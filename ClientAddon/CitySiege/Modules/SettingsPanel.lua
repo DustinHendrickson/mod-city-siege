@@ -14,37 +14,20 @@ function SettingsPanel:Create()
         return frame
     end
     
-    frame = CreateFrame("Frame", "CitySiegeSettingsPanel", UIParent)
-    frame:SetSize(500, 600)
-    frame:SetPoint("CENTER")
+    local UI = CitySiege_UI
+
+    frame = UI:CreateWindow("CitySiegeSettingsPanel", "City Siege Settings", 460, 560)
     frame:SetFrameStrata("DIALOG")
-    frame:EnableMouse(true)
-    frame:SetMovable(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    frame:Hide()
-    
-    -- Background
-    CitySiege_Utils:SetBackdrop(frame, 0, 0, 0, 0.9)
-    
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFF16C3F2City Siege|r Settings")
-    
-    -- Close button
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
-    closeBtn:SetScript("OnClick", function() frame:Hide() end)
-    
-    -- Scroll frame for settings
-    local scrollFrame = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 10, -50)
-    scrollFrame:SetPoint("BOTTOMRIGHT", -30, 50)
-    
-    local content = CreateFrame("Frame", nil, scrollFrame)
-    content:SetSize(450, 1200)
+
+    -- Recessed well, then a scroll frame inside it (named, as 3.3.5 requires).
+    local inset = UI:CreateInset(frame, 16, 16, 40, 44)
+
+    local scrollFrame = CreateFrame("ScrollFrame", "CitySiegeSettingsScrollFrame", inset, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetPoint("TOPLEFT", 8, -8)
+    scrollFrame:SetPoint("BOTTOMRIGHT", -28, 8)
+
+    local content = CreateFrame("Frame", "CitySiegeSettingsScrollChild", scrollFrame)
+    content:SetSize(390, 1200)
     scrollFrame:SetScrollChild(content)
     
     local yOffset = -10
@@ -170,19 +153,14 @@ function SettingsPanel:Create()
     yOffset = yOffset - 60
     
     -- Bottom buttons
-    local resetBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    resetBtn:SetSize(120, 25)
-    resetBtn:SetPoint("BOTTOMLEFT", 10, 10)
-    resetBtn:SetText("Reset All")
-    resetBtn:SetScript("OnClick", function()
+    local resetBtn = UI:CreateButton(frame, "Reset All", 120, 22, function()
         StaticPopup_Show("CITYSIEGE_RESET_SETTINGS")
     end)
-    
-    local closeBottomBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    closeBottomBtn:SetSize(120, 25)
-    closeBottomBtn:SetPoint("BOTTOMRIGHT", -10, 10)
-    closeBottomBtn:SetText("Close")
-    closeBottomBtn:SetScript("OnClick", function() frame:Hide() end)
+    resetBtn:SetPoint("BOTTOMLEFT", 18, 16)
+    UI:SetTooltip(resetBtn, "Reset All", "Restore every addon setting to its default.")
+
+    local closeBottomBtn = UI:CreateButton(frame, "Close", 120, 22, function() frame:Hide() end)
+    closeBottomBtn:SetPoint("BOTTOMRIGHT", -18, 16)
     
     -- Load current settings
     self:LoadSettings()
@@ -194,38 +172,75 @@ function SettingsPanel:AddSectionHeader(parent, text, yOffset)
     local header = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     header:SetPoint("TOPLEFT", 10, yOffset)
     header:SetText(text)
-    header:SetTextColor(0.09, 0.76, 0.95) -- City Siege blue
-    return yOffset - 30
+    header:SetTextColor(NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
+
+    local rule = CitySiege_UI:CreateDivider(parent, 360)
+    rule:SetPoint("TOPLEFT", 10, yOffset - 20)
+
+    return yOffset - 32
 end
 
 function SettingsPanel:AddCheckbox(parent, text, yOffset, onClick)
     local checkbox = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
     checkbox:SetPoint("TOPLEFT", 20, yOffset)
-    checkbox.text:SetText(text)
+    
+    -- Get or create the text label (3.3.5 compatible)
+    local label = checkbox:GetFontString() or checkbox:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    label:SetPoint("LEFT", checkbox, "RIGHT", 5, 0)
+    label:SetText(text)
+    checkbox.text = label
+    
     checkbox:SetScript("OnClick", function(self)
         onClick(self:GetChecked())
     end)
     return checkbox
 end
 
+local sliderCount = 0
+
 function SettingsPanel:AddSlider(parent, text, yOffset, minVal, maxVal, step, onChange)
-    local slider = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", 20, yOffset)
+    -- Sliders must be named in 3.3.5 so the template can find their labels.
+    -- A counter is used rather than math.random so names cannot collide.
+    sliderCount = sliderCount + 1
+    local sliderName = "CitySiegeSlider" .. sliderCount
+
+    local slider = CreateFrame("Slider", sliderName, parent, "OptionsSliderTemplate")
+    slider:SetPoint("TOPLEFT", 24, yOffset)
     slider:SetMinMaxValues(minVal, maxVal)
     slider:SetValueStep(step)
-    slider:SetWidth(400)
-    slider:SetObeyStepOnDrag(true)
+    slider:SetWidth(330)
     
-    slider.Text:SetText(text)
-    slider.Low:SetText(minVal)
-    slider.High:SetText(maxVal)
+    -- SetObeyStepOnDrag may not exist in 3.3.5
+    if slider.SetObeyStepOnDrag then
+        slider:SetObeyStepOnDrag(true)
+    end
     
-    slider.Value = slider:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    slider.Value:SetPoint("TOP", slider, "BOTTOM", 0, 0)
+    -- Get or create text elements (3.3.5 compatible)
+    local titleText = _G[sliderName .. "Text"] or slider:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    if not _G[sliderName .. "Text"] then
+        titleText:SetPoint("BOTTOM", slider, "TOP", 0, 2)
+    end
+    titleText:SetText(text)
+    
+    local lowText = _G[sliderName .. "Low"] or slider:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    if not _G[sliderName .. "Low"] then
+        lowText:SetPoint("TOPLEFT", slider, "BOTTOMLEFT", 0, -2)
+    end
+    lowText:SetText(minVal)
+    
+    local highText = _G[sliderName .. "High"] or slider:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+    if not _G[sliderName .. "High"] then
+        highText:SetPoint("TOPRIGHT", slider, "BOTTOMRIGHT", 0, -2)
+    end
+    highText:SetText(maxVal)
+    
+    -- Create value display
+    slider.valueText = slider:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    slider.valueText:SetPoint("TOP", slider, "BOTTOM", 0, -18)
     
     slider:SetScript("OnValueChanged", function(self, value)
         value = math.floor(value * 10 + 0.5) / 10 -- Round to 1 decimal
-        self.Value:SetText(string.format("%.1f", value))
+        self.valueText:SetText(string.format("%.1f", value))
         onChange(value)
     end)
     
