@@ -744,15 +744,22 @@ namespace CitySiege
             {
                 // Legacy behaviour: visible in the chat log for anyone without
                 // the addon. Only used when explicitly opted into.
-                ChatHandler::BuildChatPacket(data, CHAT_MSG_SYSTEM, full, LANG_UNIVERSAL);
+                ChatHandler::BuildChatPacket(data, CHAT_MSG_SYSTEM, LANG_UNIVERSAL,
+                                             ObjectGuid::Empty, ObjectGuid::Empty, full,
+                                             uint8(CHAT_TAG_NONE));
             }
             else
             {
                 // LANG_ADDON traffic is swallowed by the client and surfaced to
                 // addons through CHAT_MSG_ADDON, so nobody sees raw protocol.
-                ChatHandler::BuildChatPacket(data, CHAT_MSG_WHISPER, full, LANG_ADDON, CHAT_TAG_NONE,
-                                             player->GetGUID(), player->GetName(),
-                                             player->GetGUID(), player->GetName());
+                // Built from GUIDs rather than the WorldObject overload on
+                // purpose: that one derives gmMessage from the player's RBAC
+                // and would send a GM-format packet to a GM, which the addon
+                // channel must never carry.
+                ChatHandler::BuildChatPacket(data, CHAT_MSG_WHISPER, LANG_ADDON,
+                                             player->GetGUID(), player->GetGUID(), full,
+                                             uint8(CHAT_TAG_NONE),
+                                             player->GetName(), player->GetName());
             }
 
             player->GetSession()->SendPacket(&data);

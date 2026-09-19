@@ -432,11 +432,12 @@ namespace CitySiege
                     city.manualRoute.emplace_back(x, y, z, 0.0f);
             }
 
-            // Approach anchors, as "x y z, x y z, ...". Absent, the built-in
-            // chain for the city is kept; an empty value clears it and lets the
-            // navmesh pick its own way in.
+            // Approach anchors, as "x y z, x y z, ...". The key is optional, so
+            // it is read quietly: the config manager would otherwise warn about
+            // a "missing property" for every city on every load. Absent, the
+            // city's existing anchors are kept; an empty value clears them.
             std::string const anchorKey = prefix + "Approach";
-            std::string const anchors = sConfigMgr->GetOption<std::string>(anchorKey, "@keep@");
+            std::string const anchors = sConfigMgr->GetOption<std::string>(anchorKey, "@keep@", /*showLogs*/ false);
             if (anchors != "@keep@")
             {
                 city.approach.clear();
